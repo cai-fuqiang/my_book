@@ -1,0 +1,453 @@
+
+<!DOCTYPE HTML>
+<html lang="" >
+    <head>
+        <meta charset="UTF-8">
+        <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
+        <title>clock source · GitBook</title>
+        <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+        <meta name="description" content="">
+        <meta name="generator" content="GitBook 3.2.3">
+        
+        
+        
+    
+    <link rel="stylesheet" href="../gitbook/style.css">
+
+    
+            
+                
+                <link rel="stylesheet" href="../gitbook/gitbook-plugin-highlight/website.css">
+                
+            
+                
+                <link rel="stylesheet" href="../gitbook/gitbook-plugin-search/search.css">
+                
+            
+                
+                <link rel="stylesheet" href="../gitbook/gitbook-plugin-fontsettings/website.css">
+                
+            
+        
+
+    
+
+    
+        
+    
+        
+    
+        
+    
+        
+    
+        
+    
+        
+    
+
+        
+    
+    
+    <meta name="HandheldFriendly" content="true"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <link rel="apple-touch-icon-precomposed" sizes="152x152" href="../gitbook/images/apple-touch-icon-precomposed-152.png">
+    <link rel="shortcut icon" href="../gitbook/images/favicon.ico" type="image/x-icon">
+
+    
+    <link rel="next" href="clock_source.html" />
+    
+    
+    <link rel="prev" href="introduction.html" />
+    
+
+    </head>
+    <body>
+        
+<div class="book">
+    <div class="book-summary">
+        
+            
+<div id="book-search-input" role="search">
+    <input type="text" placeholder="Type to search" />
+</div>
+
+            
+                <nav role="navigation">
+                
+
+
+<ul class="summary">
+    
+    
+
+    
+
+    
+        
+        
+    
+        <li class="chapter " data-level="1.1" data-path="../">
+            
+                <a href="../">
+            
+                    
+                    Introduction
+            
+                </a>
+            
+
+            
+        </li>
+    
+        <li class="chapter " data-level="1.2" data-path="./">
+            
+                <a href="./">
+            
+                    
+                    linux kernel time subsystem
+            
+                </a>
+            
+
+            
+            <ul class="articles">
+                
+    
+        <li class="chapter " data-level="1.2.1" data-path="introduction.html">
+            
+                <a href="introduction.html">
+            
+                    
+                    introduction
+            
+                </a>
+            
+
+            
+        </li>
+    
+        <li class="chapter active" data-level="1.2.2" data-path="clock_source.html">
+            
+                <a href="clock_source.html">
+            
+                    
+                    clock source
+            
+                </a>
+            
+
+            
+        </li>
+    
+        <li class="chapter active" data-level="1.2.3" data-path="clock_source.html">
+            
+                <a href="clock_source.html">
+            
+                    
+                    clock event
+            
+                </a>
+            
+
+            
+        </li>
+    
+        <li class="chapter active" data-level="1.2.4" data-path="clock_source.html">
+            
+                <a href="clock_source.html">
+            
+                    
+                    timer
+            
+                </a>
+            
+
+            
+        </li>
+    
+
+            </ul>
+            
+        </li>
+    
+
+    
+
+    <li class="divider"></li>
+
+    <li>
+        <a href="https://www.gitbook.com" target="blank" class="gitbook-link">
+            Published with GitBook
+        </a>
+    </li>
+</ul>
+
+
+                </nav>
+            
+        
+    </div>
+
+    <div class="book-body">
+        
+            <div class="body-inner">
+                
+                    
+
+<div class="book-header" role="navigation">
+    
+
+    <!-- Title -->
+    <h1>
+        <i class="fa fa-circle-o-notch fa-spin"></i>
+        <a href=".." >clock source</a>
+    </h1>
+</div>
+
+
+
+
+                    <div class="page-wrapper" tabindex="-1" role="main">
+                        <div class="page-inner">
+                            
+<div id="book-search-results">
+    <div class="search-noresults">
+    
+                                <section class="normal markdown-section">
+                                
+                                <h1 id="clock-source">clock source</h1>
+<h2 id="clocksource-structure"><code>clocksource</code> structure</h2>
+<pre><code class="lang-cpp"><span class="hljs-keyword">struct</span> clocksource {
+    u64         (*read)(<span class="hljs-keyword">struct</span> clocksource *cs);
+    u64         mask;
+    u32         mult;
+    u32         shift;
+    u64         max_idle_ns;
+    u32         maxadj;
+    u32         uncertainty_margin;
+<span class="hljs-meta">#<span class="hljs-meta-keyword">ifdef</span> CONFIG_ARCH_CLOCKSOURCE_DATA</span>
+    <span class="hljs-keyword">struct</span> arch_clocksource_data archdata;
+<span class="hljs-meta">#<span class="hljs-meta-keyword">endif</span></span>
+    u64         max_cycles;
+    <span class="hljs-keyword">const</span> <span class="hljs-keyword">char</span>      *name;
+    <span class="hljs-keyword">struct</span> list_head    <span class="hljs-built_in">list</span>;
+    <span class="hljs-keyword">int</span>         rating;
+    <span class="hljs-keyword">enum</span> clocksource_ids    id;
+    <span class="hljs-keyword">enum</span> vdso_clock_mode    vdso_clock_mode;
+    <span class="hljs-keyword">unsigned</span> <span class="hljs-keyword">long</span>       flags;
+
+    <span class="hljs-keyword">int</span>         (*enable)(<span class="hljs-keyword">struct</span> clocksource *cs);
+    <span class="hljs-keyword">void</span>            (*disable)(<span class="hljs-keyword">struct</span> clocksource *cs);
+    <span class="hljs-keyword">void</span>            (*suspend)(<span class="hljs-keyword">struct</span> clocksource *cs);
+    <span class="hljs-keyword">void</span>            (*resume)(<span class="hljs-keyword">struct</span> clocksource *cs);
+    <span class="hljs-keyword">void</span>            (*mark_unstable)(<span class="hljs-keyword">struct</span> clocksource *cs); <span class="hljs-keyword">void</span>            (*tick_stable)(<span class="hljs-keyword">struct</span> clocksource *cs);
+
+    <span class="hljs-comment">/* private: */</span>
+<span class="hljs-meta">#<span class="hljs-meta-keyword">ifdef</span> CONFIG_CLOCKSOURCE_WATCHDOG</span>
+    <span class="hljs-comment">/* Watchdog related data, used by the framework */</span>
+    <span class="hljs-keyword">struct</span> list_head    wd_list;
+    u64         cs_last;
+    u64         wd_last;
+<span class="hljs-meta">#<span class="hljs-meta-keyword">endif</span></span>
+    <span class="hljs-keyword">struct</span> module       *owner;
+};
+</code></pre>
+<ul>
+<li><code>read</code>: &#x662F;&#x4E00;&#x4E2A;&#x51FD;&#x6570;&#x6307;&#x9488;&#xFF0C;&#x901A;&#x8FC7;&#x8C03;&#x7528;&#x53EF;&#x4EE5;&#x83B7;&#x53D6;&#x8BE5;&#x65F6;&#x949F;&#x6E90;&#x7684;&#x65F6;&#x95F4;&#x503C;</li>
+<li><p><code>mask</code>: Bitmask for two&apos;s complement subtraction of non 64 bit counters.
+  &#x7B80;&#x5355;&#x7FFB;&#x8BD1;&#x662F;: &#x975E;64&#x4F4D;&#x8BA1;&#x6570;&#x5668;&#x7684;&#x4E8C;&#x8FDB;&#x5236;&#x8865;&#x7801;&#x51CF;&#x6CD5;&#x7684;&#x4F4D;&#x63A9;&#x7801;&#x3002;
+  &#x4E0D;&#x77E5;&#x9053;&#x6709;&#x4EC0;&#x4E48;&#x4F5C;&#x7528;</p>
+<blockquote>
+<p>NOTE:</p>
+<p>clocksource_tsc : CLOCKSOURCE_MASK(64)<br>
+clocksource_hpet, clocksource_jiffies: CLOCKSOURCE_MASK(32)<br>
+clocksource_acpi_pm: CLOCKSOURCE_MASK(24)<br></p>
+</blockquote>
+</li>
+<li><p><code>mult</code>: Cycle to nanosecond multiplier&#x3002;
+  &#x7528;&#x4E8E;&#x5C06;Cycle --&gt; ns&#xFF0C;&#x4F5C;&#x4E3A;&#x4E58;&#x6570;&#x4F7F;&#x7528;</p>
+</li>
+<li><code>shift</code>: Cycle to nanosecond divisor
+  &#x7528;&#x4E8E;&#x5C06;Cycle --&gt; ns&#xFF0C;&#x4F5C;&#x4E3A;&#x9664;&#x6570;&#x4F7F;&#x7528;&#xFF0C;&#x4F46;&#x662F;&#x8FD9;&#x91CC;&#x9700;&#x8981;&#x6CE8;&#x610F;&#x7684;&#x662F;, &#x53D8;&#x91CF;&#x540D;&#x4E3A;shift
+  &#x9664;&#x6570;&#x7684;&#x503C;&#x76F8;&#x5F53;&#x4E8E;(power of two: 2 ^ shift)</li>
+</ul>
+<blockquote>
+<p>NOTE:</p>
+<p>&#x8FD9;&#x91CC;&#x7B80;&#x5355;&#x4ECB;&#x7ECD;&#x4E0B;cycle, cycle&#x76F8;&#x5F53;&#x4E8E;&#x662F;&#x65F6;&#x949F;&#x6E90;&#x8BA1;&#x6570;&#x5668;&#x7684;&#x503C;&#xFF0C;
+&#x4F46;&#x662F;&#x8FD9;&#x4E2A;&#x503C;&#x5BF9;&#x4E8E;&#x4F7F;&#x7528;&#x8005;&#x800C;&#x8A00;
+&#x6CA1;&#x6709;&#x4EC0;&#x4E48;&#x4F5C;&#x7528;&#xFF0C;&#x6700;&#x597D;&#x4EE5;&#x65F6;&#x95F4;&#x523B;&#x5EA6;&#x4E3A;&#x5355;&#x4F4D;&#xFF0C;&#x4F8B;&#x5982;ns&#x3002;&#x4E00;&#x4E2A;cycle&#x5BF9;&#x5E94;&#x591A;&#x5C11;
+ns&#x662F;&#x548C;&#x8F93;&#x5165;&#x9891;&#x7387;&#x6709;&#x5173;, &#x6240;&#x4EE5;&#x8FD9;&#x4E2A;cycle&#x548C;ns&#x4E4B;&#x95F4;&#x6709;&#x4E00;&#x5B9A;&#x7684;&#x8F6C;&#x6362;&#x5173;&#x7CFB;, 
+&#x5173;&#x7CFB;&#x5982;&#x4E0B;:</p>
+<pre><code>&#x8F6C;&#x6362;&#x540E;&#x7684;&#x7EB3;&#x8868;&#x6570; = (A / F) * NSEC_PER_SEC
+</code></pre><p>&#x8FD9;&#x91CC;A&#x8868;&#x793A;cycle&#xFF0C; F &#x8868;&#x793A;&#x9891;&#x7387;,  NSEC_PER_SEC&#x8868;&#x793A;1s&#x5BF9;&#x5E94;&#x7684;ns&#x6570;&#x91CF;
+&#x90A3;&#x4E48;mult&#x53D8;&#x91CF;&#x5BF9;&#x5E94;&#x7684;NSEC_PER_SEC, &#x800C;shift&#x4EE3;&#x8868;&#x7684;F, &#x4F46;&#x662F;kernel&#x4E3A;&#x4E86;
+&#x7167;&#x987E;&#x90A3;&#x4E9B;&#x6CA1;&#x6709;&#x9664;&#x6CD5;&#x6307;&#x4EE4;&#x7684;&#x5904;&#x7406;&#x5668;&#xFF0C;&#x5E76;&#x4E14;&#x4E5F;&#x4E3A;&#x4E86;&#x987E;&#x53CA;&#x6548;&#x7387;&#xFF0C;&#x964D;&#x4F4E;&#x4E86;&#x4E9B;&#x7CBE;&#x5EA6;&#xFF0C;
+&#x91C7;&#x7528;&#x53F3;&#x79FB;&#x7684;&#x65B9;&#x5F0F;&#x4EE3;&#x66FF;&#x9664;&#x6CD5;</p>
+<p>&#x4EE3;&#x7801;&#x5982;&#x4E0B;:</p>
+<pre><code class="lang-cpp"><span class="hljs-function"><span class="hljs-keyword">static</span> <span class="hljs-keyword">inline</span> s64 <span class="hljs-title">clocksource_cyc2ns</span><span class="hljs-params">(u64 cycles, u32 mult, u32 shift)</span>
+</span>{
+   <span class="hljs-keyword">return</span> ((u64) cycles * mult) &gt;&gt; shift;
+}
+</code></pre>
+</blockquote>
+<ul>
+<li><code>max_idle_ns</code>: Maximum idle time permitted by the clocksource (nsecs)
+  &#x7B80;&#x5355;&#x7FFB;&#x8BD1;&#x4E3A;: clocksource&#x5141;&#x8BB8;&#x7684;&#x6700;&#x5927;&#x7684; idle time, &#x4EE5;ns&#x4E3A;&#x5355;&#x4F4D;
+  &#x5728;<code>CONFIG_NO_HZ</code>&#x7F16;&#x8BD1;&#x6761;&#x4EF6;&#x4E0B;&#x4F7F;&#x7528;&#xFF08;&#x9ED8;&#x8BA4;&#x662F;&#x542F;&#x7528;&#x7684;), &#x5141;&#x8BB8;Linux kernel
+  &#x5728;&#x6CA1;&#x6709;&#x5B9A;&#x671F;&#x7684;timer tick&#x3002;&#x8FD9;&#x6837;&#x5C31;&#x5141;&#x8BB8;kernel&#x7761;&#x7720;&#x65F6;&#x95F4;&#x8D85;&#x8FC7;&#x4E00;&#x4E2A; tick, 
+  &#x5E76;&#x4E14;&#x7761;&#x7720;&#x65F6;&#x95F4;&#x4E5F;&#x53EF;&#x80FD;&#x662F;&#x65E0;&#x9650;&#x7684;&#x3002;<code>max_idle_ns</code>&#x5B57;&#x6BB5;&#x8868;&#x793A;&#x8FD9;&#x4E2A;&#x7761;&#x7720;&#x65F6;&#x95F4;
+  &#x7684;&#x671F;&#x9650;</li>
+<li><code>maxadj</code>: Maximum adjustment value to mult (~11%) (&#x8FD9;&#x4E2A;&#x548C;&#x6821;&#x51C6;&#x6709;&#x5173;&#xFF0C;&#x8FD8;&#x5F97;&#x518D;&#x770B;&#x4E0B;)</li>
+<li><code>max_cycles</code>: Maximum safe cycle value which won&apos;t overflow on
+  multiplication<br>
+  T: &#x5728;&#x4F5C;&#x4E58;&#x6CD5;&#x65F6;&#xFF0C;&#x4E0D;&#x4F1A;&#x9020;&#x6210;&#x6EA2;&#x51FA;&#x7684;&#x6700;&#x5927;&#x7684; cycle &#x503C;&#x3002;</li>
+<li><code>name</code>: Pointer to clocksource name</li>
+<li><p><code>rating</code>: Rating value for selection (higher is better)</p>
+<pre><code>To avoid rating inflation the following list should 
+give you a guide as to how to assign your clocksource 
+a rating
+1-99: Unfit for real use
+  Only available for bootup and testing purposes.
+100-199: Base level usability.
+  Functional for real use, but not desired.
+200-299: Good.
+  A correct and usable clocksource.
+300-399: Desired.
+  A reasonably fast and accurate clocksource.
+400-499: Perfect
+  The ideal clocksource. A must-use where
+  available.
+</code></pre><blockquote>
+<p>NOTE:</p>
+<p>&#x8FD9;&#x91CC;rating &#x4EE3;&#x8868;&#x9891;&#x7387;&#xFF0C;&#x9891;&#x7387;&#x8D8A;&#x9AD8;&#xFF0C;&#x7CBE;&#x5EA6;&#x8D8A;&#x9AD8;&#xFF0C; &#x6211;&#x4EEC;&#x6765;&#x770B;&#x4E0B;&#x5404;&#x4E2A;
+clocksource&#x7684;&#x7CBE;&#x5EA6;</p>
+<p>clocksource_tsc        : 300<br> 
+clocksource_hpet        : 250<br>
+clocksource_acpi_pm    : 200<br>
+clocksource_jiffies    : 1</p>
+<p>&#x53EF;&#x89C1;tsc&#x7684;&#x7CBE;&#x5EA6;&#x6700;&#x9AD8;</p>
+</blockquote>
+</li>
+<li><p>some function pointer:</p>
+<ul>
+<li><code>enable</code> - optional function to enable clocksource;</li>
+<li><code>disable</code> - optional function to disable clocksource;</li>
+<li><code>suspend</code> - suspend function for the clocksource;</li>
+<li><code>resume</code> - resume function for the clocksource;</li>
+</ul>
+</li>
+<li><p><code>wd_list,cs_last, wd_last</code> &#x548C; <code>CONFIG_CLOCKSOURCE_WATCHDOG</code>&#x76F8;&#x5173;&#x3002;
+<strong>&#x5173;&#x4E8E;CONFIG_CLOCKSOURCE_WATCHDOG&#x540E;&#x9762;&#x518D;&#x770B;</strong></p>
+</li>
+<li><p><code>owner</code>: &#x6307;&#x5411; clocksource &#x7684; kernel module</p>
+<h1 id="ps">PS</h1>
+<h2 id="&#x7528;&#x6237;&#x6001;&#x64CD;&#x4F5C;">&#x7528;&#x6237;&#x6001;&#x64CD;&#x4F5C;</h2>
+<p>&#x53EF;&#x4EE5;&#x901A;&#x8FC7;&#x53C2;&#x770B;</p>
+<pre><code>/sys/devices/system/clocksource/clocksource0/available_clocksource
+</code></pre><p>&#x53EF;&#x83B7;&#x5F97;&#x7684;clocksource,&#x901A;&#x8FC7;</p>
+<pre><code>/sys/devices/system/clocksource/clocksource0/current_clocksources
+</code></pre><p>&#x67E5;&#x770B;&#x5F53;&#x524D;&#x7684;clocksource</p>
+</li>
+</ul>
+<blockquote>
+<p>NOTE</p>
+<p>&#x5F53;&#x524D;&#x5728;&#x7269;&#x7406;&#x673A;&#x4E2D; &#xFF0C;&#x67E5;&#x770B;&#x4E0A;&#x9762;&#x4E24;&#x4E2A;&#x6587;&#x4EF6;&#x8F93;&#x51FA;&#x5982;&#x4E0B;:<br>
+available_clocksource :<code>tsc hpet acpi_pm</code><br>
+current_clocksources  : <code>tsc</code></p>
+<p>&#x800C;&#x5728;&#x865A;&#x62DF;&#x673A;&#x4E2D; :<br>
+available_clocksource: <code>kvm-clock tsc hpet acpi_pm</code> <br>
+current_clocksources  : <code>kvm-clock</code></p>
+<p>tsc: Time Stamp Counter
+hpet: High Precision Event Timer
+acpi_pm : ACPI Power Management Timer</p>
+</blockquote>
+<h1 id="&#x53C2;&#x8003;&#x4EE3;&#x7801;">&#x53C2;&#x8003;&#x4EE3;&#x7801;</h1>
+<p>linux code tag v6.0-rc1</p>
+<h2 id="&#x53C2;&#x8003;&#x6587;&#x6863;">&#x53C2;&#x8003;&#x6587;&#x6863;</h2>
+<p><a href="https://blog.csdn.net/Rong_Toa/article/details/115350561" target="_blank">Linux&#x5185;&#x6838;&#x6DF1;&#x5165;&#x7406;&#x89E3;&#x5B9A;&#x65F6;&#x5668;&#x548C;&#x65F6;&#x95F4;&#x7BA1;&#x7406;&#xFF08;6&#xFF09;&#xFF1A;x86_64 &#x76F8;&#x5173;&#x7684;&#x65F6;&#x949F;&#x6E90;&#xFF08;kvm-clock&#xFF0C;tsc&#xFF0C;acpi_pm&#xFF0C;hpet)</a></p>
+<p><a href="https://rootw.github.io/2018/01/%E8%AE%A1%E6%97%B6/" target="_blank"> &#x65F6;&#x95F4;&#x5B50;&#x7CFB;&#x7EDF; &#x4E8C;&#x3001;&#x8BA1;&#x65F6;&#x539F;&#x7406;&#xFF0D;timekeeper&#x4E0E;clocksource</a></p>
+<p><a href="https://0xax.gitbooks.io/linux-insides/content/Timers/linux-timers-2.html" target="_blank">https://0xax.gitbooks.io/linux-insides/content/Timers/linux-timers-2.html</a></p>
+<p><a href="http://www.wowotech.net/linux_kenrel/clocksource.html" target="_blank">linux &#x591A;&#x6838; &#x7CFB;&#x7EDF;&#x65F6;&#x949F;,Linux&#x65F6;&#x95F4;&#x5B50;&#x7CFB;&#x7EDF;&#x4E4B;&#xFF08;&#x5341;&#x4E94;&#xFF09;&#xFF1A;clocksource</a></p>
+
+                                
+                                </section>
+                            
+    </div>
+    <div class="search-results">
+        <div class="has-results">
+            
+            <h1 class="search-results-title"><span class='search-results-count'></span> results matching "<span class='search-query'></span>"</h1>
+            <ul class="search-results-list"></ul>
+            
+        </div>
+        <div class="no-results">
+            
+            <h1 class="search-results-title">No results matching "<span class='search-query'></span>"</h1>
+            
+        </div>
+    </div>
+</div>
+
+                        </div>
+                    </div>
+                
+            </div>
+
+            
+                
+                <a href="introduction.html" class="navigation navigation-prev " aria-label="Previous page: introduction">
+                    <i class="fa fa-angle-left"></i>
+                </a>
+                
+                
+                <a href="clock_source.html" class="navigation navigation-next " aria-label="Next page: clock event">
+                    <i class="fa fa-angle-right"></i>
+                </a>
+                
+            
+        
+    </div>
+
+    <script>
+        var gitbook = gitbook || [];
+        gitbook.push(function() {
+            gitbook.page.hasChanged({"page":{"title":"clock source","level":"1.2.2","depth":2,"next":{"title":"clock event","level":"1.2.3","depth":2,"path":"time/clock_source.md","ref":"./time/clock_source.md","articles":[]},"previous":{"title":"introduction","level":"1.2.1","depth":2,"path":"time/introduction.md","ref":"./time/introduction.md","articles":[]},"dir":"ltr"},"config":{"gitbook":"*","theme":"default","variables":{},"plugins":[],"pluginsConfig":{"highlight":{},"search":{},"lunr":{"maxIndexSize":1000000,"ignoreSpecialCharacters":false},"sharing":{"facebook":true,"twitter":true,"google":false,"weibo":false,"instapaper":false,"vk":false,"all":["facebook","google","twitter","weibo","instapaper"]},"fontsettings":{"theme":"white","family":"sans","size":2},"theme-default":{"styles":{"website":"styles/website.css","pdf":"styles/pdf.css","epub":"styles/epub.css","mobi":"styles/mobi.css","ebook":"styles/ebook.css","print":"styles/print.css"},"showLevel":false}},"structure":{"langs":"LANGS.md","readme":"README.md","glossary":"GLOSSARY.md","summary":"SUMMARY.md"},"pdf":{"pageNumbers":true,"fontSize":12,"fontFamily":"Arial","paperSize":"a4","chapterMark":"pagebreak","pageBreaksBefore":"/","margin":{"right":62,"left":62,"top":56,"bottom":56}},"styles":{"website":"styles/website.css","pdf":"styles/pdf.css","epub":"styles/epub.css","mobi":"styles/mobi.css","ebook":"styles/ebook.css","print":"styles/print.css"}},"file":{"path":"time/clock_source.md","mtime":"2022-08-23T13:49:55.730Z","type":"markdown"},"gitbook":{"version":"3.2.3","time":"2022-08-23T14:38:52.358Z"},"basePath":"..","book":{"language":""}});
+        });
+    </script>
+</div>
+
+        
+    <script src="../gitbook/gitbook.js"></script>
+    <script src="../gitbook/theme.js"></script>
+    
+        
+        <script src="../gitbook/gitbook-plugin-search/search-engine.js"></script>
+        
+    
+        
+        <script src="../gitbook/gitbook-plugin-search/search.js"></script>
+        
+    
+        
+        <script src="../gitbook/gitbook-plugin-lunr/lunr.min.js"></script>
+        
+    
+        
+        <script src="../gitbook/gitbook-plugin-lunr/search-lunr.js"></script>
+        
+    
+        
+        <script src="../gitbook/gitbook-plugin-sharing/buttons.js"></script>
+        
+    
+        
+        <script src="../gitbook/gitbook-plugin-fontsettings/fontsettings.js"></script>
+        
+    
+
+    </body>
+</html>
+

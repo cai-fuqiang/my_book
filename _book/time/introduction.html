@@ -4,7 +4,7 @@
     <head>
         <meta charset="UTF-8">
         <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
-        <title>subpart-1 · GitBook</title>
+        <title>introduction · GitBook</title>
         <meta http-equiv="X-UA-Compatible" content="IE=edge" />
         <meta name="description" content="">
         <meta name="generator" content="GitBook 3.2.3">
@@ -57,10 +57,10 @@
     <link rel="shortcut icon" href="../gitbook/images/favicon.ico" type="image/x-icon">
 
     
-    <link rel="next" href="./" />
+    <link rel="next" href="clock_source.html" />
     
     
-    <link rel="prev" href="../time/" />
+    <link rel="prev" href="./" />
     
 
     </head>
@@ -102,16 +102,9 @@
             
         </li>
     
-
-    
-        
-        <li class="divider"></li>
-        
-        
-    
-        <li class="chapter " data-level="2.1" data-path="../time/">
+        <li class="chapter " data-level="1.2" data-path="./">
             
-                <a href="../time/">
+                <a href="./">
             
                     
                     linux kernel time subsystem
@@ -123,12 +116,51 @@
             <ul class="articles">
                 
     
-        <li class="chapter active" data-level="2.1.1" data-path="./">
+        <li class="chapter active" data-level="1.2.1" data-path="introduction.html">
             
-                <a href="./">
+                <a href="introduction.html">
             
                     
-                    subpart-1
+                    introduction
+            
+                </a>
+            
+
+            
+        </li>
+    
+        <li class="chapter " data-level="1.2.2" data-path="clock_source.html">
+            
+                <a href="clock_source.html">
+            
+                    
+                    clock source
+            
+                </a>
+            
+
+            
+        </li>
+    
+        <li class="chapter " data-level="1.2.3" data-path="clock_source.html">
+            
+                <a href="clock_source.html">
+            
+                    
+                    clock event
+            
+                </a>
+            
+
+            
+        </li>
+    
+        <li class="chapter " data-level="1.2.4" data-path="clock_source.html">
+            
+                <a href="clock_source.html">
+            
+                    
+                    timer
             
                 </a>
             
@@ -138,19 +170,6 @@
     
 
             </ul>
-            
-        </li>
-    
-        <li class="chapter active" data-level="2.2" data-path="./">
-            
-                <a href="./">
-            
-                    
-                    CHAPTER-2
-            
-                </a>
-            
-
             
         </li>
     
@@ -184,7 +203,7 @@
     <!-- Title -->
     <h1>
         <i class="fa fa-circle-o-notch fa-spin"></i>
-        <a href=".." >subpart-1</a>
+        <a href=".." >introduction</a>
     </h1>
 </div>
 
@@ -199,7 +218,27 @@
     
                                 <section class="normal markdown-section">
                                 
-                                <h2 id="this-is-a-sub-chapter-2">this is a sub chapter-2</h2>
+                                <h1 id="timers-and-time-management">Timers and time management</h1>
+<h2 id="instroduction">Instroduction</h2>
+<p>&#x65F6;&#x95F4;&#x5B50;&#x7CFB;&#x7EDF;&#x4E3B;&#x8981;&#x5305;&#x542B;&#x4E24;&#x79CD;&#x8BBE;&#x5907;&#xFF0C;&#x5BF9;&#x5E94;kernel&#x4E2D;&#x7684;&#x6982;&#x5FF5;&#x5206;&#x522B;&#x4E3A;clocksource, timer</p>
+<ul>
+<li>clocksource: &#x65F6;&#x949F;&#x6E90;&#xFF0C;&#x53EF;&#x4EE5;&#x7406;&#x89E3;&#x4E3A;&#x751F;&#x6D3B;&#x4E2D;&#x6240;&#x89C1;&#x7684;&quot;&#x5899;&#x4E0A;&#x6302;&#x949F;&quot;, &#x4ED6;&#x4EEC;&#x63D0;&#x4F9B;&#x4E86;&#x65F6;&#x95F4;(&#x65F6;&#x523B;),
+kernel &#x53EF;&#x4EE5;&#x901A;&#x8FC7;&#x65F6;&#x949F;&#x6E90;&#x83B7;&#x53D6;&#x5F53;&#x524D;&#x65F6;&#x95F4;&#xFF0C;&#x5E38;&#x89C1;&#x7684;clocksource&#x6709;:<ul>
+<li>TSC : Timer Stamp Counter</li>
+<li>RTC : Real Time Clock</li>
+<li>ACPI PM</li>
+</ul>
+</li>
+<li>timer: &#x5B9A;&#x65F6;&#x5668;, &#x53EF;&#x4EE5;&#x7406;&#x89E3;&#x4E3A;&#x751F;&#x6D3B;&#x4E2D;&#x7684;&quot;&#x95F9;&#x949F;&quot;, &#x4ED6;&#x4EEC;&#x5468;&#x671F;&#x6027;(periodic)
+  &#x6216;&#x8005;&#x4E00;&#x6B21;&#x6027;(oneshot)&#x5728;&#x8BBE;&#x7F6E;&#x7684;&#x65F6;&#x95F4;&#x95F4;&#x9694;&#x540E;&#x901A;&#x77E5;&#x5230;&#x671F;&#x4E8B;&#x4EF6;&#x3002;kernel &#x53EF;&#x4EE5;&#x901A;
+  &#x8FC7;&#x5B9A;&#x65F6;&#x5668;&#x8BBE;&#x7F6E; expired time, &#x4ECE;&#x800C;&#x5728;timer&#x5230;&#x671F;&#x65F6;, &#x83B7;&#x53D6;&#x5F97;&#x5230;&#x65F6;&#x949F;&#x4E2D;&#x65AD;&#x3002;
+  &#x5E38;&#x89C1;&#x7684;timer &#x6709;:<ul>
+<li>local APIC Timer</li>
+<li>PIT</li>
+<li>HPET</li>
+</ul>
+</li>
+</ul>
 
                                 
                                 </section>
@@ -227,12 +266,12 @@
 
             
                 
-                <a href="../time/" class="navigation navigation-prev " aria-label="Previous page: linux kernel time subsystem">
+                <a href="./" class="navigation navigation-prev " aria-label="Previous page: linux kernel time subsystem">
                     <i class="fa fa-angle-left"></i>
                 </a>
                 
                 
-                <a href="./" class="navigation navigation-next " aria-label="Next page: CHAPTER-2">
+                <a href="clock_source.html" class="navigation navigation-next " aria-label="Next page: clock source">
                     <i class="fa fa-angle-right"></i>
                 </a>
                 
@@ -243,7 +282,7 @@
     <script>
         var gitbook = gitbook || [];
         gitbook.push(function() {
-            gitbook.page.hasChanged({"page":{"title":"subpart-1","level":"2.1.1","depth":2,"next":{"title":"CHAPTER-2","level":"2.2","depth":1,"path":"chatpter-2/README.md","ref":"./chatpter-2/README.md","articles":[]},"previous":{"title":"linux kernel time subsystem","level":"2.1","depth":1,"path":"time/README.md","ref":"./time/README.md","articles":[{"title":"subpart-1","level":"2.1.1","depth":2,"path":"chatpter-2/README.md","ref":"./chatpter-2/README.md","articles":[]}]},"dir":"ltr"},"config":{"gitbook":"*","theme":"default","variables":{},"plugins":["livereload"],"pluginsConfig":{"livereload":{},"highlight":{},"search":{},"lunr":{"maxIndexSize":1000000,"ignoreSpecialCharacters":false},"sharing":{"facebook":true,"twitter":true,"google":false,"weibo":false,"instapaper":false,"vk":false,"all":["facebook","google","twitter","weibo","instapaper"]},"fontsettings":{"theme":"white","family":"sans","size":2},"theme-default":{"styles":{"website":"styles/website.css","pdf":"styles/pdf.css","epub":"styles/epub.css","mobi":"styles/mobi.css","ebook":"styles/ebook.css","print":"styles/print.css"},"showLevel":false}},"structure":{"langs":"LANGS.md","readme":"README.md","glossary":"GLOSSARY.md","summary":"SUMMARY.md"},"pdf":{"pageNumbers":true,"fontSize":12,"fontFamily":"Arial","paperSize":"a4","chapterMark":"pagebreak","pageBreaksBefore":"/","margin":{"right":62,"left":62,"top":56,"bottom":56}},"styles":{"website":"styles/website.css","pdf":"styles/pdf.css","epub":"styles/epub.css","mobi":"styles/mobi.css","ebook":"styles/ebook.css","print":"styles/print.css"}},"file":{"path":"chatpter-2/README.md","mtime":"2022-08-18T13:18:04.897Z","type":"markdown"},"gitbook":{"version":"3.2.3","time":"2022-08-22T12:54:34.802Z"},"basePath":"..","book":{"language":""}});
+            gitbook.page.hasChanged({"page":{"title":"introduction","level":"1.2.1","depth":2,"next":{"title":"clock source","level":"1.2.2","depth":2,"path":"time/clock_source.md","ref":"./time/clock_source.md","articles":[]},"previous":{"title":"linux kernel time subsystem","level":"1.2","depth":1,"path":"time/README.md","ref":"time/README.md","articles":[{"title":"introduction","level":"1.2.1","depth":2,"path":"time/introduction.md","ref":"./time/introduction.md","articles":[]},{"title":"clock source","level":"1.2.2","depth":2,"path":"time/clock_source.md","ref":"./time/clock_source.md","articles":[]},{"title":"clock event","level":"1.2.3","depth":2,"path":"time/clock_source.md","ref":"./time/clock_source.md","articles":[]},{"title":"timer","level":"1.2.4","depth":2,"path":"time/clock_source.md","ref":"./time/clock_source.md","articles":[]}]},"dir":"ltr"},"config":{"gitbook":"*","theme":"default","variables":{},"plugins":[],"pluginsConfig":{"highlight":{},"search":{},"lunr":{"maxIndexSize":1000000,"ignoreSpecialCharacters":false},"sharing":{"facebook":true,"twitter":true,"google":false,"weibo":false,"instapaper":false,"vk":false,"all":["facebook","google","twitter","weibo","instapaper"]},"fontsettings":{"theme":"white","family":"sans","size":2},"theme-default":{"styles":{"website":"styles/website.css","pdf":"styles/pdf.css","epub":"styles/epub.css","mobi":"styles/mobi.css","ebook":"styles/ebook.css","print":"styles/print.css"},"showLevel":false}},"structure":{"langs":"LANGS.md","readme":"README.md","glossary":"GLOSSARY.md","summary":"SUMMARY.md"},"pdf":{"pageNumbers":true,"fontSize":12,"fontFamily":"Arial","paperSize":"a4","chapterMark":"pagebreak","pageBreaksBefore":"/","margin":{"right":62,"left":62,"top":56,"bottom":56}},"styles":{"website":"styles/website.css","pdf":"styles/pdf.css","epub":"styles/epub.css","mobi":"styles/mobi.css","ebook":"styles/ebook.css","print":"styles/print.css"}},"file":{"path":"time/introduction.md","mtime":"2022-08-23T14:38:37.350Z","type":"markdown"},"gitbook":{"version":"3.2.3","time":"2022-08-23T14:38:52.358Z"},"basePath":"..","book":{"language":""}});
         });
     </script>
 </div>
@@ -251,10 +290,6 @@
         
     <script src="../gitbook/gitbook.js"></script>
     <script src="../gitbook/theme.js"></script>
-    
-        
-        <script src="../gitbook/gitbook-plugin-livereload/plugin.js"></script>
-        
     
         
         <script src="../gitbook/gitbook-plugin-search/search-engine.js"></script>
