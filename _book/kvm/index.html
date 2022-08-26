@@ -4,7 +4,7 @@
     <head>
         <meta charset="UTF-8">
         <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
-        <title>linux kernel time subsystem · GitBook</title>
+        <title>KVM · GitBook</title>
         <meta http-equiv="X-UA-Compatible" content="IE=edge" />
         <meta name="description" content="">
         <meta name="generator" content="GitBook 3.2.3">
@@ -57,7 +57,7 @@
     <link rel="shortcut icon" href="../gitbook/images/favicon.ico" type="image/x-icon">
 
     
-    <link rel="next" href="introduction.html" />
+    <link rel="next" href="vapic.html" />
     
     
     <link rel="prev" href="../" />
@@ -107,7 +107,7 @@
                 <a href="./">
             
                     
-                    linux kernel time subsystem
+                    KVM
             
                 </a>
             
@@ -116,12 +116,12 @@
             <ul class="articles">
                 
     
-        <li class="chapter " data-level="1.2.1" data-path="introduction.html">
+        <li class="chapter " data-level="1.2.1" data-path="vapic.html">
             
-                <a href="introduction.html">
+                <a href="vapic.html">
             
                     
-                    introduction
+                    apicv
             
                 </a>
             
@@ -129,38 +129,12 @@
             
         </li>
     
-        <li class="chapter " data-level="1.2.2" data-path="clock_source.html">
+        <li class="chapter " data-level="1.2.2" data-path="ipiv.html">
             
-                <a href="clock_source.html">
-            
-                    
-                    clock source
-            
-                </a>
-            
-
-            
-        </li>
-    
-        <li class="chapter " data-level="1.2.3" data-path="clock_source.html">
-            
-                <a href="clock_source.html">
+                <a href="ipiv.html">
             
                     
-                    clock event
-            
-                </a>
-            
-
-            
-        </li>
-    
-        <li class="chapter " data-level="1.2.4" data-path="clock_source.html">
-            
-                <a href="clock_source.html">
-            
-                    
-                    timer
+                    IPI virtualization
             
                 </a>
             
@@ -203,7 +177,7 @@
     <!-- Title -->
     <h1>
         <i class="fa fa-circle-o-notch fa-spin"></i>
-        <a href=".." >linux kernel time subsystem</a>
+        <a href=".." >KVM</a>
     </h1>
 </div>
 
@@ -218,31 +192,17 @@
     
                                 <section class="normal markdown-section">
                                 
-                                <h1 id="time">time</h1>
+                                <h1 id="kvm">kvm</h1>
 <ul>
-<li><a href="introduction.html">introduction</a></li>
-<li><a href="clock_source.html">clock source</a></li>
-<li><a href="clock_source.html">clock event</a></li>
-<li><a href="clock_source.html">timer</a></li>
+<li><a href="vapic.html">apicv</a></li>
+<li><a href="ipiv.html">ipi virtualization</a></li>
 </ul>
 <blockquote>
-<p>NOTE</p>
-<ul>
-<li>&#x53C2;&#x8003;&#x94FE;&#x63A5;<ul>
-<li><a href="https://blog.csdn.net/Rong_Toa/article/details/115350561" target="_blank">Linux&#x5185;&#x6838;&#x6DF1;&#x5165;&#x7406;&#x89E3;&#x5B9A;&#x65F6;&#x5668;&#x548C;&#x65F6;&#x95F4;&#x7BA1;&#x7406;&#xFF08;6&#xFF09;&#xFF1A;x86_64 &#x76F8;&#x5173;&#x7684;&#x65F6;&#x949F;&#x6E90;&#xFF08;kvm-clock&#xFF0C;tsc&#xFF0C;acpi_pm&#xFF0C;hpet)</a></li>
-<li><a href="https://rootw.github.io/2018/01/%E8%AE%A1%E6%97%B6/" target="_blank">&#x65F6;&#x95F4;&#x5B50;&#x7CFB;&#x7EDF; &#x4E8C;&#x3001;&#x8BA1;&#x65F6;&#x539F;&#x7406;&#xFF0D;timekeeper&#x4E0E;clocksource</a></li>
-<li><a href="https://0xax.gitbooks.io/linux-insides/content/Timers/" target="_blank">linux-insides</a></li>
-<li><a href="http://www.wowotech.net/linux_kenrel/clocksource.html" target="_blank">linux &#x591A;&#x6838; &#x7CFB;&#x7EDF;&#x65F6;&#x949F;,Linux&#x65F6;&#x95F4;&#x5B50;&#x7CFB;&#x7EDF;&#x4E4B;&#xFF08;&#x5341;&#x4E94;&#xFF09;&#xFF1A;clocksource</a></li>
-</ul>
-</li>
-</ul>
+<p>NOTE:</p>
+<p>&#x53C2;&#x8003;&#x94FE;&#x63A5;:</p>
+<p><a href="https://software.intel.com/content/www/us/en/develop/download/intel-architecture-instruction-set-extensions-programming-reference.html" target="_blank">Intel&#xAE; Architecture Instruction Set Extensions and Future Features</a></p>
+<p><a href="https://www.spinics.net/lists/kvm/msg273451.html" target="_blank">kernel mail list: IPI virtualization support for VM</a></p>
 </blockquote>
-<ul>
-<li>&#x53C2;&#x8003;&#x4EE3;&#x7801;<ul>
-<li>linux code tag v6.0-rc1</li>
-</ul>
-</li>
-</ul>
 
                                 
                                 </section>
@@ -275,7 +235,7 @@
                 </a>
                 
                 
-                <a href="introduction.html" class="navigation navigation-next " aria-label="Next page: introduction">
+                <a href="vapic.html" class="navigation navigation-next " aria-label="Next page: apicv">
                     <i class="fa fa-angle-right"></i>
                 </a>
                 
@@ -286,7 +246,7 @@
     <script>
         var gitbook = gitbook || [];
         gitbook.push(function() {
-            gitbook.page.hasChanged({"page":{"title":"linux kernel time subsystem","level":"1.2","depth":1,"next":{"title":"introduction","level":"1.2.1","depth":2,"path":"time/introduction.md","ref":"./time/introduction.md","articles":[]},"previous":{"title":"Introduction","level":"1.1","depth":1,"path":"README.md","ref":"README.md","articles":[]},"dir":"ltr"},"config":{"gitbook":"*","theme":"default","variables":{},"plugins":[],"pluginsConfig":{"highlight":{},"search":{},"lunr":{"maxIndexSize":1000000,"ignoreSpecialCharacters":false},"sharing":{"facebook":true,"twitter":true,"google":false,"weibo":false,"instapaper":false,"vk":false,"all":["facebook","google","twitter","weibo","instapaper"]},"fontsettings":{"theme":"white","family":"sans","size":2},"theme-default":{"styles":{"website":"styles/website.css","pdf":"styles/pdf.css","epub":"styles/epub.css","mobi":"styles/mobi.css","ebook":"styles/ebook.css","print":"styles/print.css"},"showLevel":false}},"structure":{"langs":"LANGS.md","readme":"README.md","glossary":"GLOSSARY.md","summary":"SUMMARY.md"},"pdf":{"pageNumbers":true,"fontSize":12,"fontFamily":"Arial","paperSize":"a4","chapterMark":"pagebreak","pageBreaksBefore":"/","margin":{"right":62,"left":62,"top":56,"bottom":56}},"styles":{"website":"styles/website.css","pdf":"styles/pdf.css","epub":"styles/epub.css","mobi":"styles/mobi.css","ebook":"styles/ebook.css","print":"styles/print.css"}},"file":{"path":"time/README.md","mtime":"2022-08-23T13:51:58.406Z","type":"markdown"},"gitbook":{"version":"3.2.3","time":"2022-08-23T14:38:52.358Z"},"basePath":"..","book":{"language":""}});
+            gitbook.page.hasChanged({"page":{"title":"KVM","level":"1.2","depth":1,"next":{"title":"apicv","level":"1.2.1","depth":2,"path":"kvm/vapic.md","ref":"./kvm/vapic.md","articles":[]},"previous":{"title":"Introduction","level":"1.1","depth":1,"path":"README.md","ref":"README.md","articles":[]},"dir":"ltr"},"config":{"gitbook":"*","theme":"default","variables":{},"plugins":[],"pluginsConfig":{"highlight":{},"search":{},"lunr":{"maxIndexSize":1000000,"ignoreSpecialCharacters":false},"sharing":{"facebook":true,"twitter":true,"google":false,"weibo":false,"instapaper":false,"vk":false,"all":["facebook","google","twitter","weibo","instapaper"]},"fontsettings":{"theme":"white","family":"sans","size":2},"theme-default":{"styles":{"website":"styles/website.css","pdf":"styles/pdf.css","epub":"styles/epub.css","mobi":"styles/mobi.css","ebook":"styles/ebook.css","print":"styles/print.css"},"showLevel":false}},"structure":{"langs":"LANGS.md","readme":"README.md","glossary":"GLOSSARY.md","summary":"SUMMARY.md"},"pdf":{"pageNumbers":true,"fontSize":12,"fontFamily":"Arial","paperSize":"a4","chapterMark":"pagebreak","pageBreaksBefore":"/","margin":{"right":62,"left":62,"top":56,"bottom":56}},"styles":{"website":"styles/website.css","pdf":"styles/pdf.css","epub":"styles/epub.css","mobi":"styles/mobi.css","ebook":"styles/ebook.css","print":"styles/print.css"}},"file":{"path":"kvm/README.md","mtime":"2022-08-26T11:28:36.401Z","type":"markdown"},"gitbook":{"version":"3.2.3","time":"2022-08-26T14:18:09.699Z"},"basePath":"..","book":{"language":""}});
         });
     </script>
 </div>

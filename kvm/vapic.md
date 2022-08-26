@@ -1,4 +1,4 @@
-#vapic
+# vapic
 ## intruduction
 在没有引入virtual apic之前，如果想将一个中断注入到guest，
 只能通过`Event injection`(事件注入) 的方式注入中断(详见
