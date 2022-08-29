@@ -1,6 +1,6 @@
 # kvm
 * [apicv](./vapic.md)
-* [ipi virtualization](ipiv.md)
+* [ipi virtualization](./ipiv.md)
 
 > NOTE:
 >
