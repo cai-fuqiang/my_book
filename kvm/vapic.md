@@ -439,4 +439,90 @@ delivery`, 详见intel sdm 29.2 EVALUATION AND DELIVERY OF VIRTUAL
 INTERRUPTS
 
 ## EVALUATION AND DELIVERY OF VIRTUAL INTERRUPTS
+当`virtual-interrupt delivery` VM-execution control 为1 时, VMX non-root operation
+下的某些操作或者VM entry，可能会导致evaluate 和 delivery virtual interrupt
 
+evaluation 这个过程可能会导致识别到一个virtual interrupt。一旦一个virtual interrupt
+被recognized, 处理器可能会在VMX non-root operation 在没有VM exit的情况下delivery
+这个virtual interrupt。
+
+### Evaluation of Pending Virtual Interrupts
+某些行为可能导致处理器去`Evaluation pending virtual interrupt`, 主要的行为有:
+* VM entry
+* TPR virtualization
+* EOI virtualization
+* self-IPI virtualization
+* posted-interrupt processing 
+
+只有这些行为会造成`evaluation pending virtual interrupt`, 即使是在其他动作中修改RVI, VPPR
+
+我们先来看下该行为的伪代码:
+```
+IF “interrupt-window exiting” is 0 AND
+	RVI[7:4] > VPPR[7:4] (see Section 29.1.1 for definition of VPPR)
+		THEN recognize a pending virtual interrupt;
+ELSE
+	do not recognize a pending virtual interrupt;
+FI;
+```
+可以看到如果`interrupt-window exiting`为0, 并且`RVI[7:4] > VPPR[7:4]`, 时才会`recognize
+a pending virtual interrupt`),。如果interrupt-window exiting 为1, 就不去delivery
+这个`virtual interrupt`, 然后在interrupt-window打开的状态下，会产生vm exit。本身`interrupt-
+window`设置了目的是，在`interrupt-window`一打开的情况下，就VM-exit, 本次的vm entry
+不能去处理中断。
+
+从上面可以看出，会不会执行recognize 操作除了和`interrupt-window exiting` 有关,还
+和RVI 和 VPPR的值有关，哪些行为会造成RVI改变呢?主要有，当然这个不绝对，例如`virtual 
+interrupt delivery` 也修改了`RVI`和`VISR` 但是并没有执行`recognize`操作，而是去
+`cease recognition`，我们在下面的章节会看到。
+* VM entry
+* self-IPI virtualization
+* posted-interrupt processing
+
+哪些行为改变了VPPR呢:
+* VM entry
+* TPR virtualization
+* EOI virtualization
+
+我们接下来看下`virtual-interrupt delivery`
+
+### virtual-interrupt delivery
+当一个virtual interrupt 被recognized是，他将在instruction boundary 去deliver,
+但是需要满足以下所有条件:
+* RFLAGS.IF=1
+* no blocking by STI
+* no blocking by MOV SS or by POP SS
+* `interrupt-window exiting` VM execution control is 0
+
+可以看到满足的条件总结如下:
+* `interrupt-window` 必须打开
+* `interrupt-window exiting` == 0
+
+这里有一些优先级顺序, 详见intel sdm 29.2 Virtual-Interrupt Delivery,
+这里不再详述
+
+同外部中断一样`virtual-interrupt delivery`可以将处理器从`inactive activity 
+state` 中唤醒，这些状态主要是使用`HLT`/`MWAIT`造成的。
+
+上面也提到过`virtual interrupt delivery`会修改`guest interrupt status`
+(`RVI` && `SVI`), 然后再VMX non-root operation 下deliver 一个event，
+并且不产生VM exit。
+
+我们来看下伪代码:
+```
+Vector := RVI;
+VISR[Vector] := 1;
+SVI := Vector;
+VPPR := Vector & F0H;
+VIRR[Vector] := 0;
+IF any bits set in VIRR
+	THEN RVI := highest index of bit set in VIRR
+	ELSE RVI := 0;
+FI;
+deliver interrupt with Vector through IDT;
+cease recognition of any pending virtual interrupt;
+```
+
+逻辑比较简单，去deliver RVI 中的vector, 更新SVI和PPR, 
+其中SVI更新为RVI, PPR 置为vector & F0H
+并且更新RVI为VIRR中的最大的向量, 
