@@ -362,6 +362,81 @@ FI
 我们会在下面章节讲到`SVI`
 
 `PPR virtualization` 是由`TPR virtualization`, `EOI virtualization`和
-`VM entry` 造成。
+`VM entry` 造成。其实VPPR还可以在`virtual interrupt delivery`过程中
+被修改，但是不会触发`PPR virtualization`，我们下面会讲到。
 
-### 
+### EOI Virtualization
+在下面的几种情况下，会触发`EOI virtualization`
+* write to APIC-access page offset 0B0H
+* WRMSR ECS=80BH
+
+另外`EOI virtualization`只在 `virtual-interrupt delivery` VM-execution
+control为1 是触发。
+
+伪代码为:
+```
+Vector := SVI;
+VISR[Vector] := 0; (see Section 29.1.1 for definition of VISR)
+IF any bits set in VISR
+	THEN SVI := highest index of bit set in VISR
+	ELSE SVI := 0;
+FI;
+perform PPR virtualiation (see Section 29.1.3);
+IF EOI_exit_bitmap[Vector] = 1 (see Section 24.6.8 for definition of EOI_exit_bitmap)
+	THEN cause EOI-induced VM exit with Vector as exit qualification;
+	ELSE evaluate pending virtual interrupts; (see Section 29.2.1)
+FI;
+```
+可以看到，在这个过程中会修改`VISR`和`SVI`, 将`VISR[SVI] = 0`;
+并且将`SVI`设置为`VISR[]`中最高的bits.
+
+从这里可以看到，`VISR`实际上模拟的是apic ISR register, 
+而SVI更像是CPU内部的一个状态，代表当前CPU正在处理的
+vector。
+
+而这里还可以看到, 有一个`EOI_exit_bitmap[vector]`的逻辑, 在这个map中设置了
+某个vector:v, 当v等于`EOI virtualization`触发时的SVI时，则会产生`EOI-included VM exit`
+并且在`exit qualification`中记录了vector，该功能用于什么场景呢，
+我们来看，没有该bitmap时，会执行`evaluate pending virtual interrupt`, 而不产生
+VM exit，但是当中断是一个level trigger mode, 并且来自于ioapic时，这时还会对
+ioapic做些判断处理, 而ioapic在hardware没有virtualization, 我们下面会讲到。
+
+### self-IPI virtualization
+在下面情况中，会触发`self-IPI virtualization`:
+* write to `APIC-access page` offset 300H
+* WRMSR ECX=83FH
+伪代码如下:
+```
+VIRR[Vector] := 1; (see Section 29.1.1 for definition of VIRR)
+RVI := max{RVI,Vector};
+evaluate pending virtual interrupts; (see Section 29.2.1)
+```
+这里面提到了`RVI`, 这个实际上是指当前CPU正在请求的vector, 我们随后会结合
+`SVI`一起看下。
+
+这里呢，我们还可以看到，当前提到的只支持self-IPI, 而发向其他cpu的IPI
+能不能也交给硬件处理，一会我们结合下`post interrupt processing`来看下
+当前如果支持该功能还差哪些处理逻辑。
+
+这里呢，也提到了`evaluate pending virtual interrupts`, 在介绍这个功能之前，
+我们先介绍下`RVI`, `SVI` 
+
+## RVI && SVI
+`RVI` 和 `SVI` 是guest state, 表示当前处理器的一些状态, 位于VMCS中`guest-state 
+area`并且没有相应的寄存器对应，所以在`guest non-register state`中的`Guest interrupt 
+status`。(请看intel sdm 24.4.2 Guest Non-Register State)。
+
+* `Guest interrupt status`. 该字段只在支持`1-setting` `virtual-interrupt
+delivery` VM-execution control。该字段是guest的`virtual-APIC state`
+的一部分，在处理器/APIC没有对应的register。分为两个8-bit 子字段
+	+ Request virtual interrupt( **RVI** ): 处理器把该字段当成请求的最高
+	优先级的virtual interrupt
+	+ Sevicing virtual interrupt( **SVI** ): 处理器把该字段当成正在处理的
+	最高优先级的virtual interrupt
+
+接下来，我们来看下`evaluate pending virtual interrupt` 和 `virtual-interrupt
+delivery`, 详见intel sdm 29.2 EVALUATION AND DELIVERY OF VIRTUAL 
+INTERRUPTS
+
+## EVALUATION AND DELIVERY OF VIRTUAL INTERRUPTS
+
