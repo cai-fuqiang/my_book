@@ -11,3 +11,4 @@
 * [KVM](./kvm/README.md)
   * [apicv](./kvm/vapic.md)
   * [IPI virtualization](./kvm/ipiv.md)
+  * [kvm patch](./kvm/patch.md)

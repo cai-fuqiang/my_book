@@ -674,6 +674,7 @@ pending virtual interrupt`
 
 ### acknowledge local APIC
 ![local apic structure](pic/Figure-10-4-local-apic-structure.png)
+
 从上图红圈中有`INTA`和`INTR`两条线(这里忽略`EXTINT`), 当lapic要向CPU 发送可屏蔽中
 断时，会执行以下步骤:
 * lapic通过`INTR`想cpu发送中断请求。

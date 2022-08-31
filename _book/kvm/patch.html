@@ -4,7 +4,7 @@
     <head>
         <meta charset="UTF-8">
         <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
-        <title>KVM · GitBook</title>
+        <title>kvm patch · GitBook</title>
         <meta http-equiv="X-UA-Compatible" content="IE=edge" />
         <meta name="description" content="">
         <meta name="generator" content="GitBook 3.2.3">
@@ -57,10 +57,8 @@
     <link rel="shortcut icon" href="../gitbook/images/favicon.ico" type="image/x-icon">
 
     
-    <link rel="next" href="vapic.html" />
     
-    
-    <link rel="prev" href="../" />
+    <link rel="prev" href="ipiv.html" />
     
 
     </head>
@@ -102,7 +100,7 @@
             
         </li>
     
-        <li class="chapter active" data-level="1.2" data-path="./">
+        <li class="chapter " data-level="1.2" data-path="./">
             
                 <a href="./">
             
@@ -142,7 +140,7 @@
             
         </li>
     
-        <li class="chapter " data-level="1.2.3" data-path="patch.html">
+        <li class="chapter active" data-level="1.2.3" data-path="patch.html">
             
                 <a href="patch.html">
             
@@ -190,7 +188,7 @@
     <!-- Title -->
     <h1>
         <i class="fa fa-circle-o-notch fa-spin"></i>
-        <a href=".." >KVM</a>
+        <a href=".." >kvm patch</a>
     </h1>
 </div>
 
@@ -205,18 +203,14 @@
     
                                 <section class="normal markdown-section">
                                 
-                                <h1 id="kvm">kvm</h1>
-<ul>
-<li><a href="vapic.html">apicv</a></li>
-<li><a href="ipiv.html">ipi virtualization</a></li>
-</ul>
-<blockquote>
-<p>NOTE:</p>
-<p>&#x53C2;&#x8003;&#x94FE;&#x63A5;:</p>
-<p><a href="https://software.intel.com/content/www/us/en/develop/download/intel-architecture-instruction-set-extensions-programming-reference.html" target="_blank">Intel&#xAE; Architecture Instruction Set Extensions and Future Features</a></p>
-<p><a href="https://www.spinics.net/lists/kvm/msg273451.html" target="_blank">kernel mail list: IPI virtualization support for VM</a></p>
-<p><a href="http://132.248.181.216/MV/CursoMaquinasVirtuales/Bibliograf%C3%ADaMaquinasVirtuales/Vtx.pdf" target="_blank">&#x65E9;&#x671F;intel VMX&#x5B9E;&#x73B0; 2008</a></p>
-</blockquote>
+                                <h1 id="&#x4E2D;&#x65AD;&#x865A;&#x62DF;&#x5316;&#x76F8;&#x5173;patch">&#x4E2D;&#x65AD;&#x865A;&#x62DF;&#x5316;&#x76F8;&#x5173;patch</h1>
+<h2 id="tpr-shadow">TPR shadow</h2>
+<pre><code>f78e0e2ee498e8f847500b565792c7d7634dcf54 
+KVM: VMX: Enable memory mapped TPR shadow (FlexPriority)
+</code></pre><h2 id="virtual-interrupt-delivery">virtual interrupt delivery</h2>
+<p><a href="https://lore.kernel.org/all/20130108154314.GA7005@redhat.com/T/#ma70d9fd45faf54cf75579d4f8b114913d75031ff" target="_blank">x86, apicv: Add APIC virtualization support</a></p>
+<h2 id="posted-interrupt-processing">posted interrupt processing</h2>
+<p><a href="https://lore.kernel.org/all/1365679516-13125-1-git-send-email-yang.z.zhang@intel.com" target="_blank">Add Posted Interrupt supporting</a></p>
 
                                 
                                 </section>
@@ -244,14 +238,10 @@
 
             
                 
-                <a href="../" class="navigation navigation-prev " aria-label="Previous page: Introduction">
+                <a href="ipiv.html" class="navigation navigation-prev navigation-unique" aria-label="Previous page: IPI virtualization">
                     <i class="fa fa-angle-left"></i>
                 </a>
                 
-                
-                <a href="vapic.html" class="navigation navigation-next " aria-label="Next page: apicv">
-                    <i class="fa fa-angle-right"></i>
-                </a>
                 
             
         
@@ -260,7 +250,7 @@
     <script>
         var gitbook = gitbook || [];
         gitbook.push(function() {
-            gitbook.page.hasChanged({"page":{"title":"KVM","level":"1.2","depth":1,"next":{"title":"apicv","level":"1.2.1","depth":2,"path":"kvm/vapic.md","ref":"./kvm/vapic.md","articles":[]},"previous":{"title":"Introduction","level":"1.1","depth":1,"path":"README.md","ref":"README.md","articles":[]},"dir":"ltr"},"config":{"gitbook":"*","theme":"default","variables":{},"plugins":[],"pluginsConfig":{"highlight":{},"search":{},"lunr":{"maxIndexSize":1000000,"ignoreSpecialCharacters":false},"sharing":{"facebook":true,"twitter":true,"google":false,"weibo":false,"instapaper":false,"vk":false,"all":["facebook","google","twitter","weibo","instapaper"]},"fontsettings":{"theme":"white","family":"sans","size":2},"theme-default":{"styles":{"website":"styles/website.css","pdf":"styles/pdf.css","epub":"styles/epub.css","mobi":"styles/mobi.css","ebook":"styles/ebook.css","print":"styles/print.css"},"showLevel":false}},"structure":{"langs":"LANGS.md","readme":"README.md","glossary":"GLOSSARY.md","summary":"SUMMARY.md"},"pdf":{"pageNumbers":true,"fontSize":12,"fontFamily":"Arial","paperSize":"a4","chapterMark":"pagebreak","pageBreaksBefore":"/","margin":{"right":62,"left":62,"top":56,"bottom":56}},"styles":{"website":"styles/website.css","pdf":"styles/pdf.css","epub":"styles/epub.css","mobi":"styles/mobi.css","ebook":"styles/ebook.css","print":"styles/print.css"}},"file":{"path":"kvm/README.md","mtime":"2022-08-31T12:10:37.780Z","type":"markdown"},"gitbook":{"version":"3.2.3","time":"2022-08-31T12:16:11.886Z"},"basePath":"..","book":{"language":""}});
+            gitbook.page.hasChanged({"page":{"title":"kvm patch","level":"1.2.3","depth":2,"previous":{"title":"IPI virtualization","level":"1.2.2","depth":2,"path":"kvm/ipiv.md","ref":"./kvm/ipiv.md","articles":[]},"dir":"ltr"},"config":{"gitbook":"*","theme":"default","variables":{},"plugins":[],"pluginsConfig":{"highlight":{},"search":{},"lunr":{"maxIndexSize":1000000,"ignoreSpecialCharacters":false},"sharing":{"facebook":true,"twitter":true,"google":false,"weibo":false,"instapaper":false,"vk":false,"all":["facebook","google","twitter","weibo","instapaper"]},"fontsettings":{"theme":"white","family":"sans","size":2},"theme-default":{"styles":{"website":"styles/website.css","pdf":"styles/pdf.css","epub":"styles/epub.css","mobi":"styles/mobi.css","ebook":"styles/ebook.css","print":"styles/print.css"},"showLevel":false}},"structure":{"langs":"LANGS.md","readme":"README.md","glossary":"GLOSSARY.md","summary":"SUMMARY.md"},"pdf":{"pageNumbers":true,"fontSize":12,"fontFamily":"Arial","paperSize":"a4","chapterMark":"pagebreak","pageBreaksBefore":"/","margin":{"right":62,"left":62,"top":56,"bottom":56}},"styles":{"website":"styles/website.css","pdf":"styles/pdf.css","epub":"styles/epub.css","mobi":"styles/mobi.css","ebook":"styles/ebook.css","print":"styles/print.css"}},"file":{"path":"kvm/patch.md","mtime":"2022-08-31T12:15:02.883Z","type":"markdown"},"gitbook":{"version":"3.2.3","time":"2022-08-31T12:16:11.886Z"},"basePath":"..","book":{"language":""}});
         });
     </script>
 </div>
