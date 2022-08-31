@@ -11,3 +11,4 @@
 * [KVM](./kvm/README.md)
   * [apicv](./kvm/vapic.md)
   * [IPI virtualization](./kvm/ipiv.md)
+  * [PATCH](./TPR_shadow/0001-KVM-VMX-Enable-memory-mapped-TPR-shadow-FlexPriority.patch)
