@@ -523,6 +523,238 @@ deliver interrupt with Vector through IDT;
 cease recognition of any pending virtual interrupt;
 ```
 
-逻辑比较简单，去deliver RVI 中的vector, 更新SVI和PPR, 
-其中SVI更新为RVI, PPR 置为vector & F0H
-并且更新RVI为VIRR中的最大的向量, 
+逻辑比较简单，最终目的是要去deliver RVI 中的vector, 
+更新相关的寄存器(VISR,VPPR,VIRR)，并且更新`guest interrupt status`
+
+具体步骤为:
+
+更新SVI和PPR, 其中SVI更新为RVI, PPR 置为RVI & F0H
+且更新RVI为VIRR中的下一个优先级最高的向量, 
+然后去通过IDT 去deliver一个interrupt, 之后便cease pending 
+virtual interrupt。
+
+这里为什么要cease pending呢，虽然在这个过程中RVI中还有值，
+但是在delivery该vector virtual  interrupt后，VPPR的值实际
+上比RVI要大，所以不满足pending 的条件。
+
+那么现在来看，仅仅从`virtual interrult delivery`的逻辑来看，
+并不能在`VMX non root operation`下连续去处理virtual interrupt,
+因为如果想要去delivery virtual interrupt, 必须要先执行`evaluate pending 
+virtual interrupt`。而在`virtual interrupt delivery` 中却不能做这个动作。
+
+但是我们再来看 `EOI virtualization`这部分，`EOI virtualization`的触发
+条件反映在guest os是，当guest os处理完一个中断后，去写APIC EOI 
+register，来接收下一个中断。在`EOI virtualization`的流程是，修改`VISR[Vector]
+:=0`,这样就可能满足`pending virtual interrupt`的条件，所以
+在这个过程中会去做`evaluate pending virtual interrupt`, 这样就形成了处理闭环。
+
+
+那么我们来总结下，`virtual interrupt delivery`的实现有什么样的作用呢?
+* 能够在一次vm entry中，去注入多个中断: 结合`virtual interrupt delivery`和
+  `EOI virtualization`可以依次完成所有中断的delivery。
+* 在vm entry时，无需关注`interrupt-window`是否开启: 造成这个作用的原因是，
+  INTEL修改了`VMX non-root operation`下中断注入的逻辑，不像是`event injection`
+  那样只在 `VM entry`时，去注入（而且我怀疑 注入时也不关注interrupt-window
+  是否打开），而是在`VMX non-root operation`的某些合适的`instruction boundary`
+  下去注入，这个合适的条件也是CPU自己去判断，主要是CPU会判断`interrupt window`
+  是否开启。
+* `TPR virtualization`中，无需判断`TPR threshold`的条件：前面讲到过，该功能
+  是在未引入`virtual interrupt delivery`时，为了降低中断的延时引入的。所以
+  在引入了`virtual interrupt delivery`, CPU在`VMX non-root operation`下
+  就会自己去`evaluate pending virtual interrupt`, 就不需要这个功能了
+
+上面说的几点，都会一些情况下造成VM exit, 而引入`virtual interrupt delivery`
+后，避免了`VM exit`发生。这也是引入`virtual interrupt delivery`的原因。
+
+上面提到`posted-interrupt processing`该过程会`evaludation of pending virtual
+interrupt`, 我们单独来看下这部分, 关于这部分的详细细节，请见intel sdm 29.6
+Posting-Interrupt Processing。
+
+## POSTED-INTERRUPT PROCESSING
+先简单介绍下`posted-interrupt processing`，`posted-interrupt processing`功能
+使得在CPU 处于`VMX non-root operation`下可以去注入中断，而不产生VM exit。
+
+我们前面提到过注入中断需要满足以下的条件:
+* 修改VIRR
+* 并将RVI设置为VIRR中最大的vector bits
+* 触发`evaluate pending virtual interrupt`
+
+我们看下引入`posted-interrupt processing`增加的一些相关的控制字段和数据结构:
+* `process posted interrupts` VM-execution control : 用于支持该功能开启
+* `posted-interrupt notification vector`: 作为一个notification使用，我们之后去介绍这个
+* `posted-interrupt descriptor`: 该字段是一个物理地址，指向`posted-interrupt descriptor`数据结构
+
+我们先来看下`posted-interrupt descriptor`结构:
+
+<table>
+	<th>Bits Position(s)</th>
+	<th>Name</th>
+	<th>Description</th>
+	<tr>
+		<td>255:0</td>
+		<td>Posted-interrupt request</td>
+		<td>
+			One bit for each interrupt vector. There is a 
+			posted-interrupt request for a vector if
+			the corresponding bit is 1
+		</td>
+	</tr>
+	<tr>
+		<td>256</td>
+		<td>Outstanding notification</td>
+		<td>
+			If this bit is set, there is a notification outstanding 
+			for one or more posted interrupts in bits 255:0
+		</td>
+	</tr>
+	<tr>
+		<td>511:257</td>
+		<td>
+			Reserved for software and other agents
+		</td>
+		<td>
+			These bits may be used by software and by other agents 
+			in the system (e.g., chipset). The processor does not modify
+			these bits.
+		</td>
+	</tr>
+</table>
+
+我们先来简单解释下这些字段的作用，然后结合`posted interrupt processing`
+的流程基本上就可以理解了。
+* `posted-interrupt request`: 供注入方填写中断vector(注入方可能是硬件:IOMMU, 
+  或者是软件： KVM注入virtual interrupt), 在`posted interrupt processing`
+  中，会将`posted-interrupt request`(之后简称 **PIR**) 或运算到 `VIRR`中,
+  并将该字段清空。
+* `Outstanding notification`: 该位也是由注入方置位，在`posted interrupt
+  processing`中会清空, 但是当注入方发现该位是置位的话，表明上一次的注入
+  还未处理，这时，注入方不再向目的cpu 发送 `posted interrupt notification`
+* `Reserved for software and other agents`: 这里面的字段在`posted interrupt
+  processing`中不会用到，也就是CPU的硬件处理不会关心里面的内容，software
+  和其他的agents可能会用到，例如:表明notification 目的地的dest apic id.
+
+`posted-interrupt descriptor` 不像是VMCC 中其他指向的数据结构，需要在没有
+logical processor 将运行在`VMX non-root operation`的current VMCS指向它。
+但是，对于该内存区域的修改，需要使用`lock read-modify-write instructions`
+
+我们来看下`posted-interrupt processing`的处理流程:
+
+之上面提到了`posted-interrupt notification`, 这个是一个`external interrupt`, 
+只不过只是起到了通知的作用，注入方通过被注入cpu 发送一个interrupt, 来触发
+目的cpu 走一个`posted interrupt processing`流程。
+
+具体流程我们来看下:
+
+当`external-interrupt exiting` VM-execution 控制字段为1 时, 任何`unmasked 
+external interrupt` 都会导致VM exit。如果`process posted interrupt` VM-execution
+control 字段为1, 该行为将会改变，并且处理器将会如下处理`external interrupt`
+* local APIC is acknowledged。(这里我们下面在解释下);处理器在ack后，apic会
+  提供给processor一个interrupt vector, 这里我们暂且称为`physical vector`
+* 将`phyiscal vector`和`posted-interrupt notification
+  vector`比较，如果相等，执行下一个步骤，如果不相等; 则产生一个正常产生一个
+  由于`external interrupt`导致的VM exit,`physical vector` 被保存在`VM-exit
+  interruption-information`字段
+* processor清空`PIR`中的`outstanding-notification` bit, 并且该过程是atomic（例如,
+  使用`locked AND operation`
+* processor将local APIC的EOI register写0; 这里的local APIC是指物理的lapic,这样
+  做的目的是消除`posted-interrupt notification vector`的影响，为什么要这样做呢？
+  因为该中断，在`VMX non-root operation`下只是一个notification的作用，既不需要
+  delivery到guest, 也不需要delivery到host，只是去让cpu触发一个`posted interrupt
+  processing`的流程, 但是由于触发了一个中断，APIC中的某些寄存器已经改变，例如:
+  ISR, 而写EOI 为0, 正好能消除这个notification产生的影响。
+* logical-OR PIR -> VIRR, 并且清空PIR。当然整个的过程也是原子的。
+* 设置RVI为old value`PIR`中最高的bits。如果PIR中没有bits被设置，RVI将保持原来的值
+
+整个的过程都是一个`uninterruptible` manner。上面最后一步完成将会执行`evaluation
+pending virtual interrupt`
+
+这里有几点我们来解释下:
+1. acknowledge local APIC
+2. VMX non-root operation ACK
+
+### acknowledge local APIC
+![local apic structure](pic/Figure-10-4-local-apic-structure.png)
+从上图红圈中有`INTA`和`INTR`两条线(这里忽略`EXTINT`), 当lapic要向CPU 发送可屏蔽中
+断时，会执行以下步骤:
+* lapic通过`INTR`想cpu发送中断请求。
+* CPU这边会在自己感觉合适的时机，发送通过`INTA`想lapic 发送 acknowledge,
+* lapic收到ack后，会向cpu发送本次中断请求的vector
+
+> NOTE:
+>
+> 我们可以猜想下，这样做的原因:
+>
+> cpu 是有自己的中断屏蔽机制的，通过设置`IF`位为0，可以去mask unmask interrupt,
+> 这个过程看起来并没有通知到lapic, 在lapic中也没有相应的register,
+> 那么，可以猜测，当清空了`IF`后，对于unmask interrupt 来临时，可以选择不去发送
+> acknowledge 来达到中断屏蔽的目的。
+>
+> 对于NMI中断，或者是其他的不可屏蔽的中断来说，他们是通过其他的线连接到cpu的，而且
+> 也没有`From CPU Core`的线，所以该类型中断是直接递送到cpu core, 并且不需要ack, 
+> 所以可以推断ack的目的是上述猜测那样。
+
+### VMX non-root operation ACK
+其实，`posted interrupt processing`依赖另一个`VM-execution control`:`Acknowledge
+interrupt on exit`, 该功能使得处理器在VM non-root operation下, 也能够去
+acknowledge interrupt controller。而在这个功能之前，CPU遇到 `external 
+interrupt` 就直接产生VM exit，在`VM non root operation`下，并没有去ack 
+lapic。而在vm exit 进入到`VM root operation`下再去ack lapic。
+
+> NOTE: 
+>
+> 其实在kvm的代码里，在vm entry 前，会关中断，也就是将`IF`clear, 那么
+> 在VM non-root operation怎么能收到该中断呢？
+>
+> 我们来猜想下:
+>
+> 1. 是不是在VM non-root operation下，会切换到guest的IF值呢? IF是来自于RFLAGS,
+> 而在 VM entry时，确实会切换该寄存器，详细请见intel sdm 26.3.2.3 loading guest
+> rip, rsp, rflags, ssp。但是，我们从`posted interrupt processing`的逻辑,
+> `external interrupt`到达cpu后, 直接 acknowledge apic了。那么从apic的角度来看
+> cpu已经接收了中断。所以跟host IF无关。
+>
+> 2. 我们来猜想下，其实处理 `IF` 的相关逻辑是CPU去操作的，所以在CPU 完全可以在
+> `VM non-root operation`下不去管host 的`IF`标记位, 遇到`external interrupt`，
+> 直接ack lapic, 这个处理流程和`VMX root operation`也不一样。
+>
+> 那么kvm 去关中断的目的是为了什么呢？<br/>
+> 实际上很简单，就是避免在VM exit后的代码，不受中断的影响。
+
+## 总结
+讲到这里，vapic的内容基本上就这些，在intel new feature中还更新了vipi ,以及对
+virtualization user interrupt 的支持，这个我们在另外的文章中介绍。
+
+那么，我们来回顾下，intel 对于vapic的实现。
+
+实际上intel这边整个的实现只是去修改CPU的处理逻辑，让cpu在某些操作下，会做一些
+emulation的操作，有的时候呢，可能需要其他的agent配合，例如lapic，但是也是使用了
+其原有接口提供的功能，并未改动lapic的处理逻辑。
+
+支持该功能后，主要有以下优化:
+
+* 对`VM non-root operation`下访问部分`virtual apic register`进行了virtualize,
+ 不会产生vm exit, 并且还会有其他的emulate的动作。部分流程会触发`evaluate of
+ pending virtual interrupt`的行为。
+* 在`VM non-root operation`中增加`evaluate of pending virtual interrupt`和
+ `virtual interrupt delivery`的处理逻辑，使得`VM non-root operation`下可以
+ 去识别到一个virtual interrupt, 并在合适的时机去delivery 一个`virtual 
+ interrupt`
+* 支持了`posted-interrupt processing`, 使得，CPU 在`VM non-root operation`
+ 中也能够去注入`virtual interrupt`,注入方可能是其他的CPU（用于软件逻辑
+ 注入, 在支持VIPI后，也可能是CPU硬件逻辑注入，我们在另一个文章中会讲到), 
+ 也可能是其他硬件注入，只要该硬件能够满足注入的逻辑即可:
+	+ 可以atomic modify `PID` 中的`PIR`
+	+ 可以根据`PID`中的`ON`(还可能有其他的判断条件)，去发送和`posted interrupt
+	  notification vector`相等vector 的interrupt
+
+  该功能支持，也为IOMMU 的`posted interrupt remapping`功能提供了CPU层面的
+  硬件支持。（IOMMU `posted interrupt remapping` 功能可用于设备中断直接
+  delivery到 `VM non-root operation`  CPU 中, 不会产生VM exit，也无需
+  软件参与该过程)
+
+> # !! NOTE:
+>
+> **本人水平有限，内容还是以intel sdm 为主，主要为 Section 29 APIC
+> Virtualization and Virtual Interrupts, 手册中没有提到的，大部分是
+> 自己的一些想法和硬件逻辑的猜想，如何有偏差，也希望大家帮忙指正，十分
+> 感谢!!!** 
