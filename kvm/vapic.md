@@ -536,7 +536,9 @@ INTERRUPTS
 
 evaluation 这个过程可能会导致识别到一个virtual interrupt。一旦一个virtual interrupt
 被recognized, 处理器可能会在VMX non-root operation 在没有VM exit的情况下delivery
-这个virtual interrupt。
+这个virtual interrupt。如下图所示:
+
+![virtual interrupt delivery](pic/virtual_interrupt_delivery.svg)
 
 ### Evaluation of Pending Virtual Interrupts
 某些行为可能导致处理器去`Evaluation pending virtual interrupt`, 主要的行为有:
@@ -734,6 +736,8 @@ logical processor 将运行在`VMX non-root operation`的current VMCS指向它�
 之上面提到了`posted-interrupt notification`, 这个是一个`external interrupt`, 
 只不过只是起到了通知的作用，注入方通过被注入cpu 发送一个interrupt, 来触发
 目的cpu 走一个`posted interrupt processing`流程。
+
+![post interrupt processing](pic/post_interrupt_processing.svg)
 
 具体流程我们来看下:
 

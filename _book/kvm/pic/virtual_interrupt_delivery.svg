@@ -1,0 +1,1505 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<!-- 由 Microsoft Visio, SVG Export 生成 virtual_interrupt_delivery.svg virtual interrupt delivery -->
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:ev="http://www.w3.org/2001/xml-events"
+		xmlns:v="http://schemas.microsoft.com/visio/2003/SVGExtensions/" width="21.5in" height="16.5in" viewBox="0 0 1548 1188"
+		xml:space="preserve" color-interpolation-filters="sRGB" class="st26">
+	<title>UML 2.5</title>
+	<desc>A template for all diagrams of UML 2.5 and earlier versions.
+For help and latest version of the template
+please visit http://softwarestencils.com. 
+Template version: 27. December 2013. 
+Known issues: The &#34;hand-drawn&#34; themes and the &#34;shady&#34; theme may have &#34;desctructive&#34; effect on some shapes.</desc>
+	<v:documentProperties v:langID="1033" v:viewMarkup="false">
+		<v:userDefs>
+			<v:ud v:nameU="msvNoAutoConnect" v:val="VT0(1):26"/>
+		</v:userDefs>
+	</v:documentProperties>
+
+	<style type="text/css">
+	<![CDATA[
+		.st1 {fill:#ffffff;stroke:#000000;stroke-linecap:round;stroke-linejoin:round;stroke-width:0.24}
+		.st2 {fill:#000000;font-family:Calibri;font-size:0.833336em}
+		.st3 {fill:#d8d8d8;stroke:#000000;stroke-linecap:round;stroke-linejoin:round;stroke-width:0.24}
+		.st4 {font-size:1em}
+		.st5 {fill:#b7dde8;stroke:#000000;stroke-linecap:round;stroke-linejoin:round;stroke-width:0.24}
+		.st6 {fill:#ffffff;stroke:#000000;stroke-linecap:round;stroke-linejoin:round;stroke-width:0.75}
+		.st7 {stroke:#000000;stroke-dasharray:5.25,3.75;stroke-linecap:round;stroke-linejoin:round;stroke-width:0.75}
+		.st8 {fill:#000000;font-family:Calibri;font-size:1.00001em;font-weight:bold}
+		.st9 {marker-end:url(#mrkr4-40);stroke:#000000;stroke-linecap:round;stroke-linejoin:round;stroke-width:0.24}
+		.st10 {fill:#000000;fill-opacity:1;stroke:#000000;stroke-opacity:1;stroke-width:0.068965517241379}
+		.st11 {fill:#ffffff;stroke:none;stroke-linecap:butt;stroke-width:7.2}
+		.st12 {fill:#000000;font-family:微软雅黑;font-size:0.666664em}
+		.st13 {font-family:Calibri;font-size:1em}
+		.st14 {fill:#000000;font-family:Calibri;font-size:0.666664em}
+		.st15 {stroke:#000000;stroke-linecap:round;stroke-linejoin:round;stroke-width:0.24}
+		.st16 {marker-end:url(#);stroke:#000000;stroke-linecap:round;stroke-linejoin:round;stroke-width:0.24}
+		.st17 {fill:#000000;fill-opacity:1;stroke:#000000;stroke-opacity:1;stroke-width:0.08695652173913}
+		.st18 {marker-end:url(#mrkr12-89);stroke:#000000;stroke-linecap:round;stroke-linejoin:round;stroke-width:0.24}
+		.st19 {fill:#ff0000;fill-opacity:1;stroke:#ff0000;stroke-opacity:1;stroke-width:0.28409090909091}
+		.st20 {marker-end:url(#mrkr12-139);stroke:#ff0000;stroke-linecap:round;stroke-linejoin:round;stroke-width:1}
+		.st21 {stroke:#000000;stroke-dasharray:1.68,1.2;stroke-linecap:round;stroke-linejoin:round;stroke-width:0.24}
+		.st22 {marker-end:url(#);stroke:#000000;stroke-dasharray:1.68,1.2;stroke-linecap:round;stroke-linejoin:round;stroke-width:0.24}
+		.st23 {stroke:#ff0000;stroke-dasharray:7,5;stroke-linecap:round;stroke-linejoin:round;stroke-width:1}
+		.st24 {marker-end:url(#);stroke:#ff0000;stroke-dasharray:7,5;stroke-linecap:round;stroke-linejoin:round;stroke-width:1}
+		.st25 {marker-end:url(#mrkr12-89);stroke:#000000;stroke-dasharray:1.68,1.2;stroke-linecap:round;stroke-linejoin:round;stroke-width:0.24}
+		.st26 {fill:none;fill-rule:evenodd;font-size:12px;overflow:visible;stroke-linecap:square;stroke-miterlimit:3}
+	]]>
+	</style>
+
+	<defs id="Markers">
+		<g id="lend4">
+			<path d="M 2 1 L 0 0 L 2 -1 L 2 1 " style="stroke:none"/>
+		</g>
+		<marker id="mrkr4-40" class="st10" v:arrowType="4" v:arrowSize="3" v:setback="29" refX="-29" orient="auto"
+				markerUnits="strokeWidth" overflow="visible">
+			<use xlink:href="#lend4" transform="scale(-14.5,-14.5) "/>
+		</marker>
+		<g id="lend12">
+			<path d="M 3 1 L 0 0 L 3 -1 " style="stroke-linecap:round;stroke-linejoin:round;fill:none"/>
+		</g>
+		<marker id="mrkr12-89" class="st17" v:arrowType="12" v:arrowSize="2" orient="auto" markerUnits="strokeWidth"
+				overflow="visible">
+			<use xlink:href="#lend12" transform="scale(-11.5,-11.5) "/>
+		</marker>
+		<marker id="mrkr12-139" class="st19" v:arrowType="12" v:arrowSize="2" orient="auto" markerUnits="strokeWidth"
+				overflow="visible">
+			<use xlink:href="#lend12" transform="scale(-3.52,-3.52) "/>
+		</marker>
+	</defs>
+	<g v:mID="55" v:index="17" v:groupContext="foregroundPage">
+		<title>virtual interrupt delivery</title>
+		<v:pageProperties v:drawingScale="1" v:pageScale="1" v:drawingUnits="19" v:shadowOffsetX="9" v:shadowOffsetY="-9"/>
+		<v:layer v:name="流程图" v:index="0"/>
+		<v:layer v:name="连接线" v:index="1"/>
+		<g id="shape4-1" v:mID="4" v:groupContext="shape" transform="translate(229.557,-398.25)">
+			<title>矩形</title>
+			<desc>VMCS</desc>
+			<v:userDefs>
+				<v:ud v:nameU="visVersion" v:val="VT0(15):26"/>
+			</v:userDefs>
+			<v:textBlock v:margins="rect(4,4,4,4)" v:verticalAlign="0"/>
+			<v:textRect cx="56.6929" cy="1076.63" width="113.39" height="222.75"/>
+			<rect x="0" y="965.25" width="113.386" height="222.75" class="st1"/>
+			<text x="4" y="978.25" class="st2" v:langID="2052"><v:paragraph/><v:tabList/>VMCS</text>		</g>
+		<g id="shape5-4" v:mID="5" v:groupContext="shape" transform="translate(229.557,-504)">
+			<title>矩形.5</title>
+			<desc>Guest non-register State</desc>
+			<v:userDefs>
+				<v:ud v:nameU="visVersion" v:val="VT0(15):26"/>
+			</v:userDefs>
+			<v:textBlock v:margins="rect(4,4,4,4)" v:verticalAlign="0"/>
+			<v:textRect cx="48.5965" cy="1149.75" width="97.2" height="76.5"/>
+			<rect x="0" y="1111.5" width="97.1929" height="76.5" class="st3"/>
+			<text x="10.55" y="1124.5" class="st2" v:langID="2052"><v:paragraph v:horizAlign="1"/><v:tabList/>Guest non-register<v:newlineChar/><tspan
+						x="38.07" dy="1.2em" class="st4">State</tspan></text>		</g>
+		<g id="shape6-8" v:mID="6" v:groupContext="shape" transform="translate(229.557,-530.22)">
+			<title>矩形.6</title>
+			<desc>RVI</desc>
+			<v:userDefs>
+				<v:ud v:nameU="visVersion" v:val="VT0(15):26"/>
+			</v:userDefs>
+			<v:textBlock v:margins="rect(4,4,4,4)"/>
+			<v:textRect cx="31.7215" cy="1180.24" width="63.45" height="15.5197"/>
+			<rect x="0" y="1172.48" width="63.4429" height="15.5197" class="st5"/>
+			<text x="24.91" y="1183.24" class="st2" v:langID="2052"><v:paragraph v:horizAlign="1"/><v:tabList/>RVI</text>		</g>
+		<g id="shape7-11" v:mID="7" v:groupContext="shape" transform="translate(229.5,-514.75)">
+			<title>矩形.7</title>
+			<desc>SVI</desc>
+			<v:userDefs>
+				<v:ud v:nameU="visVersion" v:val="VT0(15):26"/>
+			</v:userDefs>
+			<v:textBlock v:margins="rect(4,4,4,4)"/>
+			<v:textRect cx="31.7215" cy="1180.24" width="63.45" height="15.5197"/>
+			<rect x="0" y="1172.48" width="63.4429" height="15.5197" class="st5"/>
+			<text x="25.33" y="1183.24" class="st2" v:langID="2052"><v:paragraph v:horizAlign="1"/><v:tabList/>SVI</text>		</g>
+		<g id="shape9-14" v:mID="9" v:groupContext="shape" transform="translate(229.557,-420.75)">
+			<title>矩形.9</title>
+			<desc>VM-Execution Control fields</desc>
+			<v:userDefs>
+				<v:ud v:nameU="visVersion" v:val="VT0(15):26"/>
+			</v:userDefs>
+			<v:textBlock v:margins="rect(4,4,4,4)" v:verticalAlign="0"/>
+			<v:textRect cx="48.5965" cy="1149.75" width="97.2" height="76.5"/>
+			<rect x="0" y="1111.5" width="97.1929" height="76.5" class="st3"/>
+			<text x="20.03" y="1124.5" class="st2" v:langID="2052"><v:paragraph v:horizAlign="1"/><v:tabList/>VM-Execution<v:newlineChar/><tspan
+						x="21.44" dy="1.2em" class="st4">Control fields</tspan></text>		</g>
+		<g id="shape10-18" v:mID="10" v:groupContext="shape" transform="translate(229.557,-438.75)">
+			<title>矩形.10</title>
+			<desc>Virtual-APIC address</desc>
+			<v:userDefs>
+				<v:ud v:nameU="visVersion" v:val="VT0(15):26"/>
+			</v:userDefs>
+			<v:textBlock v:margins="rect(4,4,4,4)"/>
+			<v:textRect cx="31.7215" cy="1176.87" width="63.45" height="22.2697"/>
+			<rect x="0" y="1165.73" width="63.4429" height="22.2697" class="st5"/>
+			<text x="7.22" y="1173.87" class="st2" v:langID="2052"><v:paragraph v:horizAlign="1"/><v:tabList/>Virtual-APIC<v:newlineChar/><tspan
+						x="15.93" dy="1.2em" class="st4">address</tspan></text>		</g>
+		<g id="group11-22" transform="translate(81.3406,-490.5)" v:mID="11" v:groupContext="group">
+			<v:userDefs>
+				<v:ud v:nameU="visVersion" v:prompt="" v:val="VT0(15):26"/>
+				<v:ud v:nameU="ShowActor" v:prompt="" v:val="VT0(0):5"/>
+				<v:ud v:nameU="ShowDestruction" v:prompt="" v:val="VT0(0):5"/>
+			</v:userDefs>
+			<title>对象生命线</title>
+			<desc>KVM</desc>
+			<g id="shape12-23" v:mID="12" v:groupContext="shape">
+				<title>工作表.12</title>
+				<rect x="0" y="1162.49" width="51.0236" height="25.5118" class="st6"/>
+			</g>
+			<g id="shape13-25" v:mID="13" v:groupContext="shape" transform="translate(17.0079,-29.0551)">
+				<title>工作表.13</title>
+				<path d="M8.5 1188 a0 0 0 1 1 0 0 a0 0 0 1 1 0 0 Z" class="st6"/>
+			</g>
+			<g id="shape14-27" v:mID="14" v:groupContext="shape" transform="translate(17.0079,370.103)">
+				<title>工作表.14</title>
+			</g>
+			<g id="shape15-29" v:mID="15" v:groupContext="shape" transform="translate(1213.51,1188) rotate(90)">
+				<title>工作表.15</title>
+				<path d="M0 1188 L352.49 1188" class="st7"/>
+			</g>
+			<g id="shape11-32" v:mID="11" v:groupContext="groupContent">
+				<v:textBlock v:margins="rect(4,4,4,4)" v:tabSpace="42.5197"/>
+				<v:textRect cx="25.5118" cy="1175.24" width="51.03" height="25.5118"/>
+				<rect x="0" y="1162.49" width="51.0236" height="25.5118" class="st6"/>
+				<text x="13.44" y="1178.84" class="st8" v:langID="2052"><v:paragraph v:horizAlign="1"/><v:tabList/>KVM</text>			</g>
+		</g>
+		<g id="shape16-35" v:mID="16" v:groupContext="shape" v:layerMember="1" transform="translate(106.852,-419.634)">
+			<title>消息</title>
+			<desc>在VM entry 前设置RVI为 VIRR中最大的vector</desc>
+			<v:userDefs>
+				<v:ud v:nameU="IsReturn" v:prompt="" v:val="VT0(0):5"/>
+				<v:ud v:nameU="IsAsync" v:prompt="" v:val="VT0(0):26"/>
+				<v:ud v:nameU="IsSelfMessage" v:prompt="" v:val="VT0(0):5"/>
+				<v:ud v:nameU="visVersion" v:prompt="" v:val="VT0(15):26"/>
+			</v:userDefs>
+			<v:textBlock v:margins="rect(4,4,4,4)" v:tabSpace="42.5197"/>
+			<v:textRect cx="61.3524" cy="1130.07" width="77.72" height="39.9537"/>
+			<path d="M0 1188 L117.64 1076.91" class="st9"/>
+			<rect v:rectContext="textBkgnd" x="27.3995" y="1115.49" width="67.9059" height="29.1497" class="st11"/>
+			<text x="42.12" y="1122.78" class="st12" v:langID="2052"><v:paragraph v:horizAlign="1"/><v:tabList/>在<tspan
+						class="st13">VM entry<v:newlineChar/></tspan><tspan x="35.9" dy="1.215em" class="st4">前设置</tspan><tspan
+						class="st13">RVI</tspan>，为<v:newlineChar/><tspan x="27.4" dy="1.215em" class="st13">VIRR</tspan>中最大的<tspan
+						class="st13">vector</tspan></text>		</g>
+		<g id="shape17-48" v:mID="17" v:groupContext="shape" v:layerMember="0" transform="translate(235.807,-254.48)">
+			<title>流程</title>
+			<desc>virtual APIC page</desc>
+			<v:custProps>
+				<v:cp v:nameU="Cost" v:lbl="成本" v:prompt="" v:type="7" v:format="@" v:sortKey="" v:invis="false" v:ask="false"
+						v:langID="2052" v:cal="0"/>
+				<v:cp v:nameU="ProcessNumber" v:lbl="进程编号" v:prompt="" v:type="2" v:format="" v:sortKey="" v:invis="false"
+						v:ask="false" v:langID="2052" v:cal="0"/>
+				<v:cp v:nameU="Owner" v:lbl="所有者" v:prompt="" v:type="0" v:format="" v:sortKey="" v:invis="false" v:ask="false"
+						v:langID="2052" v:cal="0"/>
+				<v:cp v:nameU="Function" v:lbl="函数" v:prompt="" v:type="0" v:format="" v:sortKey="" v:invis="false" v:ask="false"
+						v:langID="2052" v:cal="0" v:val="VT4()"/>
+				<v:cp v:nameU="StartDate" v:lbl="开始日期" v:prompt="" v:type="5" v:format="" v:sortKey="" v:invis="false"
+						v:ask="false" v:langID="2052" v:cal="0"/>
+				<v:cp v:nameU="EndDate" v:lbl="结束日期" v:prompt="" v:type="5" v:format="" v:sortKey="" v:invis="false" v:ask="false"
+						v:langID="2052" v:cal="0"/>
+				<v:cp v:nameU="Status" v:lbl="状态" v:prompt="" v:type="4" v:format=";未开始;进行中;已完成;已推迟;正在等待输入" v:sortKey=""
+						v:invis="false" v:ask="false" v:langID="2052" v:cal="0" v:val="VT4()"/>
+			</v:custProps>
+			<v:userDefs>
+				<v:ud v:nameU="visVersion" v:prompt="" v:val="VT0(15):26"/>
+				<v:ud v:nameU="DefaultWidth" v:prompt="" v:val="VT0(0.98425196850394):24"/>
+				<v:ud v:nameU="DefaultHeight" v:prompt="" v:val="VT0(0.59055118110236):24"/>
+				<v:ud v:nameU="ResizeTxtHeight" v:prompt="" v:val="VT0(0.59055118110236):24"/>
+			</v:userDefs>
+			<v:textBlock v:margins="rect(2,2,2,2)" v:verticalAlign="0"/>
+			<v:textRect cx="56.6929" cy="1132.99" width="113.39" height="110.02"/>
+			<rect x="0" y="1077.98" width="113.386" height="110.02" class="st1"/>
+			<text x="2" y="1087.18" class="st14" v:langID="2052"><v:paragraph/><v:tabList/>virtual APIC page</text>		</g>
+		<g id="shape18-51" v:mID="18" v:groupContext="shape" v:layerMember="0" transform="translate(235.807,-321.98)">
+			<title>流程.18</title>
+			<desc>VIRR</desc>
+			<v:custProps>
+				<v:cp v:nameU="Cost" v:lbl="成本" v:prompt="" v:type="7" v:format="@" v:sortKey="" v:invis="false" v:ask="false"
+						v:langID="2052" v:cal="0"/>
+				<v:cp v:nameU="ProcessNumber" v:lbl="进程编号" v:prompt="" v:type="2" v:format="" v:sortKey="" v:invis="false"
+						v:ask="false" v:langID="2052" v:cal="0"/>
+				<v:cp v:nameU="Owner" v:lbl="所有者" v:prompt="" v:type="0" v:format="" v:sortKey="" v:invis="false" v:ask="false"
+						v:langID="2052" v:cal="0"/>
+				<v:cp v:nameU="Function" v:lbl="函数" v:prompt="" v:type="0" v:format="" v:sortKey="" v:invis="false" v:ask="false"
+						v:langID="2052" v:cal="0" v:val="VT4()"/>
+				<v:cp v:nameU="StartDate" v:lbl="开始日期" v:prompt="" v:type="5" v:format="" v:sortKey="" v:invis="false"
+						v:ask="false" v:langID="2052" v:cal="0"/>
+				<v:cp v:nameU="EndDate" v:lbl="结束日期" v:prompt="" v:type="5" v:format="" v:sortKey="" v:invis="false" v:ask="false"
+						v:langID="2052" v:cal="0"/>
+				<v:cp v:nameU="Status" v:lbl="状态" v:prompt="" v:type="4" v:format=";未开始;进行中;已完成;已推迟;正在等待输入" v:sortKey=""
+						v:invis="false" v:ask="false" v:langID="2052" v:cal="0" v:val="VT4()"/>
+			</v:custProps>
+			<v:userDefs>
+				<v:ud v:nameU="visVersion" v:prompt="" v:val="VT0(15):26"/>
+				<v:ud v:nameU="DefaultWidth" v:prompt="" v:val="VT0(0.98425196850394):24"/>
+				<v:ud v:nameU="DefaultHeight" v:prompt="" v:val="VT0(0.59055118110236):24"/>
+				<v:ud v:nameU="ResizeTxtHeight" v:prompt="" v:val="VT0(0.59055118110236):24"/>
+			</v:userDefs>
+			<v:textBlock v:margins="rect(2,2,2,2)"/>
+			<v:textRect cx="35.4331" cy="1180.24" width="70.87" height="15.5197"/>
+			<rect x="0" y="1172.48" width="70.8661" height="15.5197" class="st5"/>
+			<text x="27.81" y="1182.64" class="st14" v:langID="2052"><v:paragraph v:horizAlign="1"/><v:tabList/>VIRR</text>		</g>
+		<g id="shape19-54" v:mID="19" v:groupContext="shape" v:layerMember="0" transform="translate(235.807,-306.345)">
+			<title>流程.19</title>
+			<desc>VISR</desc>
+			<v:custProps>
+				<v:cp v:nameU="Cost" v:lbl="成本" v:prompt="" v:type="7" v:format="@" v:sortKey="" v:invis="false" v:ask="false"
+						v:langID="2052" v:cal="0"/>
+				<v:cp v:nameU="ProcessNumber" v:lbl="进程编号" v:prompt="" v:type="2" v:format="" v:sortKey="" v:invis="false"
+						v:ask="false" v:langID="2052" v:cal="0"/>
+				<v:cp v:nameU="Owner" v:lbl="所有者" v:prompt="" v:type="0" v:format="" v:sortKey="" v:invis="false" v:ask="false"
+						v:langID="2052" v:cal="0"/>
+				<v:cp v:nameU="Function" v:lbl="函数" v:prompt="" v:type="0" v:format="" v:sortKey="" v:invis="false" v:ask="false"
+						v:langID="2052" v:cal="0" v:val="VT4()"/>
+				<v:cp v:nameU="StartDate" v:lbl="开始日期" v:prompt="" v:type="5" v:format="" v:sortKey="" v:invis="false"
+						v:ask="false" v:langID="2052" v:cal="0"/>
+				<v:cp v:nameU="EndDate" v:lbl="结束日期" v:prompt="" v:type="5" v:format="" v:sortKey="" v:invis="false" v:ask="false"
+						v:langID="2052" v:cal="0"/>
+				<v:cp v:nameU="Status" v:lbl="状态" v:prompt="" v:type="4" v:format=";未开始;进行中;已完成;已推迟;正在等待输入" v:sortKey=""
+						v:invis="false" v:ask="false" v:langID="2052" v:cal="0" v:val="VT4()"/>
+			</v:custProps>
+			<v:userDefs>
+				<v:ud v:nameU="visVersion" v:prompt="" v:val="VT0(15):26"/>
+				<v:ud v:nameU="DefaultWidth" v:prompt="" v:val="VT0(0.98425196850394):24"/>
+				<v:ud v:nameU="DefaultHeight" v:prompt="" v:val="VT0(0.59055118110236):24"/>
+				<v:ud v:nameU="ResizeTxtHeight" v:prompt="" v:val="VT0(0.59055118110236):24"/>
+			</v:userDefs>
+			<v:textBlock v:margins="rect(2,2,2,2)"/>
+			<v:textRect cx="35.4331" cy="1180.24" width="70.87" height="15.5197"/>
+			<rect x="0" y="1172.48" width="70.8661" height="15.5197" class="st5"/>
+			<text x="28.15" y="1182.64" class="st14" v:langID="2052"><v:paragraph v:horizAlign="1"/><v:tabList/>VISR</text>		</g>
+		<g id="shape20-57" v:mID="20" v:groupContext="shape" v:layerMember="0" transform="translate(235.807,-290.48)">
+			<title>流程.20</title>
+			<desc>VTPR</desc>
+			<v:custProps>
+				<v:cp v:nameU="Cost" v:lbl="成本" v:prompt="" v:type="7" v:format="@" v:sortKey="" v:invis="false" v:ask="false"
+						v:langID="2052" v:cal="0"/>
+				<v:cp v:nameU="ProcessNumber" v:lbl="进程编号" v:prompt="" v:type="2" v:format="" v:sortKey="" v:invis="false"
+						v:ask="false" v:langID="2052" v:cal="0"/>
+				<v:cp v:nameU="Owner" v:lbl="所有者" v:prompt="" v:type="0" v:format="" v:sortKey="" v:invis="false" v:ask="false"
+						v:langID="2052" v:cal="0"/>
+				<v:cp v:nameU="Function" v:lbl="函数" v:prompt="" v:type="0" v:format="" v:sortKey="" v:invis="false" v:ask="false"
+						v:langID="2052" v:cal="0" v:val="VT4()"/>
+				<v:cp v:nameU="StartDate" v:lbl="开始日期" v:prompt="" v:type="5" v:format="" v:sortKey="" v:invis="false"
+						v:ask="false" v:langID="2052" v:cal="0"/>
+				<v:cp v:nameU="EndDate" v:lbl="结束日期" v:prompt="" v:type="5" v:format="" v:sortKey="" v:invis="false" v:ask="false"
+						v:langID="2052" v:cal="0"/>
+				<v:cp v:nameU="Status" v:lbl="状态" v:prompt="" v:type="4" v:format=";未开始;进行中;已完成;已推迟;正在等待输入" v:sortKey=""
+						v:invis="false" v:ask="false" v:langID="2052" v:cal="0" v:val="VT4()"/>
+			</v:custProps>
+			<v:userDefs>
+				<v:ud v:nameU="visVersion" v:prompt="" v:val="VT0(15):26"/>
+				<v:ud v:nameU="DefaultWidth" v:prompt="" v:val="VT0(0.98425196850394):24"/>
+				<v:ud v:nameU="DefaultHeight" v:prompt="" v:val="VT0(0.59055118110236):24"/>
+				<v:ud v:nameU="ResizeTxtHeight" v:prompt="" v:val="VT0(0.59055118110236):24"/>
+			</v:userDefs>
+			<v:textBlock v:margins="rect(2,2,2,2)"/>
+			<v:textRect cx="35.4331" cy="1180.24" width="70.87" height="15.5197"/>
+			<rect x="0" y="1172.48" width="70.8661" height="15.5197" class="st5"/>
+			<text x="26.98" y="1182.64" class="st14" v:langID="2052"><v:paragraph v:horizAlign="1"/><v:tabList/>VTPR</text>		</g>
+		<g id="shape21-60" v:mID="21" v:groupContext="shape" v:layerMember="0" transform="translate(235.807,-274.961)">
+			<title>流程.21</title>
+			<desc>VPPR</desc>
+			<v:custProps>
+				<v:cp v:nameU="Cost" v:lbl="成本" v:prompt="" v:type="7" v:format="@" v:sortKey="" v:invis="false" v:ask="false"
+						v:langID="2052" v:cal="0"/>
+				<v:cp v:nameU="ProcessNumber" v:lbl="进程编号" v:prompt="" v:type="2" v:format="" v:sortKey="" v:invis="false"
+						v:ask="false" v:langID="2052" v:cal="0"/>
+				<v:cp v:nameU="Owner" v:lbl="所有者" v:prompt="" v:type="0" v:format="" v:sortKey="" v:invis="false" v:ask="false"
+						v:langID="2052" v:cal="0"/>
+				<v:cp v:nameU="Function" v:lbl="函数" v:prompt="" v:type="0" v:format="" v:sortKey="" v:invis="false" v:ask="false"
+						v:langID="2052" v:cal="0" v:val="VT4()"/>
+				<v:cp v:nameU="StartDate" v:lbl="开始日期" v:prompt="" v:type="5" v:format="" v:sortKey="" v:invis="false"
+						v:ask="false" v:langID="2052" v:cal="0"/>
+				<v:cp v:nameU="EndDate" v:lbl="结束日期" v:prompt="" v:type="5" v:format="" v:sortKey="" v:invis="false" v:ask="false"
+						v:langID="2052" v:cal="0"/>
+				<v:cp v:nameU="Status" v:lbl="状态" v:prompt="" v:type="4" v:format=";未开始;进行中;已完成;已推迟;正在等待输入" v:sortKey=""
+						v:invis="false" v:ask="false" v:langID="2052" v:cal="0" v:val="VT4()"/>
+			</v:custProps>
+			<v:userDefs>
+				<v:ud v:nameU="visVersion" v:prompt="" v:val="VT0(15):26"/>
+				<v:ud v:nameU="DefaultWidth" v:prompt="" v:val="VT0(0.98425196850394):24"/>
+				<v:ud v:nameU="DefaultHeight" v:prompt="" v:val="VT0(0.59055118110236):24"/>
+				<v:ud v:nameU="ResizeTxtHeight" v:prompt="" v:val="VT0(0.59055118110236):24"/>
+			</v:userDefs>
+			<v:textBlock v:margins="rect(2,2,2,2)"/>
+			<v:textRect cx="35.4331" cy="1180.24" width="70.87" height="15.5197"/>
+			<rect x="0" y="1172.48" width="70.8661" height="15.5197" class="st5"/>
+			<text x="26.86" y="1182.64" class="st14" v:langID="2052"><v:paragraph v:horizAlign="1"/><v:tabList/>VPPR</text>		</g>
+		<g id="shape22-63" v:mID="22" v:groupContext="shape" v:layerMember="1" transform="translate(106.852,-419.634)">
+			<title>消息.22</title>
+			<desc>配置下面的寄存器</desc>
+			<v:userDefs>
+				<v:ud v:nameU="IsReturn" v:prompt="" v:val="VT0(0):5"/>
+				<v:ud v:nameU="IsAsync" v:prompt="" v:val="VT0(0):26"/>
+				<v:ud v:nameU="IsSelfMessage" v:prompt="" v:val="VT0(0):5"/>
+				<v:ud v:nameU="visVersion" v:prompt="" v:val="VT0(15):26"/>
+			</v:userDefs>
+			<v:textBlock v:margins="rect(4,4,4,4)" v:tabSpace="42.5197"/>
+			<v:textRect cx="64.4774" cy="1232.95" width="73.82" height="18.6536"/>
+			<path d="M0 1188 L106.69 1262.37" class="st15"/>
+			<path d="M111.61 1265.8 L123.25 1273.91" class="st16"/>
+			<rect v:rectContext="textBkgnd" x="32.4776" y="1228.09" width="63.9998" height="9.71658" class="st11"/>
+			<text x="32.48" y="1235.38" class="st12" v:langID="2052"><v:paragraph v:horizAlign="1"/><v:tabList/>配置下面的寄存器</text>		</g>
+		<g id="group23-71" transform="translate(389.976,-491.244)" v:mID="23" v:groupContext="group">
+			<v:userDefs>
+				<v:ud v:nameU="visVersion" v:prompt="" v:val="VT0(15):26"/>
+				<v:ud v:nameU="ShowActor" v:prompt="" v:val="VT0(0):5"/>
+				<v:ud v:nameU="ShowDestruction" v:prompt="" v:val="VT0(0):5"/>
+			</v:userDefs>
+			<title>对象生命线.23</title>
+			<desc>VM entry</desc>
+			<g id="shape24-72" v:mID="24" v:groupContext="shape">
+				<title>工作表.24</title>
+				<rect x="0" y="1162.49" width="51.0236" height="25.5118" class="st6"/>
+			</g>
+			<g id="shape25-74" v:mID="25" v:groupContext="shape" transform="translate(17.0079,-29.0551)">
+				<title>工作表.25</title>
+				<path d="M8.5 1188 a0 0 0 1 1 0 0 a0 0 0 1 1 0 0 Z" class="st6"/>
+			</g>
+			<g id="shape26-76" v:mID="26" v:groupContext="shape" transform="translate(17.0079,387.359)">
+				<title>工作表.26</title>
+			</g>
+			<g id="shape27-78" v:mID="27" v:groupContext="shape" transform="translate(1213.51,1188) rotate(90)">
+				<title>工作表.27</title>
+				<path d="M0 1188 L369.74 1188" class="st7"/>
+			</g>
+			<g id="shape23-81" v:mID="23" v:groupContext="groupContent">
+				<v:textBlock v:margins="rect(4,4,4,4)" v:tabSpace="42.5197"/>
+				<v:textRect cx="25.5118" cy="1175.24" width="51.03" height="25.5118"/>
+				<rect x="0" y="1162.49" width="51.0236" height="25.5118" class="st6"/>
+				<text x="16.72" y="1171.64" class="st8" v:langID="2052"><v:paragraph v:horizAlign="1"/><v:tabList/>VM <tspan
+							x="12.22" dy="1.2em" class="st4">entry</tspan></text>			</g>
+		</g>
+		<g id="group29-85" transform="translate(106.852,-235.382)" v:mID="29" v:groupContext="group">
+			<v:userDefs>
+				<v:ud v:nameU="BeginAngle" v:prompt="reserved for future use" v:val="VT0(2):26"/>
+				<v:ud v:nameU="EndAngle" v:prompt="reserved for future use" v:val="VT0(2):26"/>
+				<v:ud v:nameU="RealBeginX" v:val="VT0(0):32"/>
+				<v:ud v:nameU="RealBeginY" v:val="VT0(0):32"/>
+				<v:ud v:nameU="EndX" v:val="VT0(-5.5511151231258E-017):1"/>
+				<v:ud v:nameU="EndY" v:val="VT0(-0.125):1"/>
+				<v:ud v:nameU="Row_7" v:val="VT0(-1):1"/>
+				<v:ud v:nameU="BeginY" v:val="VT0(-0.125):1"/>
+				<v:ud v:nameU="EndX" v:prompt="" v:val="VT0(0):24"/>
+				<v:ud v:nameU="EndY" v:prompt="" v:val="VT0(-4.4408920985006E-016):24"/>
+				<v:ud v:nameU="Row_7" v:prompt="" v:val="VT0(-4.2866087051618):24"/>
+				<v:ud v:nameU="BeginY" v:prompt="" v:val="VT0(-2.3725393700787):24"/>
+			</v:userDefs>
+			<title>Transition, Edge</title>
+			<desc>执行vmlaunch/ vmresume</desc>
+			<g id="shape30-86" v:mID="30" v:groupContext="shape" transform="translate(308.636,-162.446)">
+				<title>Straight Edge.28</title>
+				<desc>N</desc>
+				<v:userDefs>
+					<v:ud v:nameU="SetSize" v:val="VT0(0):26"/>
+				</v:userDefs>
+				<v:textBlock v:margins="rect(4,4,4,4)"/>
+				<v:textRect cx="8.37669" cy="1179.62" width="14.98" height="17.6036"/>
+			</g>
+			<g id="shape31-90" v:mID="31" v:groupContext="shape" transform="translate(-16.7534,8.37669)">
+				<title>Straight Edge.29</title>
+				<desc>N</desc>
+				<v:userDefs>
+					<v:ud v:nameU="SetSize" v:val="VT0(0):26"/>
+				</v:userDefs>
+				<v:textBlock v:margins="rect(4,4,4,4)"/>
+				<v:textRect cx="8.37669" cy="1179.62" width="14.98" height="17.6036"/>
+			</g>
+			<g id="shape29-93" v:mID="29" v:groupContext="groupContent">
+				<v:textBlock v:margins="rect(4,4,4,4)"/>
+				<v:textRect cx="239.729" cy="1188" width="60.57" height="28.2536"/>
+				<path d="M0 1188 L106.15 1188" class="st15"/>
+				<path d="M112.15 1188 L161.39 1188" class="st15"/>
+				<path d="M167.39 1188 L236.95 1188 A18 18 -180 0 0 254.95 1170 L254.95 1035.18 A18 18 0 0 1 272.95 1017.18 L308.64
+							 1017.18" class="st16"/>
+				<rect v:rectContext="textBkgnd" x="214.353" y="1178.34" width="50.7535" height="19.3164" class="st11"/>
+				<text x="214.35" y="1185.63" class="st12" v:langID="2052"><v:paragraph v:horizAlign="1"/><v:tabList/>执行<tspan
+							class="st13">vmlaunch</tspan><tspan class="st13">/<v:newlineChar/></tspan><tspan x="222.49"
+							dy="1.204em" class="st13">vmresume</tspan></text>			</g>
+		</g>
+		<g id="group34-105" transform="translate(424.488,-377.858)" v:mID="34" v:groupContext="group">
+			<v:userDefs>
+				<v:ud v:nameU="BeginAngle" v:prompt="reserved for future use" v:val="VT0(2):26"/>
+				<v:ud v:nameU="EndAngle" v:prompt="reserved for future use" v:val="VT0(2):26"/>
+				<v:ud v:nameU="RealBeginX" v:val="VT0(0):32"/>
+				<v:ud v:nameU="RealBeginY" v:val="VT0(0):32"/>
+				<v:ud v:nameU="EndX" v:val="VT0(-5.5511151231258E-017):1"/>
+				<v:ud v:nameU="EndY" v:val="VT0(-0.125):1"/>
+				<v:ud v:nameU="Row_7" v:val="VT0(-1):1"/>
+				<v:ud v:nameU="BeginY" v:val="VT0(-0.125):1"/>
+				<v:ud v:nameU="RealBeginY" v:prompt="" v:val="VT0(3.1415926535898):32"/>
+				<v:ud v:nameU="EndX" v:prompt="" v:val="VT0(0.125):24"/>
+				<v:ud v:nameU="EndY" v:prompt="" v:val="VT0(0):24"/>
+				<v:ud v:nameU="Row_7" v:prompt="" v:val="VT0(0.125):24"/>
+				<v:ud v:nameU="BeginY" v:prompt="" v:val="VT0(3.1889763779528):24"/>
+			</v:userDefs>
+			<title>Transition, Edge.34</title>
+			<desc>Load Guest state</desc>
+			<g id="shape35-106" v:mID="35" v:groupContext="shape" transform="translate(-9,2598.12) rotate(180)">
+				<title>Straight Edge.28</title>
+				<desc>N</desc>
+				<v:userDefs>
+					<v:ud v:nameU="SetSize" v:val="VT0(0):26"/>
+				</v:userDefs>
+				<v:textBlock v:margins="rect(4,4,4,4)"/>
+				<v:textRect cx="7.48817" cy="1180.51" width="14.98" height="17.6036" transform="rotate(180)"/>
+			</g>
+			<g id="shape36-109" v:mID="36" v:groupContext="shape" transform="translate(-23.9763,7.48817)">
+				<title>Straight Edge.29</title>
+				<desc>N</desc>
+				<v:userDefs>
+					<v:ud v:nameU="SetSize" v:val="VT0(0):26"/>
+				</v:userDefs>
+				<v:textBlock v:margins="rect(4,4,4,4)"/>
+				<v:textRect cx="7.48817" cy="1180.51" width="14.98" height="17.6036"/>
+			</g>
+			<g id="shape34-112" v:mID="34" v:groupContext="groupContent">
+				<v:textBlock v:margins="rect(4,4,4,4)"/>
+				<v:textRect cx="61.5118" cy="1201.36" width="64.39" height="17.6036"/>
+				<path d="M-9 1188 L39.01 1188 A18 18 0 0 1 57.01 1206 L57.01 1399.61 A18 18 0 0 1 39.01 1417.61 L-9 1417.61"
+						class="st18"/>
+				<rect v:rectContext="textBkgnd" x="34.2252" y="1196.56" width="54.5735" height="9.59985" class="st11"/>
+				<text x="34.23" y="1203.76" class="st14" v:langID="2052"><v:paragraph v:horizAlign="1"/><v:tabList/>Load Guest state</text>			</g>
+		</g>
+		<g id="group37-119" transform="translate(424.488,-349.512)" v:mID="37" v:groupContext="group">
+			<v:userDefs>
+				<v:ud v:nameU="BeginAngle" v:prompt="reserved for future use" v:val="VT0(2):26"/>
+				<v:ud v:nameU="EndAngle" v:prompt="reserved for future use" v:val="VT0(2):26"/>
+				<v:ud v:nameU="RealBeginX" v:val="VT0(0):32"/>
+				<v:ud v:nameU="RealBeginY" v:val="VT0(0):32"/>
+				<v:ud v:nameU="EndX" v:val="VT0(-5.5511151231258E-017):1"/>
+				<v:ud v:nameU="EndY" v:val="VT0(-0.125):1"/>
+				<v:ud v:nameU="Row_7" v:val="VT0(-1):1"/>
+				<v:ud v:nameU="BeginY" v:val="VT0(-0.125):1"/>
+				<v:ud v:nameU="RealBeginY" v:prompt="" v:val="VT0(3.1415926535898):32"/>
+				<v:ud v:nameU="EndX" v:prompt="" v:val="VT0(0.125):24"/>
+				<v:ud v:nameU="EndY" v:prompt="" v:val="VT0(1.7763568394003E-015):24"/>
+				<v:ud v:nameU="Row_7" v:prompt="" v:val="VT0(0.125):24"/>
+				<v:ud v:nameU="BeginY" v:prompt="" v:val="VT0(2.5590551181102):24"/>
+			</v:userDefs>
+			<title>Transition, Edge.37</title>
+			<desc>Update Non-Register State</desc>
+			<g id="shape38-120" v:mID="38" v:groupContext="shape" transform="translate(-9,2552.76) rotate(180)">
+				<title>Straight Edge.28</title>
+				<desc>N</desc>
+				<v:userDefs>
+					<v:ud v:nameU="SetSize" v:val="VT0(0):26"/>
+				</v:userDefs>
+				<v:textBlock v:margins="rect(4,4,4,4)"/>
+				<v:textRect cx="7.48817" cy="1180.51" width="14.98" height="17.6036" transform="rotate(180)"/>
+			</g>
+			<g id="shape39-123" v:mID="39" v:groupContext="shape" transform="translate(-23.9763,7.48817)">
+				<title>Straight Edge.29</title>
+				<desc>N</desc>
+				<v:userDefs>
+					<v:ud v:nameU="SetSize" v:val="VT0(0):26"/>
+				</v:userDefs>
+				<v:textBlock v:margins="rect(4,4,4,4)"/>
+				<v:textRect cx="7.48817" cy="1180.51" width="14.98" height="17.6036"/>
+			</g>
+			<g id="shape37-126" v:mID="37" v:groupContext="groupContent">
+				<v:textBlock v:margins="rect(4,4,4,4)"/>
+				<v:textRect cx="25.5118" cy="1209.01" width="52.36" height="36.8035"/>
+				<path d="M-9 1188 L30.01 1188 A18 18 0 0 1 48.01 1206 L48.01 1354.25 A18 18 0 0 1 30.01 1372.25 L-9 1372.25"
+						class="st18"/>
+				<rect v:rectContext="textBkgnd" x="4.24266" y="1194.61" width="42.5385" height="28.7996" class="st11"/>
+				<text x="13.5" y="1201.81" class="st14" v:langID="2052"><v:paragraph v:horizAlign="1"/><v:tabList/>Update<v:newlineChar/><tspan
+							x="4.24" dy="1.2em" class="st4">Non</tspan>-Register<v:newlineChar/><tspan x="17.09" dy="1.2em"
+							class="st4">State</tspan></text>			</g>
+		</g>
+		<g id="group40-135" transform="translate(424.488,-306.992)" v:mID="40" v:groupContext="group">
+			<v:userDefs>
+				<v:ud v:nameU="BeginAngle" v:prompt="reserved for future use" v:val="VT0(2):26"/>
+				<v:ud v:nameU="EndAngle" v:prompt="reserved for future use" v:val="VT0(2):26"/>
+				<v:ud v:nameU="RealBeginX" v:val="VT0(0):32"/>
+				<v:ud v:nameU="RealBeginY" v:val="VT0(0):32"/>
+				<v:ud v:nameU="EndX" v:val="VT0(-5.5511151231258E-017):1"/>
+				<v:ud v:nameU="EndY" v:val="VT0(-0.125):1"/>
+				<v:ud v:nameU="Row_7" v:val="VT0(-1):1"/>
+				<v:ud v:nameU="BeginY" v:val="VT0(-0.125):1"/>
+				<v:ud v:nameU="RealBeginX" v:prompt="" v:val="VT0(-1.5707963267949):32"/>
+				<v:ud v:nameU="RealBeginY" v:prompt="" v:val="VT0(-3.1196247969955):32"/>
+				<v:ud v:nameU="EndX" v:prompt="" v:val="VT0(0.125):24"/>
+				<v:ud v:nameU="EndY" v:prompt="" v:val="VT0(0):24"/>
+				<v:ud v:nameU="Row_7" v:prompt="" v:val="VT0(0.125):24"/>
+				<v:ud v:nameU="BeginY" v:prompt="" v:val="VT0(0.70866141732283):24"/>
+			</v:userDefs>
+			<title>Transition, Edge.40</title>
+			<desc>PPR virtualization</desc>
+			<g id="shape41-136" v:mID="41" v:groupContext="shape" transform="translate(16.9117,2418.36) rotate(178.741)">
+				<title>Straight Edge.28</title>
+				<desc>N</desc>
+				<v:userDefs>
+					<v:ud v:nameU="SetSize" v:val="VT0(0):26"/>
+				</v:userDefs>
+				<v:textBlock v:margins="rect(4,4,4,4)"/>
+				<v:textRect cx="8.37669" cy="1179.62" width="14.98" height="17.6036" transform="rotate(-178.741)"/>
+			</g>
+			<g id="shape42-140" v:mID="42" v:groupContext="shape" transform="translate(1170.62,1171.25) rotate(90)">
+				<title>Straight Edge.29</title>
+				<desc>N</desc>
+				<v:userDefs>
+					<v:ud v:nameU="SetSize" v:val="VT0(0):26"/>
+				</v:userDefs>
+				<v:textBlock v:margins="rect(4,4,4,4)"/>
+				<v:textRect cx="8.37669" cy="1179.62" width="14.98" height="17.6036" transform="rotate(-90)"/>
+			</g>
+			<g id="shape40-143" v:mID="40" v:groupContext="groupContent">
+				<v:textBlock v:margins="rect(4,4,4,4)"/>
+				<v:textRect cx="19.3243" cy="1197.99" width="52.37" height="27.2035"/>
+				<path d="M-9 1188 L-9 1190.75 A2.74606 2.74606 -180 0 0 -6.25 1193.49 L-5.99 1193.49 A18 18 0 0 1 12.01 1211.49 L12.01
+							 1228.52 A10.5059 10.5059 0 0 1 1.51 1239.02 L-9 1239.02" class="st20"/>
+				<rect v:rectContext="textBkgnd" x="-1.95267" y="1188.39" width="42.5542" height="19.1997" class="st11"/>
+				<text x="13.02" y="1195.59" class="st14" v:langID="2052"><v:paragraph v:horizAlign="1"/><v:tabList/>PPR<v:newlineChar/><tspan
+							x="-1.95" dy="1.2em" class="st4">virtualization</tspan></text>			</g>
+		</g>
+		<g id="group43-151" transform="translate(406.488,-236.126)" v:mID="43" v:groupContext="group">
+			<v:userDefs>
+				<v:ud v:nameU="BeginAngle" v:prompt="reserved for future use" v:val="VT0(2):26"/>
+				<v:ud v:nameU="EndAngle" v:prompt="reserved for future use" v:val="VT0(2):26"/>
+				<v:ud v:nameU="RealBeginX" v:val="VT0(0):32"/>
+				<v:ud v:nameU="RealBeginY" v:val="VT0(0):32"/>
+				<v:ud v:nameU="EndX" v:val="VT0(-5.5511151231258E-017):1"/>
+				<v:ud v:nameU="EndY" v:val="VT0(-0.125):1"/>
+				<v:ud v:nameU="Row_7" v:val="VT0(-1):1"/>
+				<v:ud v:nameU="BeginY" v:val="VT0(-0.125):1"/>
+				<v:ud v:nameU="RealBeginY" v:prompt="" v:val="VT0(-3.1415926535898):32"/>
+				<v:ud v:nameU="EndX" v:prompt="" v:val="VT0(-0.125):24"/>
+				<v:ud v:nameU="EndY" v:prompt="" v:val="VT0(1.3322676295502E-015):24"/>
+				<v:ud v:nameU="Row_7" v:prompt="" v:val="VT0(-0.125):24"/>
+				<v:ud v:nameU="BeginY" v:prompt="" v:val="VT0(0.70866141732284):24"/>
+			</v:userDefs>
+			<title>Transition, Edge.43</title>
+			<desc>evaluate pending virtual intr</desc>
+			<g id="shape44-152" v:mID="44" v:groupContext="shape" transform="translate(9,2418.65) rotate(180)">
+				<title>Straight Edge.28</title>
+				<desc>N</desc>
+				<v:userDefs>
+					<v:ud v:nameU="SetSize" v:val="VT0(0):26"/>
+				</v:userDefs>
+				<v:textBlock v:margins="rect(4,4,4,4)"/>
+				<v:textRect cx="8.37669" cy="1179.62" width="14.98" height="17.6036" transform="rotate(180)"/>
+			</g>
+			<g id="shape45-155" v:mID="45" v:groupContext="shape" transform="translate(-7.75339,8.37669)">
+				<title>Straight Edge.29</title>
+				<desc>N</desc>
+				<v:userDefs>
+					<v:ud v:nameU="SetSize" v:val="VT0(0):26"/>
+				</v:userDefs>
+				<v:textBlock v:margins="rect(4,4,4,4)"/>
+				<v:textRect cx="8.37669" cy="1179.62" width="14.98" height="17.6036"/>
+			</g>
+			<g id="shape43-158" v:mID="43" v:groupContext="groupContent">
+				<v:textBlock v:margins="rect(4,4,4,4)"/>
+				<v:textRect cx="32.2618" cy="1214.31" width="37.77" height="46.4035"/>
+				<path d="M9 1188 L21.76 1188 A12.7559 12.7559 0 0 1 34.51 1200.76 L34.51 1226.27 A12.7559 12.7559 0 0 1 21.76 1239.02
+							 L9 1239.02" class="st20"/>
+				<rect v:rectContext="textBkgnd" x="18.2836" y="1195.11" width="27.9566" height="38.3997" class="st11"/>
+				<text x="18.28" y="1202.31" class="st14" v:langID="2052"><v:paragraph v:horizAlign="1"/><v:tabList/>evaluate<v:newlineChar/><tspan
+							x="19.06" dy="1.2em" class="st4">pending<v:newlineChar/></tspan><tspan x="21.87" dy="1.2em" class="st4">virtual <v:newlineChar/></tspan><tspan
+							x="26.51" dy="1.2em" class="st4">intr</tspan></text>			</g>
+		</g>
+		<g id="group46-168" transform="translate(300.203,-449.885)" v:mID="46" v:groupContext="group">
+			<v:userDefs>
+				<v:ud v:nameU="BeginAngle" v:prompt="reserved for future use" v:val="VT0(2):26"/>
+				<v:ud v:nameU="EndAngle" v:prompt="reserved for future use" v:val="VT0(2):26"/>
+				<v:ud v:nameU="RealBeginX" v:val="VT0(0):32"/>
+				<v:ud v:nameU="RealBeginY" v:val="VT0(0):32"/>
+				<v:ud v:nameU="EndX" v:val="VT0(-5.5511151231258E-017):1"/>
+				<v:ud v:nameU="EndY" v:val="VT0(-0.125):1"/>
+				<v:ud v:nameU="Row_7" v:val="VT0(-1):1"/>
+				<v:ud v:nameU="BeginY" v:val="VT0(-0.125):1"/>
+				<v:ud v:nameU="RealBeginY" v:prompt="" v:val="VT0(-1.5707963267948):32"/>
+				<v:ud v:nameU="EndX" v:prompt="" v:val="VT0(0.10004340277778):1"/>
+				<v:ud v:nameU="EndY" v:prompt="" v:val="VT0(0):1"/>
+				<v:ud v:nameU="Row_7" v:prompt="" v:val="VT0(0.14995659722222):1"/>
+				<v:ud v:nameU="BeginY" v:prompt="" v:val="VT0(1.1859006337294):1"/>
+			</v:userDefs>
+			<title>Transition, Edge.46</title>
+			<g id="shape47-169" v:mID="47" v:groupContext="shape" transform="translate(1168.83,1273.38) rotate(90)">
+				<title>Straight Edge.28</title>
+				<desc>N</desc>
+				<v:userDefs>
+					<v:ud v:nameU="SetSize" v:val="VT0(0):26"/>
+				</v:userDefs>
+				<v:textBlock v:margins="rect(4,4,4,4)"/>
+				<v:textRect cx="8.37669" cy="1179.62" width="14.98" height="17.6036" transform="rotate(-90)"/>
+			</g>
+			<g id="shape48-172" v:mID="48" v:groupContext="shape" transform="translate(-23.9565,8.37669)">
+				<title>Straight Edge.29</title>
+				<desc>N</desc>
+				<v:userDefs>
+					<v:ud v:nameU="SetSize" v:val="VT0(0):26"/>
+				</v:userDefs>
+				<v:textBlock v:margins="rect(4,4,4,4)"/>
+				<v:textRect cx="8.37669" cy="1179.62" width="14.98" height="17.6036"/>
+			</g>
+			<g id="shape46-175" v:mID="46" v:groupContext="groupContent">
+				<path d="M-7.2 1188 L1.55 1188 A8.75 8.75 0 0 1 10.3 1196.75 L10.3 1246.53 A10.5469 10.5469 0 0 1 -0.25 1257.07 L-2.64
+							 1257.07 A8.15625 8.15625 -180 0 0 -10.8 1265.23 L-10.8 1273.38" class="st18"/>
+			</g>
+		</g>
+		<g id="group49-180" transform="translate(549,-491.244)" v:mID="49" v:groupContext="group">
+			<v:userDefs>
+				<v:ud v:nameU="visVersion" v:prompt="" v:val="VT0(15):26"/>
+				<v:ud v:nameU="ShowActor" v:prompt="" v:val="VT0(0):5"/>
+				<v:ud v:nameU="ShowDestruction" v:prompt="" v:val="VT0(0):5"/>
+			</v:userDefs>
+			<title>对象生命线.49</title>
+			<desc>Guest</desc>
+			<g id="shape50-181" v:mID="50" v:groupContext="shape">
+				<title>工作表.50</title>
+				<rect x="0" y="1162.49" width="51.0236" height="25.5118" class="st6"/>
+			</g>
+			<g id="shape51-183" v:mID="51" v:groupContext="shape" transform="translate(17.0079,-29.0551)">
+				<title>工作表.51</title>
+				<path d="M8.5 1188 a0 0 0 1 1 0 0 a0 0 0 1 1 0 0 Z" class="st6"/>
+			</g>
+			<g id="shape52-185" v:mID="52" v:groupContext="shape" transform="translate(17.0079,384.547)">
+				<title>工作表.52</title>
+			</g>
+			<g id="shape53-187" v:mID="53" v:groupContext="shape" transform="translate(1213.51,1188) rotate(90)">
+				<title>工作表.53</title>
+				<path d="M0 1188 L366.93 1188" class="st7"/>
+			</g>
+			<g id="shape49-190" v:mID="49" v:groupContext="groupContent">
+				<v:textBlock v:margins="rect(4,4,4,4)" v:tabSpace="42.5197"/>
+				<v:textRect cx="25.5118" cy="1175.24" width="51.03" height="25.5118"/>
+				<rect x="0" y="1162.49" width="51.0236" height="25.5118" class="st6"/>
+				<text x="10.97" y="1178.84" class="st8" v:langID="2052"><v:paragraph v:horizAlign="1"/><v:tabList/>Guest</text>			</g>
+		</g>
+		<g id="group58-193" transform="translate(415.488,-121.5)" v:mID="58" v:groupContext="group">
+			<v:userDefs>
+				<v:ud v:nameU="BeginAngle" v:prompt="reserved for future use" v:val="VT0(2):26"/>
+				<v:ud v:nameU="EndAngle" v:prompt="reserved for future use" v:val="VT0(2):26"/>
+				<v:ud v:nameU="RealBeginX" v:val="VT0(0):32"/>
+				<v:ud v:nameU="RealBeginY" v:val="VT0(0):32"/>
+				<v:ud v:nameU="EndX" v:val="VT0(-5.5511151231258E-017):1"/>
+				<v:ud v:nameU="EndY" v:val="VT0(-0.125):1"/>
+				<v:ud v:nameU="Row_7" v:val="VT0(-1):1"/>
+				<v:ud v:nameU="BeginY" v:val="VT0(-0.125):1"/>
+				<v:ud v:nameU="RealBeginX" v:prompt="" v:val="VT0(0.66529766414202):32"/>
+				<v:ud v:nameU="EndX" v:prompt="" v:val="VT0(0):24"/>
+				<v:ud v:nameU="EndY" v:prompt="" v:val="VT0(4.4408920985006E-016):24"/>
+				<v:ud v:nameU="Row_7" v:prompt="" v:val="VT0(-2.2086614173228):24"/>
+				<v:ud v:nameU="BeginY" v:prompt="" v:val="VT0(-4.8991141732284):24"/>
+			</v:userDefs>
+			<title>Transition, Edge.58</title>
+			<desc>VM entry END</desc>
+			<g id="shape59-194" v:mID="59" v:groupContext="shape" transform="translate(159.024,-344.36)">
+				<title>Straight Edge.28</title>
+				<desc>N</desc>
+				<v:userDefs>
+					<v:ud v:nameU="SetSize" v:val="VT0(0):26"/>
+				</v:userDefs>
+				<v:textBlock v:margins="rect(4,4,4,4)"/>
+				<v:textRect cx="8.37669" cy="1179.62" width="14.98" height="17.6036"/>
+			</g>
+			<g id="shape60-197" v:mID="60" v:groupContext="shape" transform="translate(-741.354,270.293) rotate(-38.1187)">
+				<title>Straight Edge.29</title>
+				<desc>N</desc>
+				<v:userDefs>
+					<v:ud v:nameU="SetSize" v:val="VT0(0):26"/>
+				</v:userDefs>
+				<v:textBlock v:margins="rect(4,4,4,4)"/>
+				<v:textRect cx="8.37669" cy="1179.62" width="14.98" height="17.6036" transform="rotate(38.1187)"/>
+			</g>
+			<g id="shape58-200" v:mID="58" v:groupContext="groupContent">
+				<v:textBlock v:margins="rect(4,4,4,4)"/>
+				<v:textRect cx="124.512" cy="1056.63" width="42.09" height="27.2035"/>
+				<path d="M0 1188 L0 1184.62 A3.375 3.375 0 0 1 3.37 1181.25 L106.51 1181.25 A18 18 -180 0 0 124.51 1163.25 L124.51
+							 852.52 A17.2559 17.2559 0 0 1 141.77 835.26 L159.02 835.26" class="st18"/>
+				<rect v:rectContext="textBkgnd" x="109.281" y="1047.03" width="30.4607" height="19.1997" class="st11"/>
+				<text x="109.28" y="1054.23" class="st14" v:langID="2052"><v:paragraph v:horizAlign="1"/><v:tabList/>VM entry <v:newlineChar/><tspan
+							x="117.52" dy="1.2em" class="st4">END</tspan></text>			</g>
+		</g>
+		<g id="group61-208" transform="translate(565.512,-457.228)" v:mID="61" v:groupContext="group">
+			<v:userDefs>
+				<v:ud v:nameU="BeginAngle" v:prompt="reserved for future use" v:val="VT0(2):26"/>
+				<v:ud v:nameU="EndAngle" v:prompt="reserved for future use" v:val="VT0(2):26"/>
+				<v:ud v:nameU="RealBeginX" v:val="VT0(0):32"/>
+				<v:ud v:nameU="RealBeginY" v:val="VT0(0):32"/>
+				<v:ud v:nameU="EndX" v:val="VT0(-5.5511151231258E-017):1"/>
+				<v:ud v:nameU="EndY" v:val="VT0(-0.125):1"/>
+				<v:ud v:nameU="Row_7" v:val="VT0(-1):1"/>
+				<v:ud v:nameU="BeginY" v:val="VT0(-0.125):1"/>
+				<v:ud v:nameU="RealBeginY" v:prompt="" v:val="VT0(3.1415926535898):32"/>
+				<v:ud v:nameU="EndX" v:prompt="" v:val="VT0(-0.125):24"/>
+				<v:ud v:nameU="EndY" v:prompt="" v:val="VT0(-8.8817841970013E-016):24"/>
+				<v:ud v:nameU="Row_7" v:prompt="" v:val="VT0(-0.125):24"/>
+				<v:ud v:nameU="BeginY" v:prompt="" v:val="VT0(0.51181102362205):24"/>
+			</v:userDefs>
+			<title>Transition, Edge.61</title>
+			<desc>执行指令1</desc>
+			<g id="shape62-209" v:mID="62" v:groupContext="shape" transform="translate(9,2404.47) rotate(180)">
+				<title>Straight Edge.28</title>
+				<desc>N</desc>
+				<v:userDefs>
+					<v:ud v:nameU="SetSize" v:val="VT0(0):26"/>
+				</v:userDefs>
+				<v:textBlock v:margins="rect(4,4,4,4)"/>
+				<v:textRect cx="8.37669" cy="1179.62" width="14.98" height="17.6036" transform="rotate(180)"/>
+			</g>
+			<g id="shape63-212" v:mID="63" v:groupContext="shape" transform="translate(-7.75339,8.37669)">
+				<title>Straight Edge.29</title>
+				<desc>N</desc>
+				<v:userDefs>
+					<v:ud v:nameU="SetSize" v:val="VT0(0):26"/>
+				</v:userDefs>
+				<v:textBlock v:margins="rect(4,4,4,4)"/>
+				<v:textRect cx="8.37669" cy="1179.62" width="14.98" height="17.6036"/>
+			</g>
+			<g id="shape61-215" v:mID="61" v:groupContext="groupContent">
+				<v:textBlock v:margins="rect(4,4,4,4)"/>
+				<v:textRect cx="46.4882" cy="1206.43" width="45.87" height="18.6536"/>
+				<path d="M9 1188 L28.49 1188 A18 18 0 0 1 46.49 1206 L46.49 1206.85 A18 18 0 0 1 28.49 1224.85 L9 1224.85"
+						class="st18"/>
+				<rect v:rectContext="textBkgnd" x="28.461" y="1201.57" width="36.0547" height="9.71658" class="st11"/>
+				<text x="28.46" y="1208.85" class="st12" v:langID="2052"><v:paragraph v:horizAlign="1"/><v:tabList/>执行指令<tspan
+							class="st13">1</tspan></text>			</g>
+		</g>
+		<g id="group64-223" transform="translate(415.488,-278.646)" v:mID="64" v:groupContext="group">
+			<v:userDefs>
+				<v:ud v:nameU="BeginAngle" v:prompt="reserved for future use" v:val="VT0(2):26"/>
+				<v:ud v:nameU="EndAngle" v:prompt="reserved for future use" v:val="VT0(2):26"/>
+				<v:ud v:nameU="RealBeginX" v:val="VT0(0):32"/>
+				<v:ud v:nameU="RealBeginY" v:val="VT0(0):32"/>
+				<v:ud v:nameU="EndX" v:val="VT0(-5.5511151231258E-017):1"/>
+				<v:ud v:nameU="EndY" v:val="VT0(-0.125):1"/>
+				<v:ud v:nameU="Row_7" v:val="VT0(-1):1"/>
+				<v:ud v:nameU="BeginY" v:val="VT0(-0.125):1"/>
+				<v:ud v:nameU="RealBeginX" v:prompt="" v:val="VT0(-3.1415926535898):32"/>
+				<v:ud v:nameU="RealBeginY" v:prompt="" v:val="VT0(-1.5707963267949):32"/>
+				<v:ud v:nameU="EndX" v:prompt="" v:val="VT0(0):24"/>
+				<v:ud v:nameU="EndY" v:prompt="" v:val="VT0(0):24"/>
+				<v:ud v:nameU="Row_7" v:prompt="" v:val="VT0(2.0034448818898):24"/>
+				<v:ud v:nameU="BeginY" v:prompt="" v:val="VT0(-0.81742125984252):24"/>
+			</v:userDefs>
+			<title>Transition, Edge.64</title>
+			<desc>access</desc>
+			<g id="shape65-224" v:mID="65" v:groupContext="shape" transform="translate(1035.38,1129.15) rotate(90)">
+				<title>Straight Edge.28</title>
+				<desc>N</desc>
+				<v:userDefs>
+					<v:ud v:nameU="SetSize" v:val="VT0(0):26"/>
+				</v:userDefs>
+				<v:textBlock v:margins="rect(4,4,4,4)"/>
+				<v:textRect cx="8.37669" cy="1179.62" width="14.98" height="17.6036" transform="rotate(-90)"/>
+			</g>
+			<g id="shape66-227" v:mID="66" v:groupContext="shape" transform="translate(16.7534,2367.62) rotate(180)">
+				<title>Straight Edge.29</title>
+				<desc>N</desc>
+				<v:userDefs>
+					<v:ud v:nameU="SetSize" v:val="VT0(0):26"/>
+				</v:userDefs>
+				<v:textBlock v:margins="rect(4,4,4,4)"/>
+				<v:textRect cx="8.37669" cy="1179.62" width="14.98" height="17.6036" transform="rotate(180)"/>
+			</g>
+			<g id="shape64-230" v:mID="64" v:groupContext="groupContent">
+				<v:textBlock v:margins="rect(4,4,4,4)"/>
+				<v:textRect cx="-42.6969" cy="1117.15" width="30.65" height="17.6036"/>
+				<path d="M0 1188 L-9.74 1188 A9.74409 9.74409 0 0 1 -19.49 1178.26 L-19.49 1132.75 A15.6 15.6 -180 0 0 -35.09 1117.15
+							 L-50.69 1117.15" class="st21"/>
+				<path d="M-56.69 1117.15 L-138.25 1117.15 A6 6 -180 0 0 -144.25 1123.15 L-144.25 1129.15" class="st22"/>
+				<rect v:rectContext="textBkgnd" x="-53.1145" y="1112.35" width="20.8356" height="9.59985" class="st11"/>
+				<text x="-53.11" y="1119.55" class="st14" v:langID="2052"><v:paragraph v:horizAlign="1"/><v:tabList/>access</text>			</g>
+		</g>
+		<g id="group67-238" transform="translate(415.488,-278.646)" v:mID="67" v:groupContext="group">
+			<v:userDefs>
+				<v:ud v:nameU="BeginAngle" v:prompt="reserved for future use" v:val="VT0(2):26"/>
+				<v:ud v:nameU="EndAngle" v:prompt="reserved for future use" v:val="VT0(2):26"/>
+				<v:ud v:nameU="RealBeginX" v:val="VT0(0):32"/>
+				<v:ud v:nameU="RealBeginY" v:val="VT0(0):32"/>
+				<v:ud v:nameU="EndX" v:val="VT0(-5.5511151231258E-017):1"/>
+				<v:ud v:nameU="EndY" v:val="VT0(-0.125):1"/>
+				<v:ud v:nameU="Row_7" v:val="VT0(-1):1"/>
+				<v:ud v:nameU="BeginY" v:val="VT0(-0.125):1"/>
+				<v:ud v:nameU="RealBeginY" v:prompt="" v:val="VT0(3.1415926535898):32"/>
+				<v:ud v:nameU="EndX" v:prompt="" v:val="VT0(-8.8817841970013E-016):24"/>
+				<v:ud v:nameU="EndY" v:prompt="" v:val="VT0(4.4408920985006E-016):24"/>
+				<v:ud v:nameU="Row_7" v:prompt="" v:val="VT0(1.7012248468941):24"/>
+				<v:ud v:nameU="BeginY" v:prompt="" v:val="VT0(-3.6018700787402):24"/>
+			</v:userDefs>
+			<title>Transition, Edge.67</title>
+			<desc>load</desc>
+			<g id="shape68-239" v:mID="68" v:groupContext="shape" transform="translate(-122.488,2109.18) rotate(180)">
+				<title>Straight Edge.28</title>
+				<desc>N</desc>
+				<v:userDefs>
+					<v:ud v:nameU="SetSize" v:val="VT0(0):26"/>
+				</v:userDefs>
+				<v:textBlock v:margins="rect(4,4,4,4)"/>
+				<v:textRect cx="7.48817" cy="1180.51" width="14.98" height="17.6036" transform="rotate(180)"/>
+			</g>
+			<g id="shape69-242" v:mID="69" v:groupContext="shape" transform="translate(-14.9763,7.48817)">
+				<title>Straight Edge.29</title>
+				<desc>N</desc>
+				<v:userDefs>
+					<v:ud v:nameU="SetSize" v:val="VT0(0):26"/>
+				</v:userDefs>
+				<v:textBlock v:margins="rect(4,4,4,4)"/>
+				<v:textRect cx="7.48817" cy="1180.51" width="14.98" height="17.6036"/>
+			</g>
+			<g id="shape67-245" v:mID="67" v:groupContext="groupContent">
+				<v:textBlock v:margins="rect(4,4,4,4)"/>
+				<v:textRect cx="106.512" cy="997.089" width="23.91" height="17.6036"/>
+				<path d="M0 1188 L18.01 1188" class="st21"/>
+				<path d="M24.01 1188 L54.01 1188" class="st21"/>
+				<path d="M60.01 1188 L63.01 1188" class="st21"/>
+				<path d="M69.01 1188 L88.51 1188 A18 18 -180 0 0 106.51 1170 L106.51 946.67 A18 18 -180 0 0 88.51 928.67 L-122.49
+							 928.67" class="st22"/>
+				<rect v:rectContext="textBkgnd" x="99.4671" y="992.289" width="14.0897" height="9.59985" class="st11"/>
+				<text x="99.47" y="999.49" class="st14" v:langID="2052"><v:paragraph v:horizAlign="1"/><v:tabList/>load</text>			</g>
+		</g>
+		<g id="group70-255" transform="translate(565.512,-207.78)" v:mID="70" v:groupContext="group">
+			<v:userDefs>
+				<v:ud v:nameU="BeginAngle" v:prompt="reserved for future use" v:val="VT0(2):26"/>
+				<v:ud v:nameU="EndAngle" v:prompt="reserved for future use" v:val="VT0(2):26"/>
+				<v:ud v:nameU="RealBeginX" v:val="VT0(0):32"/>
+				<v:ud v:nameU="RealBeginY" v:val="VT0(0):32"/>
+				<v:ud v:nameU="EndX" v:val="VT0(-5.5511151231258E-017):1"/>
+				<v:ud v:nameU="EndY" v:val="VT0(-0.125):1"/>
+				<v:ud v:nameU="Row_7" v:val="VT0(-1):1"/>
+				<v:ud v:nameU="BeginY" v:val="VT0(-0.125):1"/>
+				<v:ud v:nameU="RealBeginY" v:prompt="" v:val="VT0(3.1415926535898):32"/>
+				<v:ud v:nameU="EndX" v:prompt="" v:val="VT0(-0.125):24"/>
+				<v:ud v:nameU="EndY" v:prompt="" v:val="VT0(0):24"/>
+				<v:ud v:nameU="Row_7" v:prompt="" v:val="VT0(-0.125):24"/>
+				<v:ud v:nameU="BeginY" v:prompt="" v:val="VT0(0.82677165354331):24"/>
+			</v:userDefs>
+			<title>Transition, Edge.70</title>
+			<desc>执行执行3</desc>
+			<g id="shape71-256" v:mID="71" v:groupContext="shape" transform="translate(9,2427.15) rotate(180)">
+				<title>Straight Edge.28</title>
+				<desc>N</desc>
+				<v:userDefs>
+					<v:ud v:nameU="SetSize" v:val="VT0(0):26"/>
+				</v:userDefs>
+				<v:textBlock v:margins="rect(4,4,4,4)"/>
+				<v:textRect cx="8.37669" cy="1179.62" width="14.98" height="17.6036" transform="rotate(180)"/>
+			</g>
+			<g id="shape72-259" v:mID="72" v:groupContext="shape" transform="translate(-7.75339,8.37669)">
+				<title>Straight Edge.29</title>
+				<desc>N</desc>
+				<v:userDefs>
+					<v:ud v:nameU="SetSize" v:val="VT0(0):26"/>
+				</v:userDefs>
+				<v:textBlock v:margins="rect(4,4,4,4)"/>
+				<v:textRect cx="8.37669" cy="1179.62" width="14.98" height="17.6036"/>
+			</g>
+			<g id="shape70-262" v:mID="70" v:groupContext="groupContent">
+				<v:textBlock v:margins="rect(4,4,4,4)"/>
+				<v:textRect cx="46.4882" cy="1217.76" width="45.87" height="18.6536"/>
+				<path d="M9 1188 L28.49 1188 A18 18 0 0 1 46.49 1206 L46.49 1229.53 A18 18 0 0 1 28.49 1247.53 L9 1247.53"
+						class="st18"/>
+				<rect v:rectContext="textBkgnd" x="28.461" y="1212.91" width="36.0547" height="9.71658" class="st11"/>
+				<text x="28.46" y="1220.19" class="st12" v:langID="2052"><v:paragraph v:horizAlign="1"/><v:tabList/>执行执行<tspan
+							class="st13">3</tspan></text>			</g>
+		</g>
+		<g id="group73-270" transform="translate(565.512,-292.819)" v:mID="73" v:groupContext="group">
+			<v:userDefs>
+				<v:ud v:nameU="BeginAngle" v:prompt="reserved for future use" v:val="VT0(2):26"/>
+				<v:ud v:nameU="EndAngle" v:prompt="reserved for future use" v:val="VT0(2):26"/>
+				<v:ud v:nameU="RealBeginX" v:val="VT0(0):32"/>
+				<v:ud v:nameU="RealBeginY" v:val="VT0(0):32"/>
+				<v:ud v:nameU="EndX" v:val="VT0(-5.5511151231258E-017):1"/>
+				<v:ud v:nameU="EndY" v:val="VT0(-0.125):1"/>
+				<v:ud v:nameU="Row_7" v:val="VT0(-1):1"/>
+				<v:ud v:nameU="BeginY" v:val="VT0(-0.125):1"/>
+				<v:ud v:nameU="RealBeginY" v:prompt="" v:val="VT0(3.1415926535898):32"/>
+				<v:ud v:nameU="EndX" v:prompt="" v:val="VT0(-0.125):24"/>
+				<v:ud v:nameU="EndY" v:prompt="" v:val="VT0(-8.8817841970013E-016):24"/>
+				<v:ud v:nameU="Row_7" v:prompt="" v:val="VT0(-0.125):24"/>
+				<v:ud v:nameU="BeginY" v:prompt="" v:val="VT0(0.98425196850394):24"/>
+			</v:userDefs>
+			<title>Transition, Edge.73</title>
+			<desc>执行指令2</desc>
+			<g id="shape74-271" v:mID="74" v:groupContext="shape" transform="translate(9,2438.49) rotate(180)">
+				<title>Straight Edge.28</title>
+				<desc>N</desc>
+				<v:userDefs>
+					<v:ud v:nameU="SetSize" v:val="VT0(0):26"/>
+				</v:userDefs>
+				<v:textBlock v:margins="rect(4,4,4,4)"/>
+				<v:textRect cx="8.37669" cy="1179.62" width="14.98" height="17.6036" transform="rotate(180)"/>
+			</g>
+			<g id="shape75-274" v:mID="75" v:groupContext="shape" transform="translate(-7.75339,8.37669)">
+				<title>Straight Edge.29</title>
+				<desc>N</desc>
+				<v:userDefs>
+					<v:ud v:nameU="SetSize" v:val="VT0(0):26"/>
+				</v:userDefs>
+				<v:textBlock v:margins="rect(4,4,4,4)"/>
+				<v:textRect cx="8.37669" cy="1179.62" width="14.98" height="17.6036"/>
+			</g>
+			<g id="shape73-277" v:mID="73" v:groupContext="groupContent">
+				<v:textBlock v:margins="rect(4,4,4,4)"/>
+				<v:textRect cx="46.4882" cy="1223.43" width="45.87" height="18.6536"/>
+				<path d="M9 1188 L28.49 1188 A18 18 0 0 1 46.49 1206 L46.49 1240.87 A18 18 0 0 1 28.49 1258.87 L9 1258.87"
+						class="st18"/>
+				<rect v:rectContext="textBkgnd" x="28.461" y="1218.57" width="36.0547" height="9.71658" class="st11"/>
+				<text x="28.46" y="1225.86" class="st12" v:langID="2052"><v:paragraph v:horizAlign="1"/><v:tabList/>执行指令<tspan
+							class="st13">2</tspan></text>			</g>
+		</g>
+		<g id="group79-285" transform="translate(565.512,-406.205)" v:mID="79" v:groupContext="group">
+			<v:userDefs>
+				<v:ud v:nameU="BeginAngle" v:prompt="reserved for future use" v:val="VT0(2):26"/>
+				<v:ud v:nameU="EndAngle" v:prompt="reserved for future use" v:val="VT0(2):26"/>
+				<v:ud v:nameU="RealBeginX" v:val="VT0(0):32"/>
+				<v:ud v:nameU="RealBeginY" v:val="VT0(0):32"/>
+				<v:ud v:nameU="EndX" v:val="VT0(-5.5511151231258E-017):1"/>
+				<v:ud v:nameU="EndY" v:val="VT0(-0.125):1"/>
+				<v:ud v:nameU="Row_7" v:val="VT0(-1):1"/>
+				<v:ud v:nameU="BeginY" v:val="VT0(-0.125):1"/>
+				<v:ud v:nameU="RealBeginY" v:prompt="" v:val="VT0(3.1415926535898):32"/>
+				<v:ud v:nameU="EndX" v:prompt="" v:val="VT0(-0.125):24"/>
+				<v:ud v:nameU="EndY" v:prompt="" v:val="VT0(8.8817841970013E-016):24"/>
+				<v:ud v:nameU="Row_7" v:prompt="" v:val="VT0(-0.125):24"/>
+				<v:ud v:nameU="BeginY" v:prompt="" v:val="VT0(1.3779527559055):24"/>
+			</v:userDefs>
+			<title>Transition, Edge.79</title>
+			<desc>instruction boundary</desc>
+			<g id="shape80-286" v:mID="80" v:groupContext="shape" transform="translate(9,2466.84) rotate(180)">
+				<title>Straight Edge.28</title>
+				<desc>N</desc>
+				<v:userDefs>
+					<v:ud v:nameU="SetSize" v:val="VT0(0):26"/>
+				</v:userDefs>
+				<v:textBlock v:margins="rect(4,4,4,4)"/>
+				<v:textRect cx="8.37669" cy="1179.62" width="14.98" height="17.6036" transform="rotate(180)"/>
+			</g>
+			<g id="shape81-289" v:mID="81" v:groupContext="shape" transform="translate(-7.75339,8.37669)">
+				<title>Straight Edge.29</title>
+				<desc>N</desc>
+				<v:userDefs>
+					<v:ud v:nameU="SetSize" v:val="VT0(0):26"/>
+				</v:userDefs>
+				<v:textBlock v:margins="rect(4,4,4,4)"/>
+				<v:textRect cx="8.37669" cy="1179.62" width="14.98" height="17.6036"/>
+			</g>
+			<g id="shape79-292" v:mID="79" v:groupContext="groupContent">
+				<v:textBlock v:margins="rect(4,4,4,4)"/>
+				<v:textRect cx="154.488" cy="1237.61" width="78.06" height="17.6036"/>
+				<path d="M9 1188 L136.49 1188 A18 18 0 0 1 154.49 1206 L154.49 1269.21 A18 18 0 0 1 136.49 1287.21 L9 1287.21"
+						class="st18"/>
+				<rect v:rectContext="textBkgnd" x="120.368" y="1232.81" width="68.2416" height="9.59985" class="st11"/>
+				<text x="120.37" y="1240.01" class="st14" v:langID="2052"><v:paragraph v:horizAlign="1"/><v:tabList/>instruction boundary</text>			</g>
+		</g>
+		<g id="group82-299" transform="translate(565.512,-406.205)" v:mID="82" v:groupContext="group">
+			<v:userDefs>
+				<v:ud v:nameU="BeginAngle" v:prompt="reserved for future use" v:val="VT0(2):26"/>
+				<v:ud v:nameU="EndAngle" v:prompt="reserved for future use" v:val="VT0(2):26"/>
+				<v:ud v:nameU="RealBeginX" v:val="VT0(0):32"/>
+				<v:ud v:nameU="RealBeginY" v:val="VT0(0):32"/>
+				<v:ud v:nameU="EndX" v:val="VT0(-5.5511151231258E-017):1"/>
+				<v:ud v:nameU="EndY" v:val="VT0(-0.125):1"/>
+				<v:ud v:nameU="Row_7" v:val="VT0(-1):1"/>
+				<v:ud v:nameU="BeginY" v:val="VT0(-0.125):1"/>
+				<v:ud v:nameU="RealBeginX" v:prompt="" v:val="VT0(-1.5280637360806):32"/>
+				<v:ud v:nameU="RealBeginY" v:prompt="" v:val="VT0(3.1415926535898):32"/>
+				<v:ud v:nameU="EndX" v:prompt="" v:val="VT0(-0.125):24"/>
+				<v:ud v:nameU="EndY" v:prompt="" v:val="VT0(-8.8817841970013E-016):24"/>
+				<v:ud v:nameU="Row_7" v:prompt="" v:val="VT0(-0.125):24"/>
+				<v:ud v:nameU="BeginY" v:prompt="" v:val="VT0(0.39370078740157):24"/>
+			</v:userDefs>
+			<title>Transition, Edge.82</title>
+			<desc>virtual interrupt delivery</desc>
+			<g id="shape83-300" v:mID="83" v:groupContext="shape" transform="translate(9,2395.97) rotate(180)">
+				<title>Straight Edge.28</title>
+				<desc>N</desc>
+				<v:userDefs>
+					<v:ud v:nameU="SetSize" v:val="VT0(0):26"/>
+				</v:userDefs>
+				<v:textBlock v:margins="rect(4,4,4,4)"/>
+				<v:textRect cx="8.37669" cy="1179.62" width="14.98" height="17.6036" transform="rotate(180)"/>
+			</g>
+			<g id="shape84-303" v:mID="84" v:groupContext="shape" transform="translate(1186.83,1120.87) rotate(87.5516)">
+				<title>Straight Edge.29</title>
+				<desc>N</desc>
+				<v:userDefs>
+					<v:ud v:nameU="SetSize" v:val="VT0(0):26"/>
+				</v:userDefs>
+				<v:textBlock v:margins="rect(4,4,4,4)"/>
+				<v:textRect cx="8.37669" cy="1179.62" width="14.98" height="17.6036" transform="rotate(-87.5516)"/>
+			</g>
+			<g id="shape82-306" v:mID="82" v:groupContext="groupContent">
+				<v:textBlock v:margins="rect(4,4,4,4)"/>
+				<v:textRect cx="100.488" cy="1202.17" width="89.45" height="17.6036"/>
+				<path d="M9 1188 L9 1191.04 A3.03986 3.03986 -180 0 0 12.04 1194.08 L89.35 1194.08 A11.1334 11.1334 0 0 1 100.49
+							 1205.21 L100.49 1205.21 A11.1334 11.1334 0 0 1 89.35 1216.35 L9 1216.35" class="st18"/>
+				<rect v:rectContext="textBkgnd" x="60.6743" y="1197.37" width="79.6281" height="9.59985" class="st11"/>
+				<text x="60.67" y="1204.57" class="st14" v:langID="2052"><v:paragraph v:horizAlign="1"/><v:tabList/>virtual interrupt delivery</text>			</g>
+		</g>
+		<g id="group85-313" transform="translate(565.512,-363.685)" v:mID="85" v:groupContext="group">
+			<v:userDefs>
+				<v:ud v:nameU="BeginAngle" v:prompt="reserved for future use" v:val="VT0(2):26"/>
+				<v:ud v:nameU="EndAngle" v:prompt="reserved for future use" v:val="VT0(2):26"/>
+				<v:ud v:nameU="RealBeginX" v:val="VT0(0):32"/>
+				<v:ud v:nameU="RealBeginY" v:val="VT0(0):32"/>
+				<v:ud v:nameU="EndX" v:val="VT0(-5.5511151231258E-017):1"/>
+				<v:ud v:nameU="EndY" v:val="VT0(-0.125):1"/>
+				<v:ud v:nameU="Row_7" v:val="VT0(-1):1"/>
+				<v:ud v:nameU="BeginY" v:val="VT0(-0.125):1"/>
+				<v:ud v:nameU="RealBeginY" v:prompt="" v:val="VT0(-3.1415926535898):32"/>
+				<v:ud v:nameU="EndX" v:prompt="" v:val="VT0(-0.125):24"/>
+				<v:ud v:nameU="EndY" v:prompt="" v:val="VT0(8.8817841970013E-016):24"/>
+				<v:ud v:nameU="Row_7" v:prompt="" v:val="VT0(-0.125):24"/>
+				<v:ud v:nameU="BeginY" v:prompt="" v:val="VT0(0.47244094488189):24"/>
+			</v:userDefs>
+			<title>Transition, Edge.85</title>
+			<desc>deliver interrupt with vector throught IDT</desc>
+			<g id="shape86-314" v:mID="86" v:groupContext="shape" transform="translate(9,2401.64) rotate(180)">
+				<title>Straight Edge.28</title>
+				<desc>N</desc>
+				<v:userDefs>
+					<v:ud v:nameU="SetSize" v:val="VT0(0):26"/>
+				</v:userDefs>
+				<v:textBlock v:margins="rect(4,4,4,4)"/>
+				<v:textRect cx="8.37669" cy="1179.62" width="14.98" height="17.6036" transform="rotate(180)"/>
+			</g>
+			<g id="shape87-317" v:mID="87" v:groupContext="shape" transform="translate(-7.75339,8.37669)">
+				<title>Straight Edge.29</title>
+				<desc>N</desc>
+				<v:userDefs>
+					<v:ud v:nameU="SetSize" v:val="VT0(0):26"/>
+				</v:userDefs>
+				<v:textBlock v:margins="rect(4,4,4,4)"/>
+				<v:textRect cx="8.37669" cy="1179.62" width="14.98" height="17.6036"/>
+			</g>
+			<g id="shape85-320" v:mID="85" v:groupContext="groupContent">
+				<v:textBlock v:margins="rect(4,4,4,4)"/>
+				<v:textRect cx="57.7382" cy="1205.01" width="101.95" height="27.2035"/>
+				<path d="M9 1188 L40.73 1188 A17.0079 17.0079 0 0 1 57.74 1205.01 L57.74 1205.01 A17.0079 17.0079 0 0 1 40.73 1222.02
+							 L9 1222.02" class="st18"/>
+				<rect v:rectContext="textBkgnd" x="11.6744" y="1195.41" width="92.1278" height="19.1997" class="st11"/>
+				<text x="11.67" y="1202.61" class="st14" v:langID="2052"><v:paragraph v:horizAlign="1"/><v:tabList/>deliver interrupt with vector<v:newlineChar/><tspan
+							x="37.04" dy="1.2em" class="st4">throught IDT</tspan></text>			</g>
+		</g>
+		<g id="group88-328" transform="translate(761.404,-491.244)" v:mID="88" v:groupContext="group">
+			<v:userDefs>
+				<v:ud v:nameU="visVersion" v:prompt="" v:val="VT0(15):26"/>
+				<v:ud v:nameU="ShowActor" v:prompt="" v:val="VT0(0):5"/>
+				<v:ud v:nameU="ShowDestruction" v:prompt="" v:val="VT0(0):5"/>
+			</v:userDefs>
+			<title>对象生命线.88</title>
+			<desc>Guest interrupt processing</desc>
+			<g id="shape89-329" v:mID="89" v:groupContext="shape" transform="translate(23.0846,0)">
+				<title>工作表.89</title>
+				<rect x="0" y="1162.49" width="51.0236" height="25.5118" class="st6"/>
+			</g>
+			<g id="shape90-331" v:mID="90" v:groupContext="shape" transform="translate(40.0925,-29.0551)">
+				<title>工作表.90</title>
+				<path d="M8.5 1188 a0 0 0 1 1 0 0 a0 0 0 1 1 0 0 Z" class="st6"/>
+			</g>
+			<g id="shape91-333" v:mID="91" v:groupContext="shape" transform="translate(32.3976,439.109)">
+				<title>工作表.91</title>
+			</g>
+			<g id="shape92-335" v:mID="92" v:groupContext="shape" transform="translate(1236.6,1188) rotate(90)">
+				<title>工作表.92</title>
+				<path d="M0 1188 L421.49 1188" class="st7"/>
+			</g>
+			<g id="shape88-338" v:mID="88" v:groupContext="groupContent">
+				<v:textBlock v:margins="rect(4,4,4,4)" v:tabSpace="42.5197"/>
+				<v:textRect cx="48.5965" cy="1175.24" width="97.2" height="25.5118"/>
+				<rect x="0" y="1162.49" width="97.1929" height="25.5118" class="st6"/>
+				<text x="10.12" y="1171.64" class="st8" v:langID="2052"><v:paragraph v:horizAlign="1"/><v:tabList/>Guest interrupt<v:newlineChar/><tspan
+							x="22.16" dy="1.2em" class="st4">processing</tspan></text>			</g>
+		</g>
+		<g id="group93-342" transform="translate(623.25,-346.677)" v:mID="93" v:groupContext="group">
+			<v:userDefs>
+				<v:ud v:nameU="BeginAngle" v:prompt="reserved for future use" v:val="VT0(2):26"/>
+				<v:ud v:nameU="EndAngle" v:prompt="reserved for future use" v:val="VT0(2):26"/>
+				<v:ud v:nameU="RealBeginX" v:val="VT0(0):32"/>
+				<v:ud v:nameU="RealBeginY" v:val="VT0(0):32"/>
+				<v:ud v:nameU="EndX" v:val="VT0(-5.5511151231258E-017):1"/>
+				<v:ud v:nameU="EndY" v:val="VT0(-0.125):1"/>
+				<v:ud v:nameU="Row_7" v:val="VT0(-1):1"/>
+				<v:ud v:nameU="BeginY" v:val="VT0(-0.125):1"/>
+				<v:ud v:nameU="EndY" v:prompt="" v:val="VT0(0):24"/>
+				<v:ud v:nameU="Row_7" v:prompt="" v:val="VT0(-2.59375):1"/>
+				<v:ud v:nameU="BeginY" v:prompt="" v:val="VT0(-1.7716535433071):24"/>
+			</v:userDefs>
+			<title>Transition, Edge.93</title>
+			<g id="shape94-343" v:mID="94" v:groupContext="shape" transform="translate(186.75,-119.182)">
+				<title>Straight Edge.28</title>
+				<desc>N</desc>
+				<v:userDefs>
+					<v:ud v:nameU="SetSize" v:val="VT0(0):26"/>
+				</v:userDefs>
+				<v:textBlock v:margins="rect(4,4,4,4)"/>
+				<v:textRect cx="8.37669" cy="1179.62" width="14.98" height="17.6036"/>
+			</g>
+			<g id="shape95-346" v:mID="95" v:groupContext="shape" transform="translate(-16.7534,8.37669)">
+				<title>Straight Edge.29</title>
+				<desc>N</desc>
+				<v:userDefs>
+					<v:ud v:nameU="SetSize" v:val="VT0(0):26"/>
+				</v:userDefs>
+				<v:textBlock v:margins="rect(4,4,4,4)"/>
+				<v:textRect cx="8.37669" cy="1179.62" width="14.98" height="17.6036"/>
+			</g>
+			<g id="shape93-349" v:mID="93" v:groupContext="groupContent">
+				<path d="M0 1188 L93.75 1188" class="st23"/>
+				<path d="M99.75 1188 L141.75 1188 A18 18 -180 0 0 159.75 1170 L159.75 1073.94 A13.5 13.5 0 0 1 173.25 1060.44 L186.75
+							 1060.44" class="st24"/>
+			</g>
+		</g>
+		<g id="group96-355" transform="translate(819,-474.236)" v:mID="96" v:groupContext="group">
+			<v:userDefs>
+				<v:ud v:nameU="BeginAngle" v:prompt="reserved for future use" v:val="VT0(2):26"/>
+				<v:ud v:nameU="EndAngle" v:prompt="reserved for future use" v:val="VT0(2):26"/>
+				<v:ud v:nameU="RealBeginX" v:val="VT0(0):32"/>
+				<v:ud v:nameU="RealBeginY" v:val="VT0(0):32"/>
+				<v:ud v:nameU="EndX" v:val="VT0(-5.5511151231258E-017):1"/>
+				<v:ud v:nameU="EndY" v:val="VT0(-0.125):1"/>
+				<v:ud v:nameU="Row_7" v:val="VT0(-1):1"/>
+				<v:ud v:nameU="BeginY" v:val="VT0(-0.125):1"/>
+				<v:ud v:nameU="RealBeginY" v:prompt="" v:val="VT0(3.1415926535898):32"/>
+				<v:ud v:nameU="EndX" v:prompt="" v:val="VT0(0.125):1"/>
+				<v:ud v:nameU="EndY" v:prompt="" v:val="VT0(-8.8817841970013E-016):24"/>
+				<v:ud v:nameU="Row_7" v:prompt="" v:val="VT0(0.125):1"/>
+				<v:ud v:nameU="BeginY" v:prompt="" v:val="VT0(4.0157480314961):24"/>
+			</v:userDefs>
+			<title>Transition, Edge.96</title>
+			<desc>exec Guest software interrupt HANDLER</desc>
+			<g id="shape97-356" v:mID="97" v:groupContext="shape" transform="translate(-9,2656.76) rotate(180)">
+				<title>Straight Edge.28</title>
+				<desc>N</desc>
+				<v:userDefs>
+					<v:ud v:nameU="SetSize" v:val="VT0(0):26"/>
+				</v:userDefs>
+				<v:textBlock v:margins="rect(4,4,4,4)"/>
+				<v:textRect cx="8.37669" cy="1179.62" width="14.98" height="17.6036" transform="rotate(180)"/>
+			</g>
+			<g id="shape98-359" v:mID="98" v:groupContext="shape" transform="translate(-25.7534,8.37669)">
+				<title>Straight Edge.29</title>
+				<desc>N</desc>
+				<v:userDefs>
+					<v:ud v:nameU="SetSize" v:val="VT0(0):26"/>
+				</v:userDefs>
+				<v:textBlock v:margins="rect(4,4,4,4)"/>
+				<v:textRect cx="8.37669" cy="1179.62" width="14.98" height="17.6036"/>
+			</g>
+			<g id="shape96-362" v:mID="96" v:groupContext="groupContent">
+				<v:textBlock v:margins="rect(4,4,4,4)"/>
+				<v:textRect cx="81" cy="1332.57" width="47.28" height="46.4035"/>
+				<path d="M-9 1188 L63 1188 A18 18 0 0 1 81 1206 L81 1459.13 A18 18 0 0 1 63 1477.13 L-9 1477.13" class="st18"/>
+				<rect v:rectContext="textBkgnd" x="63.1722" y="1313.37" width="35.6556" height="38.3997" class="st11"/>
+				<text x="63.17" y="1320.57" class="st14" v:langID="2052"><v:paragraph v:horizAlign="1"/><v:tabList/>exec Guest <v:newlineChar/><tspan
+							x="66.61" dy="1.2em" class="st4">software<v:newlineChar/></tspan><tspan x="66.32" dy="1.2em"
+							class="st4">interrupt <v:newlineChar/></tspan><tspan x="65.34" dy="1.2em" class="st4">HANDLER</tspan></text>			</g>
+		</g>
+		<g id="group99-372" transform="translate(574.512,-349.512)" v:mID="99" v:groupContext="group">
+			<v:userDefs>
+				<v:ud v:nameU="BeginAngle" v:prompt="reserved for future use" v:val="VT0(2):26"/>
+				<v:ud v:nameU="EndAngle" v:prompt="reserved for future use" v:val="VT0(2):26"/>
+				<v:ud v:nameU="RealBeginX" v:val="VT0(0):32"/>
+				<v:ud v:nameU="RealBeginY" v:val="VT0(0):32"/>
+				<v:ud v:nameU="EndX" v:val="VT0(-5.5511151231258E-017):1"/>
+				<v:ud v:nameU="EndY" v:val="VT0(-0.125):1"/>
+				<v:ud v:nameU="Row_7" v:val="VT0(-1):1"/>
+				<v:ud v:nameU="BeginY" v:val="VT0(-0.125):1"/>
+				<v:ud v:nameU="RealBeginX" v:prompt="" v:val="VT0(-2.7973104676325):32"/>
+				<v:ud v:nameU="RealBeginY" v:prompt="" v:val="VT0(1.5707963267949):32"/>
+				<v:ud v:nameU="EndX" v:prompt="" v:val="VT0(-8.8817841970013E-016):24"/>
+				<v:ud v:nameU="EndY" v:prompt="" v:val="VT0(0):24"/>
+				<v:ud v:nameU="Row_7" v:prompt="" v:val="VT0(4.2121062992126):24"/>
+				<v:ud v:nameU="BeginY" v:prompt="" v:val="VT0(1.0354330708662):24"/>
+			</v:userDefs>
+			<title>Transition, Edge.99</title>
+			<desc>update</desc>
+			<g id="shape100-373" v:mID="100" v:groupContext="shape" transform="translate(-1482.89,1262.55) rotate(-90)">
+				<title>Straight Edge.28</title>
+				<desc>N</desc>
+				<v:userDefs>
+					<v:ud v:nameU="SetSize" v:val="VT0(0):26"/>
+				</v:userDefs>
+				<v:textBlock v:margins="rect(4,4,4,4)"/>
+				<v:textRect cx="8.37669" cy="1179.62" width="14.98" height="17.6036" transform="rotate(90)"/>
+			</g>
+			<g id="shape101-376" v:mID="101" v:groupContext="shape" transform="translate(413.918,2292.75) rotate(160.274)">
+				<title>Straight Edge.29</title>
+				<desc>N</desc>
+				<v:userDefs>
+					<v:ud v:nameU="SetSize" v:val="VT0(0):26"/>
+				</v:userDefs>
+				<v:textBlock v:margins="rect(4,4,4,4)"/>
+				<v:textRect cx="8.37669" cy="1179.62" width="14.98" height="17.6036" transform="rotate(-160.274)"/>
+			</g>
+			<g id="shape99-379" v:mID="99" v:groupContext="groupContent">
+				<v:textBlock v:margins="rect(4,4,4,4)"/>
+				<v:textRect cx="-114.36" cy="1447.51" width="32.92" height="17.6036"/>
+				<path d="M0 1188 L-8.26 1188 A8.25591 8.25591 -180 0 0 -16.51 1196.26 L-16.51 1429.51 A18 18 0 0 1 -34.51 1447.51
+							 L-285.27 1447.51 A18 18 0 0 1 -303.27 1429.51 L-303.27 1262.55" class="st25"/>
+				<rect v:rectContext="textBkgnd" x="-125.911" y="1442.71" width="23.1012" height="9.59985" class="st11"/>
+				<text x="-125.91" y="1449.91" class="st14" v:langID="2052"><v:paragraph v:horizAlign="1"/><v:tabList/>update</text>			</g>
+		</g>
+		<g id="group102-386" transform="translate(574.512,-349.512)" v:mID="102" v:groupContext="group">
+			<v:userDefs>
+				<v:ud v:nameU="BeginAngle" v:prompt="reserved for future use" v:val="VT0(2):26"/>
+				<v:ud v:nameU="EndAngle" v:prompt="reserved for future use" v:val="VT0(2):26"/>
+				<v:ud v:nameU="RealBeginX" v:val="VT0(0):32"/>
+				<v:ud v:nameU="RealBeginY" v:val="VT0(0):32"/>
+				<v:ud v:nameU="EndX" v:val="VT0(-5.5511151231258E-017):1"/>
+				<v:ud v:nameU="EndY" v:val="VT0(-0.125):1"/>
+				<v:ud v:nameU="Row_7" v:val="VT0(-1):1"/>
+				<v:ud v:nameU="BeginY" v:val="VT0(-0.125):1"/>
+				<v:ud v:nameU="RealBeginX" v:prompt="" v:val="VT0(-2.3382413642169):32"/>
+				<v:ud v:nameU="RealBeginY" v:prompt="" v:val="VT0(0.97998775762325):32"/>
+				<v:ud v:nameU="EndX" v:prompt="" v:val="VT0(0):24"/>
+				<v:ud v:nameU="EndY" v:prompt="" v:val="VT0(-8.8817841970013E-016):24"/>
+				<v:ud v:nameU="Row_7" v:prompt="" v:val="VT0(4.7918307086614):24"/>
+				<v:ud v:nameU="BeginY" v:prompt="" v:val="VT0(-2.4027504374453):24"/>
+			</v:userDefs>
+			<title>Transition, Edge.102</title>
+			<desc>update</desc>
+			<g id="shape103-387" v:mID="103" v:groupContext="shape" transform="translate(-1325.42,357.418) rotate(-56.1492)">
+				<title>Straight Edge.28</title>
+				<desc>N</desc>
+				<v:userDefs>
+					<v:ud v:nameU="SetSize" v:val="VT0(0):26"/>
+				</v:userDefs>
+				<v:textBlock v:margins="rect(4,4,4,4)"/>
+				<v:textRect cx="7.48817" cy="1180.51" width="14.98" height="17.6036" transform="rotate(56.1492)"/>
+			</g>
+			<g id="shape104-390" v:mID="104" v:groupContext="shape" transform="translate(859.997,1996.85) rotate(133.971)">
+				<title>Straight Edge.29</title>
+				<desc>N</desc>
+				<v:userDefs>
+					<v:ud v:nameU="SetSize" v:val="VT0(0):26"/>
+				</v:userDefs>
+				<v:textBlock v:margins="rect(4,4,4,4)"/>
+				<v:textRect cx="7.48817" cy="1180.51" width="14.98" height="17.6036" transform="rotate(-133.971)"/>
+			</g>
+			<g id="shape102-393" v:mID="102" v:groupContext="groupContent">
+				<v:textBlock v:margins="rect(4,4,4,4)"/>
+				<v:textRect cx="-272.505" cy="1475.95" width="32.92" height="17.6036"/>
+				<path d="M0 1188 L-8.26 1188 A8.25591 8.25591 -180 0 0 -16.51 1196.26 L-16.51 1457.95 A18 18 0 0 1 -34.51 1475.95
+							 L-340.51 1475.95 A18 18 0 0 1 -358.51 1457.95 L-358.51 1021.75 A6.75 6.75 0 0 1 -351.76 1015 L-345.01
+							 1015" class="st25"/>
+				<rect v:rectContext="textBkgnd" x="-284.055" y="1471.15" width="23.1012" height="9.59985" class="st11"/>
+				<text x="-284.06" y="1478.35" class="st14" v:langID="2052"><v:paragraph v:horizAlign="1"/><v:tabList/>update</text>			</g>
+		</g>
+		<g id="group108-400" transform="translate(819,-329.669)" v:mID="108" v:groupContext="group">
+			<v:userDefs>
+				<v:ud v:nameU="BeginAngle" v:prompt="reserved for future use" v:val="VT0(2):26"/>
+				<v:ud v:nameU="EndAngle" v:prompt="reserved for future use" v:val="VT0(2):26"/>
+				<v:ud v:nameU="RealBeginX" v:val="VT0(0):32"/>
+				<v:ud v:nameU="RealBeginY" v:val="VT0(0):32"/>
+				<v:ud v:nameU="EndX" v:val="VT0(-5.5511151231258E-017):1"/>
+				<v:ud v:nameU="EndY" v:val="VT0(-0.125):1"/>
+				<v:ud v:nameU="Row_7" v:val="VT0(-1):1"/>
+				<v:ud v:nameU="BeginY" v:val="VT0(-0.125):1"/>
+				<v:ud v:nameU="RealBeginY" v:prompt="" v:val="VT0(-3.1250409434722):32"/>
+				<v:ud v:nameU="EndX" v:prompt="" v:val="VT0(0.125):1"/>
+				<v:ud v:nameU="EndY" v:prompt="" v:val="VT0(8.8817841970013E-016):24"/>
+				<v:ud v:nameU="Row_7" v:prompt="" v:val="VT0(0.125):1"/>
+				<v:ud v:nameU="BeginY" v:prompt="" v:val="VT0(1.0236220472441):24"/>
+			</v:userDefs>
+			<title>Transition, Edge.108</title>
+			<desc>write EOI -&#62; 0</desc>
+			<g id="shape109-401" v:mID="109" v:groupContext="shape" transform="translate(10.5239,2441.16) rotate(179.052)">
+				<title>Straight Edge.28</title>
+				<desc>N</desc>
+				<v:userDefs>
+					<v:ud v:nameU="SetSize" v:val="VT0(0):26"/>
+				</v:userDefs>
+				<v:textBlock v:margins="rect(4,4,4,4)"/>
+				<v:textRect cx="8.37669" cy="1179.62" width="14.98" height="17.6036" transform="rotate(-179.052)"/>
+			</g>
+			<g id="shape110-404" v:mID="110" v:groupContext="shape" transform="translate(-25.7534,8.37669)">
+				<title>Straight Edge.29</title>
+				<desc>N</desc>
+				<v:userDefs>
+					<v:ud v:nameU="SetSize" v:val="VT0(0):26"/>
+				</v:userDefs>
+				<v:textBlock v:margins="rect(4,4,4,4)"/>
+				<v:textRect cx="8.37669" cy="1179.62" width="14.98" height="17.6036"/>
+			</g>
+			<g id="shape108-407" v:mID="108" v:groupContext="groupContent">
+				<v:textBlock v:margins="rect(4,4,4,4)"/>
+				<v:textRect cx="31.5" cy="1224.85" width="57.57" height="17.6036"/>
+				<path d="M-9 1188 L13.5 1188 A18 18 0 0 1 31.5 1206 L31.5 1245.98 A15.1875 15.1875 0 0 1 16.31 1261.17 L1.39 1261.17
+							 a0.265748 0.265748 -180 0 0 -0.265748 0.265748 L1.12 1261.44 a0.265748 0.265748 0 0 1 -0.265748 0.265748
+							 L-9 1261.7" class="st18"/>
+				<rect v:rectContext="textBkgnd" x="7.62325" y="1220.05" width="47.7537" height="9.59985" class="st11"/>
+				<text x="7.62" y="1227.25" class="st14" v:langID="2052"><v:paragraph v:horizAlign="1"/><v:tabList/>write EOI  -&#62;  0</text>			</g>
+		</g>
+		<g id="group117-414" transform="translate(810,-292.819)" v:mID="117" v:groupContext="group">
+			<v:userDefs>
+				<v:ud v:nameU="BeginAngle" v:prompt="reserved for future use" v:val="VT0(2):26"/>
+				<v:ud v:nameU="EndAngle" v:prompt="reserved for future use" v:val="VT0(2):26"/>
+				<v:ud v:nameU="RealBeginX" v:val="VT0(0):32"/>
+				<v:ud v:nameU="RealBeginY" v:val="VT0(0):32"/>
+				<v:ud v:nameU="EndX" v:val="VT0(-5.5511151231258E-017):1"/>
+				<v:ud v:nameU="EndY" v:val="VT0(-0.125):1"/>
+				<v:ud v:nameU="Row_7" v:val="VT0(-1):1"/>
+				<v:ud v:nameU="BeginY" v:val="VT0(-0.125):1"/>
+				<v:ud v:nameU="RealBeginX" v:prompt="" v:val="VT0(-2.5606135878875):32"/>
+				<v:ud v:nameU="RealBeginY" v:prompt="" v:val="VT0(3.1415926535898):32"/>
+				<v:ud v:nameU="EndY" v:prompt="" v:val="VT0(0):24"/>
+				<v:ud v:nameU="Row_7" v:prompt="" v:val="VT0(3.5):1"/>
+				<v:ud v:nameU="BeginY" v:prompt="" v:val="VT0(2.5669291338583):24"/>
+			</v:userDefs>
+			<title>Transition, Edge.117</title>
+			<desc>EOI virtualization may exec evaluate pending virtual interrupt</desc>
+			<g id="shape118-415" v:mID="118" v:groupContext="shape" transform="translate(-252,2552.44) rotate(180)">
+				<title>Straight Edge.28</title>
+				<desc>N</desc>
+				<v:userDefs>
+					<v:ud v:nameU="SetSize" v:val="VT0(0):26"/>
+				</v:userDefs>
+				<v:textBlock v:margins="rect(4,4,4,4)"/>
+				<v:textRect cx="8.37669" cy="1179.62" width="14.98" height="17.6036" transform="rotate(180)"/>
+			</g>
+			<g id="shape119-418" v:mID="119" v:groupContext="shape" transform="translate(661.432,2164.88) rotate(146.712)">
+				<title>Straight Edge.29</title>
+				<desc>N</desc>
+				<v:userDefs>
+					<v:ud v:nameU="SetSize" v:val="VT0(0):26"/>
+				</v:userDefs>
+				<v:textBlock v:margins="rect(4,4,4,4)"/>
+				<v:textRect cx="8.37669" cy="1179.62" width="14.98" height="17.6036" transform="rotate(-146.712)"/>
+			</g>
+			<g id="shape117-421" v:mID="117" v:groupContext="groupContent">
+				<v:textBlock v:margins="rect(4,4,4,4)"/>
+				<v:textRect cx="-148.5" cy="1366.07" width="67.79" height="46.4035"/>
+				<path d="M0 1188 L0 1190.6 A2.59695 2.59695 0 0 1 -2.6 1193.19 L-17.25 1193.19" class="st21"/>
+				<path d="M-23.25 1193.19 L-29.25 1193.19 A18 18 -180 0 0 -47.25 1211.19 L-47.25 1354.82 A18 18 0 0 1 -65.25 1372.82
+							 L-252 1372.82" class="st22"/>
+				<rect v:rectContext="textBkgnd" x="-176.58" y="1346.87" width="56.1594" height="38.3997" class="st11"/>
+				<text x="-176.29" y="1354.07" class="st14" v:langID="2052"><v:paragraph v:horizAlign="1"/><v:tabList/>EOI virtualization<v:newlineChar/><tspan
+							x="-163.73" dy="1.2em" class="st4">may exec<v:newlineChar/></tspan><tspan x="-176.58" dy="1.2em"
+							class="st4">evaluate pending <v:newlineChar/></tspan><tspan x="-174.48" dy="1.2em" class="st4">virtual interrupt</tspan></text>			</g>
+		</g>
+		<g id="group120-432" transform="translate(819,-255.969)" v:mID="120" v:groupContext="group">
+			<v:userDefs>
+				<v:ud v:nameU="BeginAngle" v:prompt="reserved for future use" v:val="VT0(2):26"/>
+				<v:ud v:nameU="EndAngle" v:prompt="reserved for future use" v:val="VT0(2):26"/>
+				<v:ud v:nameU="RealBeginX" v:val="VT0(0):32"/>
+				<v:ud v:nameU="RealBeginY" v:val="VT0(0):32"/>
+				<v:ud v:nameU="EndX" v:val="VT0(-5.5511151231258E-017):1"/>
+				<v:ud v:nameU="EndY" v:val="VT0(-0.125):1"/>
+				<v:ud v:nameU="Row_7" v:val="VT0(-1):1"/>
+				<v:ud v:nameU="BeginY" v:val="VT0(-0.125):1"/>
+				<v:ud v:nameU="RealBeginY" v:prompt="" v:val="VT0(-3.1247320568246):32"/>
+				<v:ud v:nameU="EndX" v:prompt="" v:val="VT0(0.125):1"/>
+				<v:ud v:nameU="EndY" v:prompt="" v:val="VT0(-8.8817841970013E-016):24"/>
+				<v:ud v:nameU="Row_7" v:prompt="" v:val="VT0(0.125):1"/>
+				<v:ud v:nameU="BeginY" v:prompt="" v:val="VT0(0.98425196850394):24"/>
+			</v:userDefs>
+			<title>Transition, Edge.120</title>
+			<desc>IRET</desc>
+			<g id="shape121-433" v:mID="121" v:groupContext="shape" transform="translate(10.9032,2439.21) rotate(179.034)">
+				<title>Straight Edge.28</title>
+				<desc>N</desc>
+				<v:userDefs>
+					<v:ud v:nameU="SetSize" v:val="VT0(0):26"/>
+				</v:userDefs>
+				<v:textBlock v:margins="rect(4,4,4,4)"/>
+				<v:textRect cx="7.48817" cy="1180.51" width="14.98" height="17.6036" transform="rotate(-179.034)"/>
+			</g>
+			<g id="shape122-436" v:mID="122" v:groupContext="shape" transform="translate(-23.9763,7.48817)">
+				<title>Straight Edge.29</title>
+				<desc>N</desc>
+				<v:userDefs>
+					<v:ud v:nameU="SetSize" v:val="VT0(0):26"/>
+				</v:userDefs>
+				<v:textBlock v:margins="rect(4,4,4,4)"/>
+				<v:textRect cx="7.48817" cy="1180.51" width="14.98" height="17.6036"/>
+			</g>
+			<g id="shape120-439" v:mID="120" v:groupContext="groupContent">
+				<v:textBlock v:margins="rect(4,4,4,4)"/>
+				<v:textRect cx="29.25" cy="1218.97" width="23.98" height="17.6036"/>
+				<path d="M-9 1188 L13.5 1188 A18 18 0 0 1 31.5 1206 L31.5 1240.87 A18 18 0 0 1 13.5 1258.87 L-9 1258.87"
+						class="st18"/>
+				<rect v:rectContext="textBkgnd" x="22.168" y="1214.17" width="14.1641" height="9.59985" class="st11"/>
+				<text x="22.17" y="1221.37" class="st14" v:langID="2052"><v:paragraph v:horizAlign="1"/><v:tabList/>IRET</text>			</g>
+		</g>
+		<g id="group129-446" transform="translate(810,-185.102)" v:mID="129" v:groupContext="group">
+			<v:userDefs>
+				<v:ud v:nameU="BeginAngle" v:prompt="reserved for future use" v:val="VT0(2):26"/>
+				<v:ud v:nameU="EndAngle" v:prompt="reserved for future use" v:val="VT0(2):26"/>
+				<v:ud v:nameU="RealBeginX" v:val="VT0(0):32"/>
+				<v:ud v:nameU="RealBeginY" v:val="VT0(0):32"/>
+				<v:ud v:nameU="EndX" v:val="VT0(-5.5511151231258E-017):1"/>
+				<v:ud v:nameU="EndY" v:val="VT0(-0.125):1"/>
+				<v:ud v:nameU="Row_7" v:val="VT0(-1):1"/>
+				<v:ud v:nameU="BeginY" v:val="VT0(-0.125):1"/>
+				<v:ud v:nameU="RealBeginX" v:prompt="" v:val="VT0(3.1415926535898):32"/>
+				<v:ud v:nameU="RealBeginY" v:prompt="" v:val="VT0(3.1415926535898):32"/>
+				<v:ud v:nameU="EndY" v:prompt="" v:val="VT0(0):24"/>
+				<v:ud v:nameU="Row_7" v:prompt="" v:val="VT0(1.8020833333333):1"/>
+				<v:ud v:nameU="BeginY" v:prompt="" v:val="VT0(-1.6929133858268):24"/>
+			</v:userDefs>
+			<title>Transition, Edge.129</title>
+			<g id="shape130-447" v:mID="130" v:groupContext="shape" transform="translate(-129.75,2245.73) rotate(180)">
+				<title>Straight Edge.28</title>
+				<desc>N</desc>
+				<v:userDefs>
+					<v:ud v:nameU="SetSize" v:val="VT0(0):26"/>
+				</v:userDefs>
+				<v:textBlock v:margins="rect(4,4,4,4)"/>
+				<v:textRect cx="8.37669" cy="1179.62" width="14.98" height="17.6036" transform="rotate(180)"/>
+			</g>
+			<g id="shape131-450" v:mID="131" v:groupContext="shape" transform="translate(16.7534,2367.62) rotate(180)">
+				<title>Straight Edge.29</title>
+				<desc>N</desc>
+				<v:userDefs>
+					<v:ud v:nameU="SetSize" v:val="VT0(0):26"/>
+				</v:userDefs>
+				<v:textBlock v:margins="rect(4,4,4,4)"/>
+				<v:textRect cx="8.37669" cy="1179.62" width="14.98" height="17.6036" transform="rotate(180)"/>
+			</g>
+			<g id="shape129-453" v:mID="129" v:groupContext="groupContent">
+				<path d="M0 1188 L-10.13 1188 A10.125 10.125 0 0 1 -20.25 1177.87 L-20.25 1084.11 A18 18 -180 0 0 -38.25 1066.11
+							 L-129.75 1066.11" class="st18"/>
+			</g>
+		</g>
+		<g id="group132-458" transform="translate(576,-301.5)" v:mID="132" v:groupContext="group">
+			<v:userDefs>
+				<v:ud v:nameU="BeginAngle" v:prompt="reserved for future use" v:val="VT0(2):26"/>
+				<v:ud v:nameU="EndAngle" v:prompt="reserved for future use" v:val="VT0(2):26"/>
+				<v:ud v:nameU="RealBeginX" v:val="VT0(0):32"/>
+				<v:ud v:nameU="RealBeginY" v:val="VT0(0):32"/>
+				<v:ud v:nameU="EndX" v:val="VT0(-5.5511151231258E-017):1"/>
+				<v:ud v:nameU="EndY" v:val="VT0(-0.125):1"/>
+				<v:ud v:nameU="Row_7" v:val="VT0(-1):1"/>
+				<v:ud v:nameU="BeginY" v:val="VT0(-0.125):1"/>
+				<v:ud v:nameU="EndY" v:prompt="" v:val="VT0(-8.8817841970013E-016):1"/>
+				<v:ud v:nameU="Row_7" v:prompt="" v:val="VT0(-2.59375):1"/>
+				<v:ud v:nameU="BeginY" v:prompt="" v:val="VT0(2.4977854330709):1"/>
+			</v:userDefs>
+			<title>Transition, Edge.132</title>
+			<desc>may exec virtual interrupt delivery</desc>
+			<g id="shape133-459" v:mID="133" v:groupContext="shape" transform="translate(186.75,188.217)">
+				<title>Straight Edge.28</title>
+				<desc>N</desc>
+				<v:userDefs>
+					<v:ud v:nameU="SetSize" v:val="VT0(0):26"/>
+				</v:userDefs>
+				<v:textBlock v:margins="rect(4,4,4,4)"/>
+				<v:textRect cx="8.37669" cy="1179.62" width="14.98" height="17.6036"/>
+			</g>
+			<g id="shape134-462" v:mID="134" v:groupContext="shape" transform="translate(-16.7534,8.37669)">
+				<title>Straight Edge.29</title>
+				<desc>N</desc>
+				<v:userDefs>
+					<v:ud v:nameU="SetSize" v:val="VT0(0):26"/>
+				</v:userDefs>
+				<v:textBlock v:margins="rect(4,4,4,4)"/>
+				<v:textRect cx="8.37669" cy="1179.62" width="14.98" height="17.6036"/>
+			</g>
+			<g id="shape132-465" v:mID="132" v:groupContext="groupContent">
+				<v:textBlock v:margins="rect(4,4,4,4)"/>
+				<v:textRect cx="140.063" cy="1231.23" width="61.78" height="46.4035"/>
+				<path d="M0 1188 L122.06 1188 A18 18 0 0 1 140.06 1206 L140.06 1349.84 A18 18 -180 0 0 158.06 1367.84 L186.75 1367.84"
+						class="st25"/>
+				<rect v:rectContext="textBkgnd" x="114.082" y="1212.03" width="51.9604" height="38.3997" class="st11"/>
+				<text x="133.14" y="1219.23" class="st14" v:langID="2052"><v:paragraph v:horizAlign="1"/><v:tabList/>may <v:newlineChar/><tspan
+							x="132.66" dy="1.2em" class="st4">exec<v:newlineChar/></tspan><tspan x="114.08" dy="1.2em" class="st4">virtual interrupt<v:newlineChar/></tspan><tspan
+							x="127.13" dy="1.2em" class="st4">delivery</tspan></text>			</g>
+		</g>
+	</g>
+</svg>
