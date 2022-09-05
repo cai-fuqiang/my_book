@@ -1,41 +1,136 @@
 # vapic
 ## intruduction
 
+### LAPIC register
+![local apic structure](pic/Figure-10-4-local-apic-structure.png)
+
+这里主要介绍如下寄存器:
+* **IRR** : 用于记录中断源请求的vector, 以bits表示
+* **ISR** : 用于记录当前cpu正在处理的vector, 以bits表示
+* **TPR** : 用于记录当前最低的中断优先级。
+* **PPR** : 该寄存器会在中断优先级评估过程中使用, 该寄存器是ISR， TPR
+ 的最大值，如果`IRR_max_Vector > PPR`, APIC就会想cpu delivery一个中断。
+* **ICR** : 该寄存器用于核间中断。
+
+还有一些线:
+* **INTR**: LOAPIC通过它想CPU发送中断请求
+* **INTA**: CPU在收到INTR发送过来的中断请求后，通过INTA ack lapic
+
+这两条线在很早的CPU中就引入了, 请看下图:
+
+![8259A](pic/8259A.png)
+
+上图是将82C55 芯片的。
+
+在INTR拉高后，INTA拉低电平，然后这时LAPIC再通过地址总线将vector
+number 传给cpu。
+
+（其他细节可以看下: http://ece-research.unm.edu/jimp/310/slides/8086_interrupts.html)
+
+> NOTE:
+>
+> 我们可以猜想下，这样实现的原因:
+>
+> cpu 是有自己的中断屏蔽机制的，通过设置`IF`位为0，可以去mask unmask interrupt,
+> 这个过程看起来并没有通知到lapic, 在lapic中也没有相应的register,
+> 那么，可以猜测，当清空了`IF`后，对于unmask interrupt 来临时，可以选择不去发送
+> acknowledge 来达到中断屏蔽的目的。
+>
+> 对于NMI中断，或者是其他的不可屏蔽的中断来说，他们是通过其他的线连接到cpu的，而且
+> 也没有`From CPU Core`的线，所以该类型中断是直接递送到cpu core, 并且不需要ack, 
+> 所以可以推断ack的目的是上述猜测那样。
+
 ### VM root operation上接收external interrupt逻辑
+我们先来看下, 在`VM root operation`下中断的处理逻辑。如下图:
 
 ![recv intr on VM root operation](./pic/interrupt_recv_on_vm_root.svg)
 
-### 引入该功能原因
-在没有引入virtual apic之前，如果想将一个中断注入到guest，
-只能通过`Event injection`(事件注入) 的方式注入中断(详见
-intel sdm 26.6)
+这里说下自己的理解, 中断处理可以分为两个部分:
+* 中断发送端: lapic。
+* 中断接收端: cpu
 
-该方式有一些缺点:
+
+#### 中断接收端
+lapic在接收到来自总线上的中断请求时，会将IRR[Vector]置位，
+同时将会去判断该中断请求是否要递交到CPU， 这时会去判断
+IRR > PPR, 如果条件满足，则将通过`INTR`发送中断请求。当
+CPU端通过`INTA`发送给lapic一个 ack时，lapic再将ISR置位，
+同时修改`PPR`, 然后将中断信息vector发送给cpu，这时lapic
+就完成了一个中断的delivery 到CPU的流程。
+
+#### 中断接收端
+CPU这端在收到来自`INTR`的中断请求后，会去在instruction
+boundary 处，去判断当前CPU STATE是否满足接收中断的条件，
+主要是interrupt-window是否打开，如果没有打开，则继续执行
+指令，pending 该interrupt; 因为interrupt-window主要是由
+指令打开，所以在当interrupt-window打开的instruction boundary
+处，会去接收该interrupt。接收该interrupt的逻辑是: 先通过
+`INTA`向lapic发送一个ack, 然后再接收来自于lapic的中断信息，
+主要为vector, 再通过IDT 去穿过中断门，进行指令跳转，特权级
+切换，和一些堆栈操作，提供中断处理的上下文，然后转入中断
+处理流程。
+
+### 早期vapic的实现
+早期vapic的实现可以参考:
+
+[早期intel VMX实现 2008](http://132.248.181.216/MV/CursoMaquinasVirtuales/Bibliograf%C3%ADaMaquinasVirtuales/Vtx.pdf)
+
+从上面我们可以看出，apic和cpu这边是有一些交互逻辑的，
+apic这边需要接收外部设备递交过来的中断消息，同时去判断
+该中断是否要传递到cpu中，而cpu这边则需要判断是否要接收
+这个中断, 并通过idt完成中断处理。
+
+要从硬件方面去模拟上面的这一行为的话, 就要去模拟上述行为，
+但是早期的VMX并没有支持那么多，只是给VMM提供了一个`event 
+injection`feature让其去在每次`VM entry`中，注入一个中断。
+
+`event injection`过程，实际上就是在vm entry过程中，会根据
+VMM 提供的vector， 完成通过IDT 穿过中断门的模拟。所以说
+这个只是模拟了中断流程的一部分。
+
+![event injection流程](./pic/event_inject.svg)
+
+可以看到`event injection`是发生在VM entry比较靠后的位置，在
+执行该流程是，`CPU register`已经是Guest的了，所以通过IDT穿过
+中断门，vm entry后，Guest state已经是穿过中断门后的RIP 和
+stack了。
+
+因为`event injection`只发生在`VM entry`流程，而且每次只能
+去注入一个vector。所以如果有多个中断需要处理， 或者更
+改了某些寄存器达到了中断pendding/delivery的条件（例如
+修改TPR RFLAGS.IF), 这时需要一些机制，能够立刻VM exit,
+以便减少中断延迟。在VMCS VM-execution controls中引入
+如下几个字段:
+
+* interrupt-window exiting
+* Use TPR shadow
+* TPR threshold
+
+**interrupt-window exiting**: 该字段用于VM non-root 
+operation CPU一旦打开了 interrupt-window, 就会产生VM exit。
+例如，在kvm本次vm entry前，发现guest interrupt-window是
+关闭的状态（例如IF=0), 则就把这个位置上，当guest interrupt
+-window打开时，则会触发VM-exit,在下次VM entry时在注入中断。
+同时在处理多个中断时也可以使用，例如本次VM entry注入一个中断，
+在注入中断时，CPU会把interrupt-window关闭，等中断流程处理完，
+guest kernel会通过`IRET`指令恢复RFLAGS，此时interrupt-window
+打开。产生VM exit，这时在下次VM entry时，注入下一个中断。
+
+**TPR threshold** :假如说，当前的`TPR > MAX_IRR`的话，则表示
+该中断被TPR阻塞了，本次的vm-entry不注入该中断, 但是guest 
+os 可能会修改TPR导致上面的条件满足，如果没有`TPR threshold`的
+话，可能得等某个事件导致`VM exit`，中断延时比较高，如果软件
+层面把`TPR threshold`设置为`MAX_IRR`的话，则避免了这个问题，
+在guest os 修改`TPR < TPR threshold(MAX_IRR)`时, 则直接产生VM-exit。
+
+但是该方式有一些缺点:
 * 一次只能注入一个中断
 * 并且注入的时间点，只发生在vm entry, 所以受interrupt window
 的影响，可能会导致软件注入中断不成功，需要软件特殊处理。
 
-那么我们来看, 上面的两个缺点，kvm(software)这边是如何处理的: 
-* 一次只能注入一个中断:<br/>
-当如果本次vm entry 发现有多个中断需要注入时，设置VMCS中的`primary 
-processor-based VM-execution controls`中的`interrupt-window exit`
-字段。因为在注入中断过程中会将`interrupt-windows`关闭(实际上
-也就是将IF=0)，所以等guest software 将interrupt-windows开启时，
-就使其产生vm-exit, 然后在下次的vm entry中在将下一个中断注入。
-
-* 受interrupt-window 影响<br/>
-如果本次vm entry发现`interrupt-windows`关闭(主要有guest的
-IF=0，或者VMCS中`Guest-state Aare`中`Interruptibility 
-state`中的某些位为1(详见intel  sdm 24.4.2 Guest 
-Non-Register state), 那么在本次vm-entry 就不注入中断，
-然后把`interrupt-window exit`字段置1，让guest在interrupt
-window开启的时候产生vm exit, 然后在下次vm entry 时注入
-中断。
-
 所以我们来看上面的影响，处理上面两种情况时，会产生多次的vm 
-exit。另外还有guest software 对于apic register的访问，这里面
-有些寄存器可能访问的比较频繁，例如TPR，所以为了减少vm exit,
-intel 引入了 `APIC Virtualization 和 virtual interrupt`。
+exit。另外还有guest software 对于apic register的访问，
+所以intel 引入了 `APIC Virtualization 和 virtual interrupt`。
 
 引入上述功能后，可以在一次vm-entry中注入多个中断，并且
 无需关心interrupt window, 并且，还可以使用posted-interrupt
@@ -44,7 +139,6 @@ descriptor)和向其发送一个特殊的中断NV(notification vector),
 注入中断。
 
 我们来看下上述功能的实现
-
 
 ## vapic实现
 apic 虚拟化，最底层的是要虚拟化apic 的这些寄存器，而intel 这边的实现
@@ -331,16 +425,8 @@ FI;
 `VTPR`和`TPR threshold`的值，如果`VTPR` 小于 `TPR threshold`的话，
 则会造成VM exit。
 
-关于`TPR threshold`的作用就如上所述，这个在软件层看来有什么
-用呢, 这个可以协助减少中断延时。在没有支持`virtual-interrupt 
-delivery` 之前，中断只能通过`event injection`的方式注入, 
-假如说，当前的`TPR > MAX_IRR`的话，则表示该中断被TPR阻塞了，
-本次的vm-entry不注入该中断, 但是guest os 可能会修改TPR导致上面
-的条件满足，如果没有`TPR threshold`的话，可能得等某个事件
-导致`VM exit`，中断延时比较高，如果软件层面把`TPR threshold`设置
-为`MAX_IRR`的话，则避免了这个问题，在guest os 修改
-`TPR < TPR threshold(MAX_IRR)`时, 则直接产生VM-exit。该字段和
-`interrupt-window exit`产生的作用相似。
+前面也说到在使用`event injection`的方式注入中断，`TPR threashold`
+可以帮助减少中断延时。
 
 而在支持了`virtual-interrupt delivery`之后, 则没必要处理`TPR
 threshold`逻辑了, 则会执行`PPR virtualization`, 并且去`evaluate
@@ -678,28 +764,6 @@ pending virtual interrupt`
 1. acknowledge local APIC
 2. VMX non-root operation ACK
 
-### acknowledge local APIC
-![local apic structure](pic/Figure-10-4-local-apic-structure.png)
-
-从上图红圈中有`INTA`和`INTR`两条线(这里忽略`EXTINT`), 当lapic要向CPU 发送可屏蔽中
-断时，会执行以下步骤:
-* lapic通过`INTR`想cpu发送中断请求。
-* CPU这边会在自己感觉合适的时机，发送通过`INTA`想lapic 发送 acknowledge,
-* lapic收到ack后，会向cpu发送本次中断请求的vector
-
-> NOTE:
->
-> 我们可以猜想下，这样做的原因:
->
-> cpu 是有自己的中断屏蔽机制的，通过设置`IF`位为0，可以去mask unmask interrupt,
-> 这个过程看起来并没有通知到lapic, 在lapic中也没有相应的register,
-> 那么，可以猜测，当清空了`IF`后，对于unmask interrupt 来临时，可以选择不去发送
-> acknowledge 来达到中断屏蔽的目的。
->
-> 对于NMI中断，或者是其他的不可屏蔽的中断来说，他们是通过其他的线连接到cpu的，而且
-> 也没有`From CPU Core`的线，所以该类型中断是直接递送到cpu core, 并且不需要ack, 
-> 所以可以推断ack的目的是上述猜测那样。
-
 ### VMX non-root operation ACK
 其实，`posted interrupt processing`依赖另一个`VM-execution control`:`Acknowledge
 interrupt on exit`, 该功能使得处理器在VM non-root operation下, 也能够去
@@ -757,7 +821,8 @@ emulation的操作，有的时候呢，可能需要其他的agent配合，例如
   该功能支持，也为IOMMU 的`posted interrupt remapping`功能提供了CPU层面的
   硬件支持。（IOMMU `posted interrupt remapping` 功能可用于设备中断直接
   delivery到 `VM non-root operation`  CPU 中, 不会产生VM exit，也无需
-  软件参与该过程)
+  软件参与该过程)。以及intel new feature`IPI virtualization`提供了
+  相应的中断dest方的硬件支持。
 
 > # !! NOTE:
 >
