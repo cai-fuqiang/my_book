@@ -7,7 +7,8 @@
   * [clock event](./time/clock_source.md)
   * [timer](./time/clock_source.md)
 -->
-
+* [APIC](./apic/README.md)
+  * [xapic](./apic/x2apic.md)
 * [KVM](./kvm/README.md)
   * [apicv](./kvm/vapic.md)
   * [IPI virtualization](./kvm/ipiv.md)

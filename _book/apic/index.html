@@ -4,7 +4,7 @@
     <head>
         <meta charset="UTF-8">
         <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
-        <title>KVM · GitBook</title>
+        <title>APIC · GitBook</title>
         <meta http-equiv="X-UA-Compatible" content="IE=edge" />
         <meta name="description" content="">
         <meta name="generator" content="GitBook 3.2.3">
@@ -57,10 +57,10 @@
     <link rel="shortcut icon" href="../gitbook/images/favicon.ico" type="image/x-icon">
 
     
-    <link rel="next" href="vapic.html" />
+    <link rel="next" href="x2apic.html" />
     
     
-    <link rel="prev" href="../apic/x2apic.html" />
+    <link rel="prev" href="../" />
     
 
     </head>
@@ -102,9 +102,9 @@
             
         </li>
     
-        <li class="chapter " data-level="1.2" data-path="../apic/">
+        <li class="chapter active" data-level="1.2" data-path="./">
             
-                <a href="../apic/">
+                <a href="./">
             
                     
                     APIC
@@ -116,9 +116,9 @@
             <ul class="articles">
                 
     
-        <li class="chapter " data-level="1.2.1" data-path="../apic/x2apic.html">
+        <li class="chapter " data-level="1.2.1" data-path="x2apic.html">
             
-                <a href="../apic/x2apic.html">
+                <a href="x2apic.html">
             
                     
                     xapic
@@ -134,9 +134,9 @@
             
         </li>
     
-        <li class="chapter active" data-level="1.3" data-path="./">
+        <li class="chapter " data-level="1.3" data-path="../kvm/">
             
-                <a href="./">
+                <a href="../kvm/">
             
                     
                     KVM
@@ -148,9 +148,9 @@
             <ul class="articles">
                 
     
-        <li class="chapter " data-level="1.3.1" data-path="vapic.html">
+        <li class="chapter " data-level="1.3.1" data-path="../kvm/vapic.html">
             
-                <a href="vapic.html">
+                <a href="../kvm/vapic.html">
             
                     
                     apicv
@@ -161,9 +161,9 @@
             
         </li>
     
-        <li class="chapter " data-level="1.3.2" data-path="ipiv.html">
+        <li class="chapter " data-level="1.3.2" data-path="../kvm/ipiv.html">
             
-                <a href="ipiv.html">
+                <a href="../kvm/ipiv.html">
             
                     
                     IPI virtualization
@@ -174,9 +174,9 @@
             
         </li>
     
-        <li class="chapter " data-level="1.3.3" data-path="patch.html">
+        <li class="chapter " data-level="1.3.3" data-path="../kvm/patch.html">
             
-                <a href="patch.html">
+                <a href="../kvm/patch.html">
             
                     
                     kvm patch
@@ -222,7 +222,7 @@
     <!-- Title -->
     <h1>
         <i class="fa fa-circle-o-notch fa-spin"></i>
-        <a href=".." >KVM</a>
+        <a href=".." >APIC</a>
     </h1>
 </div>
 
@@ -237,18 +237,14 @@
     
                                 <section class="normal markdown-section">
                                 
-                                <h1 id="kvm">kvm</h1>
+                                <h1 id="apic">apic</h1>
 <ul>
-<li><a href="vapic.html">apicv</a></li>
-<li><a href="ipiv.html">ipi virtualization</a></li>
+<li><a href="x2apic.html">x2apic</a></li>
 </ul>
 <blockquote>
-<p>NOTE:</p>
-<p>&#x53C2;&#x8003;&#x94FE;&#x63A5;:</p>
-<p><a href="https://software.intel.com/content/www/us/en/develop/download/intel-architecture-instruction-set-extensions-programming-reference.html" target="_blank">Intel&#xAE; Architecture Instruction Set Extensions and Future Features</a></p>
-<p><a href="https://www.spinics.net/lists/kvm/msg273451.html" target="_blank">kernel mail list: IPI virtualization support for VM</a></p>
-<p><a href="http://132.248.181.216/MV/CursoMaquinasVirtuales/Bibliograf%C3%ADaMaquinasVirtuales/Vtx.pdf" target="_blank">&#x65E9;&#x671F;intel VMX&#x5B9E;&#x73B0; 2008</a></p>
-<p><a href="https://patentimages.storage.googleapis.com/73/44/9e/cc7fee3e128a52/US5701496.pdf" target="_blank">&#x65E9;&#x671F;APIC&#x5B9E;&#x73B0;</a></p>
+<p>NOTE</p>
+<p>&#x53C2;&#x8003;&#x94FE;&#x63A5;</p>
+<p><a href="https://www.naic.edu/~phil/software/intel/318148.pdf" target="_blank">intel x2apic SPEC</a></p>
 </blockquote>
 
                                 
@@ -277,12 +273,12 @@
 
             
                 
-                <a href="../apic/x2apic.html" class="navigation navigation-prev " aria-label="Previous page: xapic">
+                <a href="../" class="navigation navigation-prev " aria-label="Previous page: Introduction">
                     <i class="fa fa-angle-left"></i>
                 </a>
                 
                 
-                <a href="vapic.html" class="navigation navigation-next " aria-label="Next page: apicv">
+                <a href="x2apic.html" class="navigation navigation-next " aria-label="Next page: xapic">
                     <i class="fa fa-angle-right"></i>
                 </a>
                 
@@ -293,7 +289,7 @@
     <script>
         var gitbook = gitbook || [];
         gitbook.push(function() {
-            gitbook.page.hasChanged({"page":{"title":"KVM","level":"1.3","depth":1,"next":{"title":"apicv","level":"1.3.1","depth":2,"path":"kvm/vapic.md","ref":"./kvm/vapic.md","articles":[]},"previous":{"title":"xapic","level":"1.2.1","depth":2,"path":"apic/x2apic.md","ref":"./apic/x2apic.md","articles":[]},"dir":"ltr"},"config":{"gitbook":"*","theme":"default","variables":{},"plugins":[],"pluginsConfig":{"highlight":{},"search":{},"lunr":{"maxIndexSize":1000000,"ignoreSpecialCharacters":false},"sharing":{"facebook":true,"twitter":true,"google":false,"weibo":false,"instapaper":false,"vk":false,"all":["facebook","google","twitter","weibo","instapaper"]},"fontsettings":{"theme":"white","family":"sans","size":2},"theme-default":{"styles":{"website":"styles/website.css","pdf":"styles/pdf.css","epub":"styles/epub.css","mobi":"styles/mobi.css","ebook":"styles/ebook.css","print":"styles/print.css"},"showLevel":false}},"structure":{"langs":"LANGS.md","readme":"README.md","glossary":"GLOSSARY.md","summary":"SUMMARY.md"},"pdf":{"pageNumbers":true,"fontSize":12,"fontFamily":"Arial","paperSize":"a4","chapterMark":"pagebreak","pageBreaksBefore":"/","margin":{"right":62,"left":62,"top":56,"bottom":56}},"styles":{"website":"styles/website.css","pdf":"styles/pdf.css","epub":"styles/epub.css","mobi":"styles/mobi.css","ebook":"styles/ebook.css","print":"styles/print.css"}},"file":{"path":"kvm/README.md","mtime":"2022-09-09T07:15:56.447Z","type":"markdown"},"gitbook":{"version":"3.2.3","time":"2022-09-09T07:47:25.753Z"},"basePath":"..","book":{"language":""}});
+            gitbook.page.hasChanged({"page":{"title":"APIC","level":"1.2","depth":1,"next":{"title":"xapic","level":"1.2.1","depth":2,"path":"apic/x2apic.md","ref":"./apic/x2apic.md","articles":[]},"previous":{"title":"Introduction","level":"1.1","depth":1,"path":"README.md","ref":"README.md","articles":[]},"dir":"ltr"},"config":{"gitbook":"*","theme":"default","variables":{},"plugins":[],"pluginsConfig":{"highlight":{},"search":{},"lunr":{"maxIndexSize":1000000,"ignoreSpecialCharacters":false},"sharing":{"facebook":true,"twitter":true,"google":false,"weibo":false,"instapaper":false,"vk":false,"all":["facebook","google","twitter","weibo","instapaper"]},"fontsettings":{"theme":"white","family":"sans","size":2},"theme-default":{"styles":{"website":"styles/website.css","pdf":"styles/pdf.css","epub":"styles/epub.css","mobi":"styles/mobi.css","ebook":"styles/ebook.css","print":"styles/print.css"},"showLevel":false}},"structure":{"langs":"LANGS.md","readme":"README.md","glossary":"GLOSSARY.md","summary":"SUMMARY.md"},"pdf":{"pageNumbers":true,"fontSize":12,"fontFamily":"Arial","paperSize":"a4","chapterMark":"pagebreak","pageBreaksBefore":"/","margin":{"right":62,"left":62,"top":56,"bottom":56}},"styles":{"website":"styles/website.css","pdf":"styles/pdf.css","epub":"styles/epub.css","mobi":"styles/mobi.css","ebook":"styles/ebook.css","print":"styles/print.css"}},"file":{"path":"apic/README.md","mtime":"2022-09-09T07:15:53.137Z","type":"markdown"},"gitbook":{"version":"3.2.3","time":"2022-09-09T07:47:25.753Z"},"basePath":"..","book":{"language":""}});
         });
     </script>
 </div>
