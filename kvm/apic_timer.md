@@ -113,30 +113,31 @@ static bool set_target_expiration(struct kvm_lapic *apic, u32 count_reg)
 
     limit_periodic_timer_frequency(apic);
     deadline = apic->lapic_timer.period;
-
+	//////////////(3)
     if (apic_lvtt_period(apic) || apic_lvtt_oneshot(apic)) {
         if (unlikely(count_reg != APIC_TMICT)) {
             deadline = tmict_to_ns(apic,
-                ¦   ¦kvm_lapic_get_reg(apic, count_reg));
+                   kvm_lapic_get_reg(apic, count_reg));
             if (unlikely(deadline <= 0))
                 deadline = apic->lapic_timer.period;
             else if (unlikely(deadline > apic->lapic_timer.period)) {
                 pr_info_ratelimited(
-                ¦   "kvm: vcpu %i: requested lapic timer restore with "
-                ¦   "starting count register %#x=%u (%lld ns) > initial count (%lld ns). "
-                ¦   "Using initial count to start timer.\n",
-                ¦   apic->vcpu->vcpu_id,
-                ¦   count_reg,
-                ¦   kvm_lapic_get_reg(apic, count_reg),
-                ¦   deadline, apic->lapic_timer.period);
+                   "kvm: vcpu %i: requested lapic timer restore with "
+                   "starting count register %#x=%u (%lld ns) > initial count (%lld ns). "
+                   "Using initial count to start timer.\n",
+                   apic->vcpu->vcpu_id,
+                   count_reg,
+                   kvm_lapic_get_reg(apic, count_reg),
+                   deadline, apic->lapic_timer.period);
                 kvm_lapic_set_reg(apic, count_reg, 0);
                 deadline = apic->lapic_timer.period;
             }
         }
     }
-
+	//////////////(4)
     apic->lapic_timer.tscdeadline = kvm_read_l1_tsc(apic->vcpu, tscl) +
         nsec_to_cycles(apic->vcpu, deadline);
+	//////////////(5)
     apic->lapic_timer.target_expiration = ktime_add_ns(now, deadline);
 
     return true;
@@ -164,4 +165,44 @@ static inline u64 tmict_to_ns(struct kvm_lapic *apic, u32 tmict)
 A write of 0 to the initial-count register effectively stops 
 the local APIC timer, in both one-shot and periodic mode.
 ```
-另外也需要把`tscdeadline`清空。这个还得看下
+另外也需要把`tscdeadline`清空。这个还得看下为什么
+
+3. 这个里面会有一个unlikely, 但是能调用到该接口的，`count_reg`
+都为`APIC_TMICT`寄存器所以该分支走不进来
+
+4. 计算guest 的 tscdeadline, 该值会给`vmx-preemption`使用。
+但是tsc的计算比较复杂:
+* tsc时钟是开机时，开始计时，所以guest 开机时刻要比host要晚，
+他们之间有一个offset的关系。并且热迁移的虚机，tsc还可能比
+host要早(这里有个疑问，`tsc_offset`在kernel中的值均为unsigned,
+所以看起来只有 > 0的offset，还需对照下手册再看下.
+* 另外呢，guest 的tsc的频率有可能和host的tsc频率不同，例如，
+热迁移过来的虚机。
+
+基于上面的说的两点, 我们来看下代码实现:
+首先看下`kvm_read_l1_tsc`, 该函数用来获取
+guest此刻的tsc的值
+
+```cpp
+u64 kvm_read_l1_tsc(struct kvm_vcpu *vcpu, u64 host_tsc)
+{
+        return vcpu->arch.l1_tsc_offset +
+                kvm_scale_tsc(host_tsc, vcpu->arch.l1_tsc_scaling_ratio);
+}
+
+u64 kvm_scale_tsc(u64 tsc, u64 ratio)
+{
+        u64 _tsc = tsc;
+
+        if (ratio != kvm_caps.default_tsc_scaling_ratio)
+                _tsc = __scale_tsc(ratio, tsc);
+
+        return _tsc;
+}
+
+static inline u64 __scale_tsc(u64 ratio, u64 tsc)
+{
+        return mul_u64_u64_shr(tsc, ratio, kvm_caps.tsc_scaling_ratio_frac_bits);
+}
+```
+`l1_tsc_offset`, 是指host和guest
