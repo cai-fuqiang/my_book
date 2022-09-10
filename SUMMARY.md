@@ -11,5 +11,6 @@
   * [xapic](./apic/x2apic.md)
 * [KVM](./kvm/README.md)
   * [apicv](./kvm/vapic.md)
+  * [kvm lapic timer virtualization](./kvm/apic_timer.md)
   * [IPI virtualization](./kvm/ipiv.md)
   * [kvm patch](./kvm/patch.md)
