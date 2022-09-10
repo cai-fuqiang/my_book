@@ -1,0 +1,466 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<!-- 由 Microsoft Visio, SVG Export 生成 中断接收.svg 中断接受 -->
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:ev="http://www.w3.org/2001/xml-events"
+		xmlns:v="http://schemas.microsoft.com/visio/2003/SVGExtensions/" width="11in" height="16.5in" viewBox="0 0 792 1188"
+		xml:space="preserve" color-interpolation-filters="sRGB" class="st20">
+	<title>UML 2.5</title>
+	<desc>A template for all diagrams of UML 2.5 and earlier versions.
+For help and latest version of the template
+please visit http://softwarestencils.com. 
+Template version: 27. December 2013. 
+Known issues: The &#34;hand-drawn&#34; themes and the &#34;shady&#34; theme may have &#34;desctructive&#34; effect on some shapes.</desc>
+	<v:documentProperties v:langID="1033" v:viewMarkup="false">
+		<v:userDefs>
+			<v:ud v:nameU="msvNoAutoConnect" v:val="VT0(1):26"/>
+		</v:userDefs>
+	</v:documentProperties>
+
+	<style type="text/css">
+	<![CDATA[
+		.st1 {fill:#ffffff;stroke:#000000;stroke-linecap:round;stroke-linejoin:round;stroke-width:0.75}
+		.st2 {stroke:#000000;stroke-dasharray:5.25,3.75;stroke-linecap:round;stroke-linejoin:round;stroke-width:0.75}
+		.st3 {fill:#000000;font-family:Calibri;font-size:1.00001em;font-weight:bold}
+		.st4 {fill:#000000;font-family:Calibri;font-size:0.666664em}
+		.st5 {marker-end:url(#mrkr4-51);stroke:#000000;stroke-linecap:round;stroke-linejoin:round;stroke-width:0.24}
+		.st6 {fill:#000000;fill-opacity:1;stroke:#000000;stroke-opacity:1;stroke-width:0.068965517241379}
+		.st7 {fill:#ffffff;stroke:none;stroke-linecap:butt;stroke-width:7.2}
+		.st8 {fill:#000000;font-family:微软雅黑;font-size:0.499992em}
+		.st9 {font-family:Calibri;font-size:1em}
+		.st10 {font-size:1em}
+		.st11 {fill:#000000;font-family:微软雅黑;font-size:0.666664em}
+		.st12 {marker-end:url(#mrkr4-122);stroke:#c05046;stroke-linecap:round;stroke-linejoin:round;stroke-width:2}
+		.st13 {fill:#c05046;fill-opacity:1;stroke:#c05046;stroke-opacity:1;stroke-width:0.38167938931298}
+		.st14 {font-family:微软雅黑;font-size:1em}
+		.st15 {marker-end:url(#mrkr4-209);stroke:#000000;stroke-linecap:round;stroke-linejoin:round;stroke-width:1}
+		.st16 {fill:#000000;fill-opacity:1;stroke:#000000;stroke-opacity:1;stroke-width:0.23584905660377}
+		.st17 {marker-end:url(#mrkr4-225);stroke:#7e649e;stroke-linecap:round;stroke-linejoin:round;stroke-width:1}
+		.st18 {fill:#7e649e;fill-opacity:1;stroke:#7e649e;stroke-opacity:1;stroke-width:0.23584905660377}
+		.st19 {fill:#ffffff;stroke:none;stroke-linecap:butt}
+		.st20 {fill:none;fill-rule:evenodd;font-size:12px;overflow:visible;stroke-linecap:square;stroke-miterlimit:3}
+	]]>
+	</style>
+
+	<defs id="Markers">
+		<g id="lend4">
+			<path d="M 2 1 L 0 0 L 2 -1 L 2 1 " style="stroke:none"/>
+		</g>
+		<marker id="mrkr4-51" class="st6" v:arrowType="4" v:arrowSize="3" v:setback="29" refX="-29" orient="auto"
+				markerUnits="strokeWidth" overflow="visible">
+			<use xlink:href="#lend4" transform="scale(-14.5,-14.5) "/>
+		</marker>
+		<marker id="mrkr4-122" class="st13" v:arrowType="4" v:arrowSize="3" v:setback="5.24" refX="-5.24" orient="auto"
+				markerUnits="strokeWidth" overflow="visible">
+			<use xlink:href="#lend4" transform="scale(-2.62,-2.62) "/>
+		</marker>
+		<marker id="mrkr4-209" class="st16" v:arrowType="4" v:arrowSize="3" v:setback="8.48" refX="-8.48" orient="auto"
+				markerUnits="strokeWidth" overflow="visible">
+			<use xlink:href="#lend4" transform="scale(-4.24,-4.24) "/>
+		</marker>
+		<marker id="mrkr4-225" class="st18" v:arrowType="4" v:arrowSize="3" v:setback="8.48" refX="-8.48" orient="auto"
+				markerUnits="strokeWidth" overflow="visible">
+			<use xlink:href="#lend4" transform="scale(-4.24,-4.24) "/>
+		</marker>
+	</defs>
+	<g v:mID="49" v:index="15" v:groupContext="foregroundPage">
+		<title>中断接收</title>
+		<v:pageProperties v:drawingScale="1" v:pageScale="1" v:drawingUnits="19" v:shadowOffsetX="9" v:shadowOffsetY="-9"/>
+		<v:layer v:name="连接线" v:index="0"/>
+		<g id="group1-1" transform="translate(18.375,-768.353)" v:mID="1" v:groupContext="group">
+			<v:userDefs>
+				<v:ud v:nameU="visVersion" v:prompt="" v:val="VT0(15):26"/>
+				<v:ud v:nameU="ShowActor" v:prompt="" v:val="VT0(0):5"/>
+				<v:ud v:nameU="ShowDestruction" v:prompt="" v:val="VT0(0):5"/>
+			</v:userDefs>
+			<title>对象生命线</title>
+			<desc>device1</desc>
+			<g id="shape2-2" v:mID="2" v:groupContext="shape">
+				<title>工作表.2</title>
+				<rect x="0" y="1162.49" width="51.0236" height="25.5118" class="st1"/>
+			</g>
+			<g id="shape3-4" v:mID="3" v:groupContext="shape" transform="translate(17.0079,-29.0551)">
+				<title>工作表.3</title>
+				<path d="M8.5 1188 a0 0 0 1 1 0 0 a0 0 0 1 1 0 0 Z" class="st1"/>
+			</g>
+			<g id="shape4-6" v:mID="4" v:groupContext="shape" transform="translate(17.0079,415.103)">
+				<title>工作表.4</title>
+			</g>
+			<g id="shape5-8" v:mID="5" v:groupContext="shape" transform="translate(1213.51,1188) rotate(90)">
+				<title>工作表.5</title>
+				<path d="M0 1188 L397.49 1188" class="st2"/>
+			</g>
+			<g id="shape1-11" v:mID="1" v:groupContext="groupContent">
+				<v:textBlock v:margins="rect(4,4,4,4)" v:tabSpace="42.5197"/>
+				<v:textRect cx="25.5118" cy="1175.24" width="51.03" height="25.5118"/>
+				<rect x="0" y="1162.49" width="51.0236" height="25.5118" class="st1"/>
+				<text x="6.39" y="1178.84" class="st3" v:langID="2052"><v:paragraph v:horizAlign="1"/><v:tabList/>device1</text>			</g>
+		</g>
+		<g id="group6-14" transform="translate(147.351,-768.353)" v:mID="6" v:groupContext="group">
+			<v:userDefs>
+				<v:ud v:nameU="visVersion" v:prompt="" v:val="VT0(15):26"/>
+				<v:ud v:nameU="ShowActor" v:prompt="" v:val="VT0(0):5"/>
+				<v:ud v:nameU="ShowDestruction" v:prompt="" v:val="VT0(0):5"/>
+			</v:userDefs>
+			<title>对象生命线.6</title>
+			<desc>LAPIC</desc>
+			<g id="shape7-15" v:mID="7" v:groupContext="shape">
+				<title>工作表.7</title>
+				<desc>CPU</desc>
+				<v:textBlock v:margins="rect(4,4,4,4)" v:tabSpace="42.5197"/>
+				<v:textRect cx="25.5118" cy="1175.24" width="51.03" height="25.5118"/>
+				<rect x="0" y="1162.49" width="51.0236" height="25.5118" class="st1"/>
+				<text x="18.75" y="1177.64" class="st4" v:langID="2052"><v:paragraph v:horizAlign="1"/><v:tabList/>CPU</text>			</g>
+			<g id="shape8-18" v:mID="8" v:groupContext="shape" transform="translate(17.0079,-29.0551)">
+				<title>工作表.8</title>
+				<path d="M8.5 1188 a0 0 0 1 1 0 0 a0 0 0 1 1 0 0 Z" class="st1"/>
+			</g>
+			<g id="shape9-20" v:mID="9" v:groupContext="shape" transform="translate(17.0079,750.353)">
+				<title>工作表.9</title>
+			</g>
+			<g id="shape10-22" v:mID="10" v:groupContext="shape" transform="translate(1213.51,1188) rotate(90)">
+				<title>工作表.10</title>
+				<path d="M0 1188 L732.74 1188" class="st2"/>
+			</g>
+			<g id="shape6-25" v:mID="6" v:groupContext="groupContent">
+				<v:textBlock v:margins="rect(4,4,4,4)" v:tabSpace="42.5197"/>
+				<v:textRect cx="25.5118" cy="1175.24" width="51.03" height="25.5118"/>
+				<rect x="0" y="1162.49" width="51.0236" height="25.5118" class="st1"/>
+				<text x="11.37" y="1178.84" class="st3" v:langID="2052"><v:paragraph v:horizAlign="1"/><v:tabList/>LAPIC</text>			</g>
+		</g>
+		<g id="group11-28" transform="translate(270.375,-768.353)" v:mID="11" v:groupContext="group">
+			<v:userDefs>
+				<v:ud v:nameU="visVersion" v:prompt="" v:val="VT0(15):26"/>
+				<v:ud v:nameU="ShowActor" v:prompt="" v:val="VT0(0):5"/>
+				<v:ud v:nameU="ShowDestruction" v:prompt="" v:val="VT0(0):5"/>
+			</v:userDefs>
+			<title>对象生命线.11</title>
+			<desc>CPU</desc>
+			<g id="shape12-29" v:mID="12" v:groupContext="shape">
+				<title>工作表.12</title>
+				<desc>LAPIC</desc>
+				<v:textBlock v:margins="rect(4,4,4,4)" v:tabSpace="42.5197"/>
+				<v:textRect cx="25.5118" cy="1175.24" width="51.03" height="25.5118"/>
+				<rect x="0" y="1162.49" width="51.0236" height="25.5118" class="st1"/>
+				<text x="16.31" y="1177.64" class="st4" v:langID="2052"><v:paragraph v:horizAlign="1"/><v:tabList/>LAPIC</text>			</g>
+			<g id="shape13-32" v:mID="13" v:groupContext="shape" transform="translate(17.0079,-29.0551)">
+				<title>工作表.13</title>
+				<path d="M8.5 1188 a0 0 0 1 1 0 0 a0 0 0 1 1 0 0 Z" class="st1"/>
+			</g>
+			<g id="shape14-34" v:mID="14" v:groupContext="shape" transform="translate(17.0079,750.353)">
+				<title>工作表.14</title>
+			</g>
+			<g id="shape15-36" v:mID="15" v:groupContext="shape" transform="translate(1213.51,1188) rotate(90)">
+				<title>工作表.15</title>
+				<path d="M0 1188 L732.74 1188" class="st2"/>
+			</g>
+			<g id="shape11-39" v:mID="11" v:groupContext="groupContent">
+				<v:textBlock v:margins="rect(4,4,4,4)" v:tabSpace="42.5197"/>
+				<v:textRect cx="25.5118" cy="1175.24" width="51.03" height="25.5118"/>
+				<rect x="0" y="1162.49" width="51.0236" height="25.5118" class="st1"/>
+				<text x="15.23" y="1178.84" class="st3" v:langID="2052"><v:paragraph v:horizAlign="1"/><v:tabList/>CPU</text>			</g>
+		</g>
+		<g id="shape16-42" v:mID="16" v:groupContext="shape" transform="translate(-1139.86,796.654) rotate(-90)">
+			<title>激活</title>
+			<v:userDefs>
+				<v:ud v:nameU="visVersion" v:prompt="" v:val="VT0(15):26"/>
+			</v:userDefs>
+			<rect x="0" y="1179.5" width="360" height="8.50394" class="st1"/>
+		</g>
+		<g id="shape17-44" v:mID="17" v:groupContext="shape" transform="translate(-1010.88,1122.64) rotate(-90)">
+			<title>激活.17</title>
+			<v:userDefs>
+				<v:ud v:nameU="visVersion" v:prompt="" v:val="VT0(15):26"/>
+			</v:userDefs>
+			<rect x="0" y="1179.5" width="685.754" height="8.50394" class="st1"/>
+		</g>
+		<g id="shape18-46" v:mID="18" v:groupContext="shape" v:layerMember="0" transform="translate(43.8868,-743.338)">
+			<title>消息</title>
+			<desc>向LAPIC发送 MSI中断请求 INTR1</desc>
+			<v:userDefs>
+				<v:ud v:nameU="IsReturn" v:prompt="" v:val="VT0(0):5"/>
+				<v:ud v:nameU="IsAsync" v:prompt="" v:val="VT0(0):26"/>
+				<v:ud v:nameU="IsSelfMessage" v:prompt="" v:val="VT0(0):5"/>
+				<v:ud v:nameU="visVersion" v:prompt="" v:val="VT0(15):26"/>
+			</v:userDefs>
+			<v:textBlock v:margins="rect(4,4,4,4)" v:tabSpace="42.5197"/>
+			<v:textRect cx="64.4882" cy="1197" width="58.73" height="23.9782"/>
+			<path d="M0 1197 L122.02 1197" class="st5"/>
+			<rect v:rectContext="textBkgnd" x="39.8075" y="1189.71" width="49.3616" height="14.5745" class="st7"/>
+			<text x="49.26" y="1195.18" class="st8" v:langID="2052"><v:paragraph v:horizAlign="1"/><v:tabList/>向<tspan class="st9">LAPIC</tspan>发送<v:newlineChar/><tspan
+						x="39.81" dy="1.215em" class="st9">MSI</tspan>中断请求<tspan class="st9"> </tspan><tspan class="st9">INTR</tspan><tspan
+						class="st9">1</tspan></text>		</g>
+		<g id="shape19-59" v:mID="19" v:groupContext="shape" v:layerMember="0" transform="translate(168.115,-717.1)">
+			<title>消息.19</title>
+			<desc>修改IRR 比对PPR IRR</desc>
+			<v:userDefs>
+				<v:ud v:nameU="IsReturn" v:prompt="" v:val="VT0(0):5"/>
+				<v:ud v:nameU="IsAsync" v:prompt="" v:val="VT0(0):26"/>
+				<v:ud v:nameU="IsSelfMessage" v:prompt="" v:val="VT0(0):5"/>
+				<v:ud v:nameU="visVersion" v:prompt="" v:val="VT0(15):26"/>
+				<v:ud v:nameU="IsSelfMessage" v:prompt="" v:val="VT0(1):5"/>
+			</v:userDefs>
+			<v:textBlock v:margins="rect(4,4,4,4)" v:tabSpace="42.5197"/>
+			<v:textRect cx="9" cy="1206.43" width="40.21" height="23.9782"/>
+			<path d="M9 1188 L27 1188 L27 1224.85 L15.96 1224.85" class="st5"/>
+			<rect v:rectContext="textBkgnd" x="-6.42003" y="1199.14" width="30.8403" height="14.5745" class="st7"/>
+			<text x="-1.01" y="1204.6" class="st8" v:langID="2052"><v:paragraph v:horizAlign="1"/><v:tabList/>修改<tspan class="st9">IRR<v:newlineChar/></tspan><tspan
+						x="-6.42" dy="1.215em" class="st10">比对</tspan><tspan class="st9">PPR IRR</tspan></text>		</g>
+		<g id="shape20-69" v:mID="20" v:groupContext="shape" v:layerMember="0" transform="translate(172.863,-645.968)">
+			<title>消息.20</title>
+			<desc>满足中断发送条件, 通过INTR发送中断 请求</desc>
+			<v:userDefs>
+				<v:ud v:nameU="IsReturn" v:prompt="" v:val="VT0(0):5"/>
+				<v:ud v:nameU="IsAsync" v:prompt="" v:val="VT0(0):26"/>
+				<v:ud v:nameU="IsSelfMessage" v:prompt="" v:val="VT0(0):5"/>
+				<v:ud v:nameU="visVersion" v:prompt="" v:val="VT0(15):26"/>
+			</v:userDefs>
+			<v:textBlock v:margins="rect(4,4,4,4)" v:tabSpace="42.5197"/>
+			<v:textRect cx="61.5118" cy="1179" width="60.22" height="31.9654"/>
+			<path d="M0 1179 L116.06 1179" class="st5"/>
+			<rect v:rectContext="textBkgnd" x="36.7636" y="1168.07" width="49.4964" height="21.8617" class="st7"/>
+			<text x="36.76" y="1173.53" class="st8" v:langID="2052"><v:paragraph v:horizAlign="1"/><v:tabList/>满足中断发送条件<tspan
+						class="st9">, <v:newlineChar/></tspan><tspan x="37.73" dy="1.215em" class="st10">通过</tspan><tspan
+						class="st9">INTR</tspan>发送中断<v:newlineChar/><tspan x="55.51" dy="1.215em" class="st10">请求</tspan></text>		</g>
+		<g id="shape21-80" v:mID="21" v:groupContext="shape" transform="translate(-887.861,1122.64) rotate(-90)">
+			<title>激活.21</title>
+			<v:userDefs>
+				<v:ud v:nameU="visVersion" v:prompt="" v:val="VT0(15):26"/>
+			</v:userDefs>
+			<rect x="0" y="1179.5" width="685.984" height="8.50394" class="st1"/>
+		</g>
+		<g id="shape22-82" v:mID="22" v:groupContext="shape" v:layerMember="0" transform="translate(286.887,-638.615)">
+			<title>消息.22</title>
+			<desc>判断当前CPU state 中interrupt window 是否打开如果打开 便接收中断</desc>
+			<v:userDefs>
+				<v:ud v:nameU="IsReturn" v:prompt="" v:val="VT0(0):5"/>
+				<v:ud v:nameU="IsAsync" v:prompt="" v:val="VT0(0):26"/>
+				<v:ud v:nameU="IsSelfMessage" v:prompt="" v:val="VT0(0):5"/>
+				<v:ud v:nameU="visVersion" v:prompt="" v:val="VT0(15):26"/>
+				<v:ud v:nameU="IsSelfMessage" v:prompt="" v:val="VT0(1):5"/>
+			</v:userDefs>
+			<v:textBlock v:margins="rect(4,4,4,4)" v:tabSpace="42.5197"/>
+			<v:textRect cx="82.7362" cy="1203.09" width="114.44" height="39.9537"/>
+			<path d="M9 1188 L27 1188 L27 1216.35 L15.96 1216.35" class="st5"/>
+			<rect v:rectContext="textBkgnd" x="31.3303" y="1188.52" width="102.812" height="29.1497" class="st7"/>
+			<text x="31.33" y="1195.81" class="st11" v:langID="2052"><v:paragraph v:horizAlign="1"/><v:tabList/>判断当前<tspan
+						class="st9">CPU state </tspan>中<tspan class="st9">interrupt <v:newlineChar/></tspan><tspan x="32.88"
+						dy="1.215em" class="st9">window </tspan>是否打开，如果打开<v:newlineChar/><tspan x="62.74" dy="1.215em" class="st10">便接收中断</tspan></text>		</g>
+		<g id="shape23-93" v:mID="23" v:groupContext="shape" v:layerMember="0" transform="translate(295.887,-575.102)">
+			<title>消息.23</title>
+			<desc>通过INTA同意中断</desc>
+			<v:userDefs>
+				<v:ud v:nameU="IsReturn" v:prompt="" v:val="VT0(0):5"/>
+				<v:ud v:nameU="IsAsync" v:prompt="" v:val="VT0(0):26"/>
+				<v:ud v:nameU="IsSelfMessage" v:prompt="" v:val="VT0(0):5"/>
+				<v:ud v:nameU="visVersion" v:prompt="" v:val="VT0(15):26"/>
+			</v:userDefs>
+			<v:textBlock v:margins="rect(4,4,4,4)" v:tabSpace="42.5197"/>
+			<v:textRect cx="-61.5118" cy="1179" width="73.52" height="18.6536"/>
+			<path d="M0 1179 L-116.06 1179" class="st5"/>
+			<rect v:rectContext="textBkgnd" x="-93.3652" y="1174.14" width="63.707" height="9.71658" class="st7"/>
+			<text x="-93.37" y="1181.43" class="st11" v:langID="2052"><v:paragraph v:horizAlign="1"/><v:tabList/>通过<tspan
+						class="st9">INTA</tspan>同意中断</text>		</g>
+		<g id="shape24-101" v:mID="24" v:groupContext="shape" v:layerMember="0" transform="translate(172.863,-546.755)">
+			<title>消息.24</title>
+			<desc>将ISR[vector]置位修改PPR, 将中断的vector发送给CPU</desc>
+			<v:userDefs>
+				<v:ud v:nameU="IsReturn" v:prompt="" v:val="VT0(0):5"/>
+				<v:ud v:nameU="IsAsync" v:prompt="" v:val="VT0(0):26"/>
+				<v:ud v:nameU="IsSelfMessage" v:prompt="" v:val="VT0(0):5"/>
+				<v:ud v:nameU="visVersion" v:prompt="" v:val="VT0(15):26"/>
+			</v:userDefs>
+			<v:textBlock v:margins="rect(4,4,4,4)" v:tabSpace="42.5197"/>
+			<v:textRect cx="61.5118" cy="1179" width="109.84" height="29.3037"/>
+			<path d="M0 1179 L116.06 1179" class="st5"/>
+			<rect v:rectContext="textBkgnd" x="12.4063" y="1169.28" width="98.2109" height="19.4332" class="st7"/>
+			<text x="12.41" y="1176.57" class="st11" v:langID="2052"><v:paragraph v:horizAlign="1"/><v:tabList/>将<tspan class="st9">ISR</tspan><tspan
+						class="st9">[</tspan><tspan class="st9">vector</tspan><tspan class="st9">]</tspan>置位，修改<tspan class="st9">PPR</tspan><tspan
+						class="st9">, <v:newlineChar/></tspan><tspan x="16.41" dy="1.215em" class="st10">将中断的</tspan><tspan
+						class="st9">vector</tspan>发送给<tspan class="st9">CPU</tspan></text>		</g>
+		<g id="shape25-117" v:mID="25" v:groupContext="shape" v:layerMember="0" transform="translate(286.887,-533.078)">
+			<title>消息.25</title>
+			<desc>CPU通过IDT穿过中断门 并关闭interrupt window(RFLAGS.IF=0) 执行中断处理函数在中断函 数...</desc>
+			<v:userDefs>
+				<v:ud v:nameU="IsReturn" v:prompt="" v:val="VT0(0):5"/>
+				<v:ud v:nameU="IsAsync" v:prompt="" v:val="VT0(0):26"/>
+				<v:ud v:nameU="IsSelfMessage" v:prompt="" v:val="VT0(0):5"/>
+				<v:ud v:nameU="visVersion" v:prompt="" v:val="VT0(15):26"/>
+				<v:ud v:nameU="IsSelfMessage" v:prompt="" v:val="VT0(1):5"/>
+			</v:userDefs>
+			<v:textBlock v:margins="rect(4,4,4,4)" v:tabSpace="42.5197"/>
+			<v:textRect cx="91.4882" cy="1260.21" width="136.22" height="61.2538"/>
+			<path d="M9 1188 L27 1188 L27 1457.29 L19.48 1457.29" class="st12"/>
+			<rect v:rectContext="textBkgnd" x="28.2856" y="1235.92" width="126.405" height="48.5829" class="st7"/>
+			<text x="43.3" y="1243.21" class="st4" v:langID="2052"><v:paragraph v:horizAlign="1"/><v:tabList/>CPU<tspan
+						class="st14">通过</tspan>IDT<tspan class="st14">，</tspan><tspan class="st14">穿过中断门</tspan><tspan class="st14">，<v:newlineChar/></tspan><tspan
+						x="28.29" dy="1.215em" class="st14">并关闭</tspan>interrupt window(RFLAGS.IF=0)<v:newlineChar/><tspan
+						x="39.49" dy="1.215em" class="st14">执行中断处理函数</tspan><tspan class="st14">，</tspan><tspan class="st14">在中断函<v:newlineChar/></tspan><tspan
+						x="44.23" dy="1.215em" class="st14">数中</tspan><tspan class="st14">，</tspan><tspan class="st14">会取</tspan>WRITE LAPIC EOI<v:newlineChar/><tspan
+						x="32.04" dy="1.215em" class="st14">并且以</tspan>IRET<tspan class="st14">指令结束</tspan><tspan class="st14">，</tspan><tspan
+						class="st14">还原</tspan>RFLAGS</text>		</g>
+		<g id="shape32-140" v:mID="32" v:groupContext="shape" v:layerMember="0" transform="translate(43.8868,-504.235)">
+			<title>消息.32</title>
+			<desc>向LAPIC发送INTR2 优先级和INTR1 相等</desc>
+			<v:userDefs>
+				<v:ud v:nameU="IsReturn" v:prompt="" v:val="VT0(0):5"/>
+				<v:ud v:nameU="IsAsync" v:prompt="" v:val="VT0(0):26"/>
+				<v:ud v:nameU="IsSelfMessage" v:prompt="" v:val="VT0(0):5"/>
+				<v:ud v:nameU="visVersion" v:prompt="" v:val="VT0(15):26"/>
+			</v:userDefs>
+			<v:textBlock v:margins="rect(4,4,4,4)" v:tabSpace="42.5197"/>
+			<v:textRect cx="64.4882" cy="1179" width="79.7" height="39.9537"/>
+			<path d="M0 1179 L122.02 1179" class="st5"/>
+			<rect v:rectContext="textBkgnd" x="29.5468" y="1164.43" width="69.8829" height="29.1497" class="st7"/>
+			<text x="29.55" y="1171.71" class="st11" v:langID="2052"><v:paragraph v:horizAlign="1"/><v:tabList/>向<tspan class="st9">LAPIC</tspan>发送<tspan
+						class="st9">INTR</tspan><tspan class="st9">2</tspan>，<v:newlineChar/><tspan x="38.75" dy="1.215em"
+						class="st10">优先级和</tspan><tspan class="st9">INTR</tspan><tspan class="st9">1<v:newlineChar/></tspan><tspan
+						x="56.49" dy="1.215em" class="st10">相等</tspan></text>		</g>
+		<g id="shape33-154" v:mID="33" v:groupContext="shape" v:layerMember="0" transform="translate(163.863,-499.062)">
+			<title>自关联消息</title>
+			<desc>修改IRR 通过判断IRR !&#62; PPR, 不满足中断发送条件</desc>
+			<v:userDefs>
+				<v:ud v:nameU="IsReturn" v:prompt="" v:val="VT0(0):5"/>
+				<v:ud v:nameU="IsAsync" v:prompt="" v:val="VT0(0):26"/>
+				<v:ud v:nameU="IsSelfMessage" v:prompt="" v:val="VT0(1):5"/>
+				<v:ud v:nameU="visVersion" v:prompt="" v:val="VT0(15):26"/>
+			</v:userDefs>
+			<v:textBlock v:margins="rect(4,4,4,4)" v:tabSpace="42.5197"/>
+			<v:textRect cx="66.2598" cy="1215.84" width="87.14" height="39.9537"/>
+			<path d="M9 1188 L27 1188 L27 1244.69 L15.96 1244.69" class="st5"/>
+			<rect v:rectContext="textBkgnd" x="28.502" y="1201.26" width="75.5156" height="29.1497" class="st7"/>
+			<text x="52.91" y="1208.55" class="st11" v:langID="2052"><v:paragraph v:horizAlign="1"/><v:tabList/>修改<tspan
+						class="st9">IRR<v:newlineChar/></tspan><tspan x="28.5" dy="1.215em" class="st10">通过判断</tspan>，<tspan
+						class="st9">IRR </tspan><tspan class="st9">!</tspan><tspan class="st9">&#62; </tspan><tspan class="st9">PPR</tspan><tspan
+						class="st9">, <v:newlineChar/></tspan><tspan x="30.26" dy="1.215em" class="st10">不满足中断发送条件</tspan></text>		</g>
+		<g id="shape36-169" v:mID="36" v:groupContext="shape" v:layerMember="0" transform="translate(163.863,-414.023)">
+			<title>消息.36</title>
+			<desc>修改ISR[Vector]= 0, 修改PPR 通过判断IRR &#62; PPR 满足中断发送条件</desc>
+			<v:userDefs>
+				<v:ud v:nameU="IsReturn" v:prompt="" v:val="VT0(0):5"/>
+				<v:ud v:nameU="IsAsync" v:prompt="" v:val="VT0(0):26"/>
+				<v:ud v:nameU="IsSelfMessage" v:prompt="" v:val="VT0(0):5"/>
+				<v:ud v:nameU="visVersion" v:prompt="" v:val="VT0(15):26"/>
+				<v:ud v:nameU="IsSelfMessage" v:prompt="" v:val="VT0(1):5"/>
+			</v:userDefs>
+			<v:textBlock v:margins="rect(4,4,4,4)" v:tabSpace="42.5197"/>
+			<v:textRect cx="70.5118" cy="1208.66" width="104.61" height="39.9537"/>
+			<path d="M9 1188 L27 1188 L27 1230.52 L15.96 1230.52" class="st5"/>
+			<rect v:rectContext="textBkgnd" x="23.1154" y="1194.08" width="94.7931" height="29.1497" class="st7"/>
+			<text x="23.12" y="1201.37" class="st11" v:langID="2052"><v:paragraph v:horizAlign="1"/><v:tabList/>修改<tspan
+						class="st9">ISR</tspan><tspan class="st9">[</tspan><tspan class="st9">Vector</tspan><tspan class="st9">]= </tspan><tspan
+						class="st9">0</tspan><tspan class="st9">, </tspan>修改<tspan class="st9">PPR<v:newlineChar/></tspan><tspan
+						x="35.05" dy="1.215em" class="st10">通过判断</tspan><tspan class="st9">IRR </tspan><tspan class="st9">&#62; </tspan><tspan
+						class="st9">PPR</tspan>，<v:newlineChar/><tspan x="38.51" dy="1.215em" class="st10">满足中断发送条件</tspan></text>		</g>
+		<g id="shape38-188" v:mID="38" v:groupContext="shape" v:layerMember="0" transform="translate(295.887,-416.361)">
+			<title>消息.38</title>
+			<desc>写EOI寄存器</desc>
+			<v:userDefs>
+				<v:ud v:nameU="IsReturn" v:prompt="" v:val="VT0(0):5"/>
+				<v:ud v:nameU="IsAsync" v:prompt="" v:val="VT0(0):26"/>
+				<v:ud v:nameU="IsSelfMessage" v:prompt="" v:val="VT0(0):5"/>
+				<v:ud v:nameU="visVersion" v:prompt="" v:val="VT0(15):26"/>
+			</v:userDefs>
+			<v:textBlock v:margins="rect(4,4,4,4)" v:tabSpace="42.5197"/>
+			<v:textRect cx="-61.5118" cy="1179" width="53.04" height="18.6536"/>
+			<path d="M0 1179 L-116.06 1179" class="st5"/>
+			<rect v:rectContext="textBkgnd" x="-83.121" y="1174.14" width="43.2186" height="9.71658" class="st7"/>
+			<text x="-83.12" y="1181.43" class="st11" v:langID="2052"><v:paragraph v:horizAlign="1"/><v:tabList/>写<tspan
+						class="st9">EOI</tspan>寄存器</text>		</g>
+		<g id="shape39-196" v:mID="39" v:groupContext="shape" v:layerMember="0" transform="translate(172.863,-334.157)">
+			<title>消息.39</title>
+			<desc>通过INTR发送中断</desc>
+			<v:userDefs>
+				<v:ud v:nameU="IsReturn" v:prompt="" v:val="VT0(0):5"/>
+				<v:ud v:nameU="IsAsync" v:prompt="" v:val="VT0(0):26"/>
+				<v:ud v:nameU="IsSelfMessage" v:prompt="" v:val="VT0(0):5"/>
+				<v:ud v:nameU="visVersion" v:prompt="" v:val="VT0(15):26"/>
+			</v:userDefs>
+			<v:textBlock v:margins="rect(4,4,4,4)" v:tabSpace="42.5197"/>
+			<v:textRect cx="61.5118" cy="1179" width="73.24" height="18.6536"/>
+			<path d="M0 1179 L116.06 1179" class="st5"/>
+			<rect v:rectContext="textBkgnd" x="29.801" y="1174.14" width="63.4219" height="9.71658" class="st7"/>
+			<text x="29.8" y="1181.43" class="st11" v:langID="2052"><v:paragraph v:horizAlign="1"/><v:tabList/>通过<tspan class="st9">INTR</tspan>发送中断</text>		</g>
+		<g id="shape40-204" v:mID="40" v:groupContext="shape" v:layerMember="0" transform="translate(286.887,-317.645)">
+			<title>消息.40</title>
+			<desc>通过判断此时RFLAGS.IF=0 不满足中断接收条件 中断持续PENDING</desc>
+			<v:userDefs>
+				<v:ud v:nameU="IsReturn" v:prompt="" v:val="VT0(0):5"/>
+				<v:ud v:nameU="IsAsync" v:prompt="" v:val="VT0(0):26"/>
+				<v:ud v:nameU="IsSelfMessage" v:prompt="" v:val="VT0(0):5"/>
+				<v:ud v:nameU="visVersion" v:prompt="" v:val="VT0(15):26"/>
+				<v:ud v:nameU="IsSelfMessage" v:prompt="" v:val="VT0(1):5"/>
+			</v:userDefs>
+			<v:textBlock v:margins="rect(4,4,4,4)" v:tabSpace="42.5197"/>
+			<v:textRect cx="77.9882" cy="1204.53" width="98.3" height="39.9537"/>
+			<path d="M9 1188 L27 1188 L27 1222.02 L17.48 1222.02" class="st15"/>
+			<rect v:rectContext="textBkgnd" x="33.7462" y="1189.95" width="88.4842" height="29.1497" class="st7"/>
+			<text x="33.75" y="1197.24" class="st11" v:langID="2052"><v:paragraph v:horizAlign="1"/><v:tabList/>通过判断此时<tspan
+						class="st9">RFLAGS</tspan><tspan class="st9">.</tspan><tspan class="st9">IF</tspan><tspan class="st9">=</tspan><tspan
+						class="st9">0<v:newlineChar/></tspan><tspan x="37.99" dy="1.215em" class="st10">不满足中断接收条件</tspan>，<v:newlineChar/><tspan
+						x="46.81" dy="1.215em" class="st10">中断持续</tspan><tspan class="st9">PENDING</tspan></text>		</g>
+		<g id="shape41-220" v:mID="41" v:groupContext="shape" v:layerMember="0" transform="translate(286.887,-246.779)">
+			<title>消息.41</title>
+			<desc>RFLAGS.IF=1后interrupt- window打开接收中断</desc>
+			<v:userDefs>
+				<v:ud v:nameU="IsReturn" v:prompt="" v:val="VT0(0):5"/>
+				<v:ud v:nameU="IsAsync" v:prompt="" v:val="VT0(0):26"/>
+				<v:ud v:nameU="IsSelfMessage" v:prompt="" v:val="VT0(0):5"/>
+				<v:ud v:nameU="visVersion" v:prompt="" v:val="VT0(15):26"/>
+				<v:ud v:nameU="IsSelfMessage" v:prompt="" v:val="VT0(1):5"/>
+			</v:userDefs>
+			<v:textBlock v:margins="rect(4,4,4,4)" v:tabSpace="42.5197"/>
+			<v:textRect cx="84.7382" cy="1214.4" width="98.11" height="29.3037"/>
+			<path d="M9 1188 L27 1188 L27 1241.86 L17.48 1241.86" class="st17"/>
+			<rect v:rectContext="textBkgnd" x="40.5901" y="1204.68" width="88.2963" height="19.4332" class="st7"/>
+			<text x="40.59" y="1211.97" class="st4" v:langID="2052"><v:paragraph v:horizAlign="1"/><v:tabList/>RFLAGS.IF=1<tspan
+						class="st14">后</tspan><tspan class="st14">，</tspan>interrupt-<v:newlineChar/><tspan x="43.79" dy="1.215em"
+						class="st10">window</tspan><tspan class="st14">打开</tspan><tspan class="st14">，</tspan><tspan class="st14">接收中断</tspan></text>		</g>
+		<g id="shape42-234" v:mID="42" v:groupContext="shape" v:layerMember="0" transform="translate(295.887,-164.078)">
+			<title>消息.42</title>
+			<desc>通过INTA接受中断</desc>
+			<v:userDefs>
+				<v:ud v:nameU="IsReturn" v:prompt="" v:val="VT0(0):5"/>
+				<v:ud v:nameU="IsAsync" v:prompt="" v:val="VT0(0):26"/>
+				<v:ud v:nameU="IsSelfMessage" v:prompt="" v:val="VT0(0):5"/>
+				<v:ud v:nameU="visVersion" v:prompt="" v:val="VT0(15):26"/>
+			</v:userDefs>
+			<v:textBlock v:margins="rect(4,4,4,4)" v:tabSpace="42.5197"/>
+			<v:textRect cx="-61.5118" cy="1179" width="73.52" height="18.6536"/>
+			<path d="M0 1179 L-116.06 1179" class="st5"/>
+			<rect v:rectContext="textBkgnd" x="-93.3652" y="1174.14" width="63.707" height="9.71658" class="st7"/>
+			<text x="-93.37" y="1181.43" class="st11" v:langID="2052"><v:paragraph v:horizAlign="1"/><v:tabList/>通过<tspan
+						class="st9">INTA</tspan>接受中断</text>		</g>
+		<g id="shape43-242" v:mID="43" v:groupContext="shape" v:layerMember="0" transform="translate(172.863,-130.062)">
+			<title>消息.43</title>
+			<desc>将ISR[vector]置位修改PPR, 将中断的vector发送给CPU</desc>
+			<v:userDefs>
+				<v:ud v:nameU="IsReturn" v:prompt="" v:val="VT0(0):5"/>
+				<v:ud v:nameU="IsAsync" v:prompt="" v:val="VT0(0):26"/>
+				<v:ud v:nameU="IsSelfMessage" v:prompt="" v:val="VT0(0):5"/>
+				<v:ud v:nameU="visVersion" v:prompt="" v:val="VT0(15):26"/>
+			</v:userDefs>
+			<v:textBlock v:margins="rect(4,4,4,4)" v:tabSpace="42.5197"/>
+			<v:textRect cx="61.5118" cy="1179" width="109.84" height="29.3037"/>
+			<path d="M0 1179 L116.06 1179" class="st5"/>
+			<rect v:rectContext="textBkgnd" x="12.4063" y="1169.28" width="98.2109" height="19.4332" class="st19"/>
+			<text x="12.41" y="1176.57" class="st11" v:langID="2052"><v:paragraph v:horizAlign="1"/><v:tabList/>将<tspan class="st9">ISR</tspan><tspan
+						class="st9">[</tspan><tspan class="st9">vector</tspan><tspan class="st9">]</tspan>置位，修改<tspan class="st9">PPR</tspan><tspan
+						class="st9">, <v:newlineChar/></tspan><tspan x="16.41" dy="1.215em" class="st10">将中断的</tspan><tspan
+						class="st9">vector</tspan>发送给<tspan class="st9">CPU</tspan></text>		</g>
+		<g id="shape46-258" v:mID="46" v:groupContext="shape" v:layerMember="0" transform="translate(286.887,-119.22)">
+			<title>自关联消息.46</title>
+			<desc>CPU通过IDT穿过中断门进行中断处理</desc>
+			<v:userDefs>
+				<v:ud v:nameU="IsReturn" v:prompt="" v:val="VT0(0):5"/>
+				<v:ud v:nameU="IsAsync" v:prompt="" v:val="VT0(0):26"/>
+				<v:ud v:nameU="IsSelfMessage" v:prompt="" v:val="VT0(1):5"/>
+				<v:ud v:nameU="visVersion" v:prompt="" v:val="VT0(15):26"/>
+			</v:userDefs>
+			<v:textBlock v:margins="rect(4,4,4,4)" v:tabSpace="42.5197"/>
+			<v:textRect cx="98.2382" cy="1204.1" width="138.18" height="18.6536"/>
+			<path d="M9 1188 L27 1188 L27 1222.02 L15.96 1222.02" class="st5"/>
+			<rect v:rectContext="textBkgnd" x="34.0548" y="1199.25" width="128.367" height="9.71658" class="st7"/>
+			<text x="34.05" y="1206.53" class="st4" v:langID="2052"><v:paragraph v:horizAlign="1"/><v:tabList/>CPU<tspan
+						class="st14">通过</tspan>IDT<tspan class="st14">穿过中断门进行中断处理</tspan></text>		</g>
+	</g>
+</svg>
