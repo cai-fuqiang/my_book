@@ -205,4 +205,80 @@ static inline u64 __scale_tsc(u64 ratio, u64 tsc)
         return mul_u64_u64_shr(tsc, ratio, kvm_caps.tsc_scaling_ratio_frac_bits);
 }
 ```
-`l1_tsc_offset`, 是指host和guest
+`l1_tsc_offset`, 是指`l1 guest`和`host`之前的tsc差值，在intel sdm `24.6.5
+Time-stamp counter offset and mutiplier` 章节中有讲。
+
+> NOTE
+>
+> 在`struct kvm_vcpu_arch`中有`tsc_offset`和`l1_tsc_offset`两个成员，
+> 在没有嵌套虚拟化的场景下，两个值相等，详见`kvm_vcpu_write_tsc_offset()`
+> 函数
+
+除了`offset`之外, `kvm_scale_tsc()`还根据host 和 guest之间，tsc的频率
+比例, 得到guest 频率的tsc值，当然，最终这个值，还需要加上`tsc_offset`
+
+我们来仔细看下这块:
+
+在`struct kvm_vcpu_arch`中，也有和`tsc offset`类似的成员
+```cpp
+struct kvm_vcpu_arch {
+	...
+	u64 l1_tsc_scaling_ratio;
+	u64 tsc_scaling_ratio; /* current scaling ratio */
+	...
+};
+```
+在没有嵌套虚拟化的场景下，`l1_tsc_scaling_ratio == tsc_scaling_ratio`, 
+这个值表示 `guest_tsc_hz` 和 `host_tsc_hz`, 的一个比例关系，该值, 该值是一个整数，所以
+只能允许`guest tsc` 比`host tsc` 大。
+
+另外 `struct kvm_caps`中有两个成员会涉及到:
+```cpp
+struct kvm_caps {
+	...
+	u64 default_tsc_scaling_ratio;
+	u8 tsc_scaling_ratio_frac_bits;
+	...
+};
+```
+这里先解释下`tsc_scaling_ratio_frac_bits`, 在intel sdm `25.3 changes to 
+instruction behavior in VMX Non-Root Operation`章节中，关于`RDMSR`的
+一些解释:
+
+在使能了`use TSC offseting`和`use TSC scaling`后，
+```
+RDMSR first computes the product of the value of the
+IA32_TIME_STAMP_COUNTER MSR and the value of the TSC 
+multiplier. It then shifts the value of the product right 48 
+bits and loads EAX:EDX with the sum of that shifted value and
+the value of the TSC offset.
+```
+这里会现将 `IA32_TIME_STAMP_COUNTER` msr value 和 `TSC multiplier`
+做乘法，然后在`左移48 bits`, 之后再将这个结果和 `TSC offset`
+相加。
+
+猜测，这里这样做的目的是为了提高下精度，如果只是做乘积，那么
+得到的值只能是整数倍。
+
+首先在`hardware_setup()`代码中，赋值`kvm_caps.tsc_scaling_ratio_frac_bits`
+```cpp
+static __init int hardware_setup(void)
+{
+	...
+	kvm_caps.tsc_scaling_ratio_frac_bits = 48;
+	...
+}
+```
+在`kvm_arch_hardware_setup()`中赋值`kvm_caps.default_tsc_scaling_ratio`
+```cpp
+int kvm_arch_hardware_setup(void *opaque)
+{
+	...
+	kvm_caps.default_tsc_scaling_ratio = 1ULL << kvm_caps.tsc_scaling_ratio_frac_bits;
+	...
+}
+```
+
+# PS
+## 相关资料
+* intel sdm `17.17 time-stamp counter`: 里面讲到了`contant tsc`, 和tsc频率相关
