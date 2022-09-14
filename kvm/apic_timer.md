@@ -278,6 +278,12 @@ int kvm_arch_hardware_setup(void *opaque)
 	...
 }
 ```
+那么我们回过头来再看，`kvm_scale_tsc`的代码:
+如果`ratio`和`default_tsc_scaling_ratio`不相等，会去做一个
+```
+tsc * ratio >> kvm_caps.tsc_scaling_ratio_frac_bits
+```
+如果相等，坐上面的动作其实还是等于`tsc`
 
 # PS
 ## 相关资料
