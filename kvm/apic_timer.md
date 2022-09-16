@@ -205,6 +205,13 @@ static inline u64 __scale_tsc(u64 ratio, u64 tsc)
         return mul_u64_u64_shr(tsc, ratio, kvm_caps.tsc_scaling_ratio_frac_bits);
 }
 ```
+这里主要包括两个变量`vcpu->arch.l1_tsc_offset`，另一个是`vcpu->arch.l1_tsc_scaling_ratio`
+* **l1_tsc_offset**: 指的是`guest tsc` 和 `host tsc` 的差值
+* **l1_tsc_scaling_ratio**: 指的是`guest tsc` 和 `host tsc`之间的一个ratio的比例关系
+
+我们分别来看下
+
+### l1_tsc_offset
 `l1_tsc_offset`, 是指`l1 guest`和`host`之前的tsc差值，在intel sdm `24.6.5
 Time-stamp counter offset and mutiplier` 章节中有讲。
 
@@ -213,7 +220,166 @@ Time-stamp counter offset and mutiplier` 章节中有讲。
 > 在`struct kvm_vcpu_arch`中有`tsc_offset`和`l1_tsc_offset`两个成员，
 > 在没有嵌套虚拟化的场景下，两个值相等，详见`kvm_vcpu_write_tsc_offset()`
 > 函数
+我们猜想下下面的场景
 
+* init offset <br/>
+当这个vcpu创建，要去enter guest 之前，`guest tsc`理论上的值为0，而这时
+host 的tsc `> 0`的。所以有一个offset
+* change offset <br/>
+	+ guest software : `WRMSR IA32_TIME_STAMP_COUNTER`, `WRMSR IA32_TSC_ADJUST`,
+		因为这个时候修改了guest tsc, 所以offset也改变了
+	+ qemu ioctl : 这个主要应用于热迁移场景。
+#### init offset
+堆栈如下:
+```
+kvm_vm_ioctl_create_vcpu
+	kvm_arch_vcpu_postcreate
+		kvm_synchronize_tsc(vcpu, 0)
+```
+
+##### kvm_arch_vcpu_postcreate
+
+我们先看下`kvm_arch_vcpu_postcreate()`
+```cpp
+void kvm_arch_vcpu_postcreate(struct kvm_vcpu *vcpu)
+{
+	...
+	vcpu_load(vcpu);
+	kvm_synchronize_tsc(vcpu, 0);
+	vcpu_put(vcpu);
+	...
+}
+```
+这里会先去`vcpu_load`, 然后在执行完`kvm_synchronize_tsc`会在执行
+`vcpu_put`, 原因是在`kvm_synchronize_tsc`中会访问VMCS。
+
+##### kvm_synchronize_tsc
+```cpp
+static void kvm_synchronize_tsc(struct kvm_vcpu *vcpu, u64 data)
+{
+    struct kvm *kvm = vcpu->kvm;
+    u64 offset, ns, elapsed;
+    unsigned long flags;
+    bool matched = false;
+    bool synchronizing = false;
+
+    raw_spin_lock_irqsave(&kvm->arch.tsc_write_lock, flags);
+	////////////////////////////(1)
+    offset = kvm_compute_l1_tsc_offset(vcpu, data);
+	////////////////////////////(2)
+    ns = get_kvmclock_base_ns();
+	////////////////////////////(3)
+    elapsed = ns - kvm->arch.last_tsc_nsec;
+	////////////////////////////(4)
+    if (vcpu->arch.virtual_tsc_khz) {
+        if (data == 0) {
+            /*
+            ¦* detection of vcpu initialization -- need to sync
+            ¦* with other vCPUs. This particularly helps to keep
+            ¦* kvm_clock stable after CPU hotplug
+            ¦*/
+			////////////////////////////(5)
+            synchronizing = true;
+        } else {
+            u64 tsc_exp = kvm->arch.last_tsc_write +
+                        nsec_to_cycles(vcpu, elapsed);
+            u64 tsc_hz = vcpu->arch.virtual_tsc_khz * 1000LL;
+            /*
+            ¦* Special case: TSC write with a small delta (1 second)
+            ¦* of virtual cycle time against real time is
+            ¦* interpreted as an attempt to synchronize the CPU.
+            ¦*/
+            synchronizing = data < tsc_exp + tsc_hz &&
+                    data + tsc_hz > tsc_exp;
+        }
+    }
+
+    /*
+    ¦* For a reliable TSC, we can match TSC offsets, and for an unstable
+    ¦* TSC, we add elapsed time in this computation.  We could let the
+    ¦* compensation code attempt to catch up if we fall behind, but
+    ¦* it's better to try to match offsets from the beginning.
+    ¦   ¦*/
+    if (synchronizing &&
+    ¦   vcpu->arch.virtual_tsc_khz == kvm->arch.last_tsc_khz) {
+        if (!kvm_check_tsc_unstable()) {
+            offset = kvm->arch.cur_tsc_offset;
+        } else {
+            u64 delta = nsec_to_cycles(vcpu, elapsed);
+            data += delta;
+            offset = kvm_compute_l1_tsc_offset(vcpu, data);
+        }
+        matched = true;
+    }
+
+    __kvm_synchronize_tsc(vcpu, offset, data, ns, matched);
+    raw_spin_unlock_irqrestore(&kvm->arch.tsc_write_lock, flags);
+}
+```
+该函数代码比较多:
+首先说下参数:
+```cpp
+static void kvm_synchronize_tsc(struct kvm_vcpu *vcpu, u64 data)
+```
+第二个参数是`u64` 的类型, 代表要guest设置的tsc的值。
+
+1. 该处会根据data和当前host 的tsc的值计算offset。计算函数:
+`kvm_compute_l1_tsc_offset`:
+```cpp
+static u64 kvm_compute_l1_tsc_offset(struct kvm_vcpu *vcpu, u64 target_tsc)
+{
+    u64 tsc;
+
+    tsc = kvm_scale_tsc(rdtsc(), vcpu->arch.l1_tsc_scaling_ratio);
+
+    return target_tsc - tsc;
+}
+```
+`kvm_scale_tsc()`上面分析过，会将host_tsc按照一定的比例计算转换为guest_tsc,
+然后再使用`target_tsc(参数, 如果是create_vcpu路径, 值为0) - tsc`返回, 这里需要注意
+两点。
+* 如果`target_tsc < tsc`, 相减后，实际上是一个负数，但是我们来看这两个变量
+ 的类型,都是 `u64`，但实际上, CPU的数值计算是不关心正负数的。如果不考虑guest
+ host tsc 频率差异, CPU最终会将tsc的值加 offset 值并返回给guest, 值为
+ `guest_tsc - host_tsc +  host_tsc = guest_tsc`
+* guest tsc 和 host tsc 的转换公式大概为:<br/>
+```
+host_tsc->guest_tsc
+host_tsc * TSC_multiplier / 48 + tsc_offset = guest_tsc
+```
+`tsc_offset`计算公式大概为:
+```
+tsc_offset = guest_tsc -  host_tsc * TSC_mutiplier / 48
+```
+所以看到上面，会先将`host_tsc` 经过一个scaling_ratio的转换，然后在用`guest_tsc - 该值`
+
+2. `get_kvmclock_base_ns()` 该函数是后来加的一个函数，之前是`ktime_get_boot_ns()`,
+该函数是获取启动之后的纳秒数。
+
+> NOTE
+>
+> `get_kvmclock_base_ns()`引入的patch
+> commit id: 8171cd68806bd2fc28ef688e32fb2a3b3deb04e5 
+>
+> KVM: x86: use raw clock values consistently
+3. `kvm->arch.last_tsc_nsec`, 这个指的是，最后一次更改tsc的时间, 
+这里会做一个减法，得到据上次更改的时间差
+4.
+5. `virtual_tsc_khz`表示虚机的tsc的频率, 会在`kvm_set_tsc_khz`中设置，
+初始化路径如下：
+```
+kvm_vm_ioctl_create_vcpu
+	kvm_arch_vcpu_create
+		kvm_set_tsc_khz			<----
+	kvm_arch_vcpu_postcreate
+```
+如果是从`create vcpu`走下来，`virtual_tsc_khz`有值, 并且`data == 0`,
+会置 `synchronizing = true`。表示需要和其他vcpu进行同步, 因为如
+果是物理cpu上(这个是猜的，并没有在手册中找到资料) TSC 在RESET后
+都是在同一时刻以相同的频率增加(invariant tsc)
+
+
+### l1_tsc_scaling_ratio
 除了`offset`之外, `kvm_scale_tsc()`还根据host 和 guest之间，tsc的频率
 比例, 得到guest 频率的tsc值，当然，最终这个值，还需要加上`tsc_offset`
 
@@ -229,7 +395,7 @@ struct kvm_vcpu_arch {
 };
 ```
 在没有嵌套虚拟化的场景下，`l1_tsc_scaling_ratio == tsc_scaling_ratio`, 
-这个值表示 `guest_tsc_hz` 和 `host_tsc_hz`, 的一个比例关系，该值, 该值是一个整数，所以
+这个值表示 `guest_tsc_hz` 和 `host_tsc_hz`, 的一个比例关系，该值是一个整数，所以
 只能允许`guest tsc` 比`host tsc` 大。
 
 另外 `struct kvm_caps`中有两个成员会涉及到:
@@ -281,10 +447,15 @@ int kvm_arch_hardware_setup(void *opaque)
 那么我们回过头来再看，`kvm_scale_tsc`的代码:
 如果`ratio`和`default_tsc_scaling_ratio`不相等，会去做一个
 ```
-tsc * ratio >> kvm_caps.tsc_scaling_ratio_frac_bits
+tsc * default_tsc_scaling_ratio >> kvm_caps.tsc_scaling_ratio_frac_bits
 ```
-如果相等，坐上面的动作其实还是等于`tsc`
+其结果还是`tsc`的值。
 
+> NOTE:
+>
+> 关于elapsed 作用没有太看懂:
+> commit id : f38e098ff3a315bb74abbb4a35cba11bbea8e2fa
+> KVM: x86: TSC reset compensation
 # PS
 ## 相关资料
-* intel sdm `17.17 time-stamp counter`: 里面讲到了`contant tsc`, 和tsc频率相关
+* intel sdm `17.17 time-stamp counter`: 里面讲到了`invariant tsc`, 和tsc频率相关
