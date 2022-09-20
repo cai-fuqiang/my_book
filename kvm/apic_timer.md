@@ -281,9 +281,11 @@ static void kvm_synchronize_tsc(struct kvm_vcpu *vcpu, u64 data)
 			////////////////////////////(5)
             synchronizing = true;
         } else {
+			////////////////////////////(6)
             u64 tsc_exp = kvm->arch.last_tsc_write +
                         nsec_to_cycles(vcpu, elapsed);
             u64 tsc_hz = vcpu->arch.virtual_tsc_khz * 1000LL;
+
             /*
             ¦* Special case: TSC write with a small delta (1 second)
             ¦* of virtual cycle time against real time is
@@ -300,6 +302,7 @@ static void kvm_synchronize_tsc(struct kvm_vcpu *vcpu, u64 data)
     ¦* compensation code attempt to catch up if we fall behind, but
     ¦* it's better to try to match offsets from the beginning.
     ¦   ¦*/
+	////////////////////////////(7)
     if (synchronizing &&
     ¦   vcpu->arch.virtual_tsc_khz == kvm->arch.last_tsc_khz) {
         if (!kvm_check_tsc_unstable()) {
@@ -376,7 +379,12 @@ kvm_vm_ioctl_create_vcpu
 如果是从`create vcpu`走下来，`virtual_tsc_khz`有值, 并且`data == 0`,
 会置 `synchronizing = true`。表示需要和其他vcpu进行同步, 因为如
 果是物理cpu上(这个是猜的，并没有在手册中找到资料) TSC 在RESET后
-都是在同一时刻以相同的频率增加(invariant tsc)
+都是在同一时刻以相同的频率增加(invariant tsc), 所以这时得同步下, 
+保证所有的vcpu在进入guest时，获取的tsc都是一样的。
+
+6. 这里的注释是，如果TSC 改变的增量很少，则被认为是同步CPU。
+`tsc_exp`指的是计算出的期望的tsc, 而`tsc_hz`则指的是1s 的guest的
+tsc的cycle, 所以这里判断`|data - tsc_exp| <= 1s`
 
 
 ### l1_tsc_scaling_ratio
