@@ -82,4 +82,26 @@ invariant TSC 的处理器上，OS可能使用TSC作为 wall clock timer service
 (替代ACPI/HEPT timers)。TSC 的读取效率会更高，不会有ring translation
 或者时访问 platform resource 带来的开销
 
-##
+## IA32_TSC_AUX register and RDTSCP support
+`IA32_TSC_AUX`是一个辅助性的MSR, `IA32_TSC_AUX`被设计用于结合`IA32_TSC`
+使用。`IA32_TSC_AUX`提供了一个32-bit的字段，并由特权级别软件初始化。
+（例如可以初始化为 `logical processor ID`)
+
+`IA32_TSC_AUX`早期的用法， 是结合`IA32_TSC` 允许软件通过`RDTSCP`指令atomic
+读取`IA32_TSC`中的 time stamp和`IA32_TSC_AUX`中的signal value 。
+并且`IA32_TSC`->`EDX:EAX`, `TSC_AUX`->`ECX`。
+
+用户态程序可以使用`RDTSCP`指令判断，是否有CPU migration 的行为。同时也可以
+使用它来判断在NUMA系统中`per-CPU TSC`是否会不一致。
+
+## Time-Stamp Counter Adjustment
+软件可以通过使用`WRMSR`指令写入`IA32_TIME_STAMP_COUNTER` MSR修改`TSC`的
+值。因为每次写入只能操作当前所在的CPU，软件这边来同步这件事情是非常困难的。
+（很难让所有CPU 的tsc保持在同一个值）。
+
+`TSC adjustment`的同步机制造是使用`IA32_TSC_ADJUST`MSR。和
+`IA32_TIME_STAMP_COUNTER` MSR一样，该寄存器也是每个logical processor
+单独存在。逻辑处理器如下使用`IA32_TSC_ADJUST` MSR
+* 在RESET时，`IA32_TSC_ADJUST` MSR为0.
+* 如果执行`WRMSR`->`IA32_TIME_STAMP_COUNTER` MSR 为原来TSC的值 +/- x,
+ 那么
