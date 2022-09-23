@@ -140,3 +140,60 @@ When ART hardware is reset, both invariant TSC and K are also reset.
 那么对于`TSC virtualization` 来说，我们不妨先来看看，
 和TSC相关的`VMX non-root operation`: `RDTSCP`, `RDTSC`
 是怎么个行为。
+我们主要来看下, intel sdm `25.3  CHANGES TO INSTRUCTION 
+BEHAVIOR IN VMX NON-ROOT OPERATION`, 对于RDTSC和RDTSCP指令的说明:
+
+## RDTSC
+Behavior of the RDTSC instruction is determined by 
+the settings of the “RDTSC exiting” and “use TSC offsetting” 
+VM-execution controls:
+    + If both controls are 0, RDTSC operates normally.
+    + If the “RDTSC exiting” VM-execution control is 0 and the 
+     "use TSC offsetting” VM-execution control is 1, the 
+     value returned is determined by the setting of the "use TSC 
+     scaling" VM-execution control:
+        * If the control is 0, RDTSC loads EAX:EDX with the sum of
+        the value of the IA32_TIME_STAMP_COUNTER MSR and the value
+        of the TSC offset.
+        * If the control is 1, RDTSC first computes the product of 
+        the value of the IA32_TIME_STAMP_COUNTER MSR and the value of
+        the TSC multiplier. It then shifts the value of the product
+        right 48 bits and loads EAX:EDX with the sum of that shifted
+        value and the value of the TSC offset.
+    + If the "RDTSC exiting" VM-execution control is 1, RDTSC causes 
+    a VM exit.
+
+这里面主要提到以下控制位:
+* **RDTSC exiting**: 如果控制位为1, `RDTSC`指令则会产生 VM exit。
+* **use TSC offsetting** : 用于表示guest和host tsc的差值。
+* **use TSC scaling** : 用于表示 guest和host tsc ratio的比例转换。
+
+如果使能`use TSC offsetting`, `use TSC scaling`这两个标志位的话,
+我们来看下guest 使用`RDTSC`是什么结果:
+* 只使能`use TSC offsetting`: <br/>
+  `IA32_TIME_STAMP_COUNTER + TSC offset`
+* 使能`use TSC offsetting`和`use TSC scaling`:<br/>
+  `(IA32_TIME_STAMP_COUNTER * TSC multiplier) >> 48 + TSC offset`
+
+> NOTE:
+>
+> 这里为什么要 (IA32_TIME_STAMP_COUNTER * TSC multiplier) >> 48
+> 这里其实是想要获取的是guest 和 host TSC ratio的一个转换关系,
+> 可能通过这样的方式可以获取更好的精度。
+>
+> 另外这里要先进行乘法操作，而且由于后面的48 bits的右移，导致如果
+> guest ratio 比 host ratio 如果要高的话，考虑到不能溢出，会导致，
+> IA32_TIME_STAMP_COUNTER的最大值可能减少很多。(如果是相等的话，
+> 实际上少了3/4)。但是不知道这个中间的计算值的类型是不是64bits。
+>
+> 在手册中没有找到VMX non-root operation下的伪代码，这里涉及的运
+> 算关系可能得需要再了解下。
+
+上面讲的`use TSC offsetting`和`use TSC scaling`指的是VM execution
+control 字段，关于存储offset和multiplier值的字段如下:
+* TSC-offset
+* TSC-multiplier
+
+这两个字段
+关于`TSC-offset`和`TSC-multiplier`在`intel sdm 24.6.5 Time-Stamp 
+Counter Offset and Multiplier` 有讲, 
