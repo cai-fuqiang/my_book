@@ -66,11 +66,11 @@ Intel(R) Core(TM) i5-10210U CPU @ 1.60GHz
 对于 `privilege level 0`的对TSC的访问。操作系统禁用用户访问tsc后，
 应该通过 `user-acessible` 编程接口去模拟该指令。
 
-RDTSC 指令不是 `serializing`/`ordered`。在执行读该 counter 之前
+`RDTSC` 指令不是 `serializing`/`ordered`。在执行读该 counter 之前
 去等待所有的先前的指令执行完成。相似的，在`RDTSC`执行前，需要
 执行 subsequent instruction。
 
-RDMSR 和 WRMSR 指令会去read && write TSC, 像是读 ordinary MSR一样
+`RDMSR` 和 `WRMSR` 指令会去read && write TSC, 像是读 ordinary MSR一样
 
 ## invariant TSC
 新处理器中的time stamp counter 支持了一项增强功能，被称为 `invariant 
@@ -104,4 +104,39 @@ invariant TSC 的处理器上，OS可能使用TSC作为 wall clock timer service
 单独存在。逻辑处理器如下使用`IA32_TSC_ADJUST` MSR
 * 在RESET时，`IA32_TSC_ADJUST` MSR为0.
 * 如果执行`WRMSR`->`IA32_TIME_STAMP_COUNTER` MSR 为原来TSC的值 +/- x,
- 那么
+ 处理器也相应的会对`IA32_TSC_ADJUST`MSR, 进行+/- x的操作。
+* 如果执行`WRMSR->IA32_TSC_ADJUST` MSR为原来该寄存器值的 +/- x, 
+ 处理器也相应会对`IA32_TSC_ADJUST` MSR, 进行 +/- x的操作。
+
+`IA32_TSC_ADJUST` 不像`TSC`，不会因为time elapse(时间消逝)而自增，只能通过
+`WRMSR`->`IA32_TSC_ADJUST`/`IA32_TIME_STAMP_COUNTER` MSR来改变他的值。
+软件可以通过在每个logical processor `WRMSR` 相同的值->`IA32_TSC_ADJUST` MSR,
+来保证时间同步。
+
+`CPUID.(EAX=07H, ECX=0H):EBX.TSC_ADJUST(bit 1)` 指示是否支持`IA32_TSC_ADJUST`
+MSR。
+
+### 17.17.4 Invariant Time-Keeping
+invariant TSC 是基于 `invariant timekeeping hardware`实现，（称为
+Always Running Timer or ART), 它以 core crystal clock frequency 
+运行。
+
+如果`CPUID.15H:EBX[31:0] != 0` && `CPUID.80000007H:EDX[InvariantTSC] = 1`,
+`TSC`和`ART` 保持的线性关系如下：
+```
+TSC_Value = (ART_Value * CPUID.15H:EBX[31:0] )/ CPUID.15H:EAX[31:0] + K
+```
+Where 'K' is an offset that can be adjusted by a privileged agent.
+> PS: 这里的 K可能指IA32_TSC_ADJUST 和 VMCS 中的 TSC-offset 的值。
+When ART hardware is reset, both invariant TSC and K are also reset.
+
+# TSC virtualization
+## 简介
+从上面`TSC`一章可以看到，intel 为支持`TSC`主要实现了一些MSR(
+`IA32_TIME_STAMP_COUNTER`, `IA32_TSC_AUX`, `IA32_TSC_ADJUST`,
+和一些指令`RDTSCP`, `RDTSC`, 以及CPUID对上述功能是否支持的
+指示。
+
+那么对于`TSC virtualization` 来说，我们不妨先来看看，
+和TSC相关的`VMX non-root operation`: `RDTSCP`, `RDTSC`
+是怎么个行为。
