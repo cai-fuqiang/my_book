@@ -1,0 +1,368 @@
+
+<!DOCTYPE HTML>
+<html lang="" >
+    <head>
+        <meta charset="UTF-8">
+        <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
+        <title>xapic · GitBook</title>
+        <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+        <meta name="description" content="">
+        <meta name="generator" content="GitBook 3.2.3">
+        
+        
+        
+    
+    <link rel="stylesheet" href="../gitbook/style.css">
+
+    
+            
+                
+                <link rel="stylesheet" href="../gitbook/gitbook-plugin-highlight/website.css">
+                
+            
+                
+                <link rel="stylesheet" href="../gitbook/gitbook-plugin-search/search.css">
+                
+            
+                
+                <link rel="stylesheet" href="../gitbook/gitbook-plugin-fontsettings/website.css">
+                
+            
+        
+
+    
+
+    
+        
+    
+        
+    
+        
+    
+        
+    
+        
+    
+        
+    
+
+        
+    
+    
+    <meta name="HandheldFriendly" content="true"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <link rel="apple-touch-icon-precomposed" sizes="152x152" href="../gitbook/images/apple-touch-icon-precomposed-152.png">
+    <link rel="shortcut icon" href="../gitbook/images/favicon.ico" type="image/x-icon">
+
+    
+    <link rel="next" href="../kvm/" />
+    
+    
+    <link rel="prev" href="./" />
+    
+
+    </head>
+    <body>
+        
+<div class="book">
+    <div class="book-summary">
+        
+            
+<div id="book-search-input" role="search">
+    <input type="text" placeholder="Type to search" />
+</div>
+
+            
+                <nav role="navigation">
+                
+
+
+<ul class="summary">
+    
+    
+
+    
+
+    
+        
+        
+    
+        <li class="chapter " data-level="1.1" data-path="../">
+            
+                <a href="../">
+            
+                    
+                    Introduction
+            
+                </a>
+            
+
+            
+        </li>
+    
+        <li class="chapter " data-level="1.2" data-path="./">
+            
+                <a href="./">
+            
+                    
+                    APIC
+            
+                </a>
+            
+
+            
+            <ul class="articles">
+                
+    
+        <li class="chapter active" data-level="1.2.1" data-path="x2apic.html">
+            
+                <a href="x2apic.html">
+            
+                    
+                    xapic
+            
+                </a>
+            
+
+            
+        </li>
+    
+
+            </ul>
+            
+        </li>
+    
+        <li class="chapter " data-level="1.3" data-path="../kvm/">
+            
+                <a href="../kvm/">
+            
+                    
+                    KVM
+            
+                </a>
+            
+
+            
+            <ul class="articles">
+                
+    
+        <li class="chapter " data-level="1.3.1" data-path="../kvm/vapic.html">
+            
+                <a href="../kvm/vapic.html">
+            
+                    
+                    apicv
+            
+                </a>
+            
+
+            
+        </li>
+    
+        <li class="chapter " data-level="1.3.2" data-path="../kvm/apic_timer.html">
+            
+                <a href="../kvm/apic_timer.html">
+            
+                    
+                    kvm lapic timer virtualization
+            
+                </a>
+            
+
+            
+        </li>
+    
+        <li class="chapter " data-level="1.3.3" data-path="../kvm/ipiv.html">
+            
+                <a href="../kvm/ipiv.html">
+            
+                    
+                    IPI virtualization
+            
+                </a>
+            
+
+            
+        </li>
+    
+        <li class="chapter " data-level="1.3.4" data-path="../kvm/patch.html">
+            
+                <a href="../kvm/patch.html">
+            
+                    
+                    kvm patch
+            
+                </a>
+            
+
+            
+        </li>
+    
+
+            </ul>
+            
+        </li>
+    
+
+    
+
+    <li class="divider"></li>
+
+    <li>
+        <a href="https://www.gitbook.com" target="blank" class="gitbook-link">
+            Published with GitBook
+        </a>
+    </li>
+</ul>
+
+
+                </nav>
+            
+        
+    </div>
+
+    <div class="book-body">
+        
+            <div class="body-inner">
+                
+                    
+
+<div class="book-header" role="navigation">
+    
+
+    <!-- Title -->
+    <h1>
+        <i class="fa fa-circle-o-notch fa-spin"></i>
+        <a href=".." >xapic</a>
+    </h1>
+</div>
+
+
+
+
+                    <div class="page-wrapper" tabindex="-1" role="main">
+                        <div class="page-inner">
+                            
+<div id="book-search-results">
+    <div class="search-noresults">
+    
+                                <section class="normal markdown-section">
+                                
+                                <h1 id="x2apic">x2apic</h1>
+<h2 id="x2apic-icr">x2apic ICR</h2>
+<p>&#x548C;xapic&#x4E00;&#x6837;&#xFF0C;x2apic&#x53EF;&#x4EE5;&#x901A;&#x8FC7;&#x5199;Interrupt Command Register (ICR)
+&#x5BC4;&#x5B58;&#x5668;&#x6765;&#x751F;&#x6210;&#x4E00;&#x4E2A;IPI&#x3002;</p>
+<p>&#x5728;xapic&#x6A21;&#x5F0F;&#x4E2D;&#xFF0C;ICR&#x5305;&#x542B;&#x4E00;&#x4E2A;delivery status bit(bit 12)&#x3002;
+&#x8BE5;&#x4F4D;&#x4F1A;&#x6307;&#x793A; delivery &#x8BE5;interrupt &#x7684;status&#x3002;&#x8BE5;&#x4F4D;&#x5728;&#x8F6F;&#x4EF6;&#x5C42;&#x9762;
+&#x662F;&#x53EA;&#x8BFB;&#x7684;&#x3002;&#x4E0B;&#x9762;&#x662F;xapic&#x7684;&#x4F4D;&#x56FE;</p>
+<p><img src="pic/xapic_icr.png" alt="xapic icr">&#x3002;</p>
+<p>&#x5173;&#x4E8E;<code>delivery status</code>&#x5728;&#x624B;&#x518C;&#x4E2D;&#x7684;&#x89E3;&#x91CA;:</p>
+<pre><code>Delivery Status (Read Only)
+    Indicates the IPI delivery status, as follows:
+        0 (Idle)
+            Indicates that this local APIC has completed sending any previous IPIs.
+        1 (Send Pending)
+            Indicates that this local APIC has not completed sending the last IPI.
+</code></pre><ul>
+<li>0: &#x8868;&#x793A;&#x5F53;&#x524D;local APIC &#x4E4B;&#x524D;&#x53D1;&#x9001;&#x7684;&#x4EFB;&#x4F55;IPIs&#x90FD;&#x5DF2;&#x7ECF;&#x88AB;completed&#x4E86;&#x3002;</li>
+<li>1: &#x8868;&#x793A;&#x5F53;&#x524D;local apic &#x6700;&#x540E;&#x53D1;&#x9001;&#x7684;IPI&#x8FD8;&#x672A;&#x88AB;completed&#x3002;</li>
+</ul>
+<p>&#x5F53;interrupt &#x5DF2;&#x7ECF;&#x88AB;transmiteed &#x65F6;&#xFF0C;&#x8BE5;&#x4F4D;&#x4F1A;&#x88AB;&#x6E05;&#x7A7A;&#x3002;&#x5BF9;&#x4E8E;xapic&#xFF0C;&#x8F6F;&#x4EF6;&#x5728;&#x53D1;&#x9001;ipi&#x4E4B;&#x524D;&#x9700;&#x8981;
+poll &#x8BE5;&#x4F4D;&#xFF0C;&#x76F4;&#x5230;&#x8BE5;&#x4F4D;&#x88AB;clear&#x3002;&#x76F8;&#x4F3C;&#x7684;&#xFF0C;&#x5982;&#x679C;&#x8FD9;&#x4E2A;&#x53D1;&#x9001;&#x52A8;&#x4F5C;&#x4F9D;&#x8D56;interrupt &#x4ECE;local xAPIC
+units&#x4E0A;&#x53D1;&#x51FA;&#xFF0C;&#x7CFB;&#x7EDF;&#x8F6F;&#x4EF6;&#x9700;&#x8981; busy-wait <code>delivery status</code> bit &#x88AB;&#x6E05;&#x7A7A;&#x3002;</p>
+<p>&#x4F46;&#x662F;&#x5728;x2APIC mode&#x4E2D;&#xFF0C;&#x5BF9;&#x4E8E;ICR&#x7684;&#x7F16;&#x7A0B;&#x88AB;&#x7B80;&#x5316;&#x4E86;&#x3002;&#x53EA;&#x9700;&#x8981;&#x4E00;&#x4E2A;64-bits&#x7684;ICR write &#x5C31;&#x53EF;&#x4EE5;
+&#x5B8C;&#x6210;&#x4E00;&#x6B21;dispatch interrupt</p>
+<p><img src="pic/x2apic_icr.png" alt="x2apic icr"></p>
+<p>&#x5728;x2apic&#x4E2D;&#xFF0C;&#x5BF9;&#x4E8E;WRMSR ICR &#x6307;&#x4EE4;completion&#x5E76;&#x4E0D;&#x80FD;&#x4FDD;&#x8BC1;dispatch&#x7684;interrupt &#x5DF2;&#x7ECF;&#x88AB;
+target processor received, &#x5982;&#x679C;system software usage&#x5982;&#x8981;&#x8FD9;&#x4E2A;guarantee, &#x7CFB;&#x7EDF;&#x8F6F;&#x4EF6;
+&#x5E94;&#x8BE5;&#x660E;&#x786E;&#x7684;&#x9A8C;&#x8BC1;interrupt delivery &#x5230;&#x4E86; &#x6307;&#x4EE4;&#x7684;target&#x4E0A;&#x3002;&#xFF08;&#x901A;&#x8FC7;&#x4E00;&#x79CD;&#x4EA4;&#x4E92;&#x7684;&#x8F6F;&#x4EF6;&#x673A;&#x5236;)
+&#x4F8B;&#x5982;, &#x53EF;&#x4EE5;&#x5728;&#x8BE5;&#x4E2D;&#x65AD;&#x7684;interrupt service routing &#x4E2D;&#x53BB;&#x66F4;&#x65B0;&#x4E00;&#x4E2A;&#x5185;&#x5B58;&#x533A;&#x57DF;&#xFF0C;&#x4ECE;&#x800C;&#x8BA9;
+dispatch&#x7684;software &#x53BB;&#x9A8C;&#x8BC1;memory localtion &#x662F;&#x5426;&#x88AB;&#x66F4;&#x65B0;&#x6765;&#x9A8C;&#x8BC1;&#x4E2D;&#x65AD;&#x662F;&#x5426;&#x5230;&#x8FBE;&#x3002;</p>
+<blockquote>
+<p>NOTE</p>
+<p>&#x6240;&#x4EE5;&#x770B;&#x8D77;&#x6765;&#x8BF4;&#xFF0C;x2apic &#x5728;&#x786C;&#x4EF6;&#x6D41;&#x7A0B;&#x4E0A;&#x6CA1;&#x6709;&#x505A;&#x4EC0;&#x4E48;&#x6539;&#x52A8;&#xFF0C;&#x6000;&#x7591;&#x662F;xapic<code>delivery status</code>
+&#x4E0D;&#x597D;&#x7528;&#xFF0C;&#x8F6F;&#x4EF6;&#x5C42;&#x9762;&#x90FD;&#x662F;&#x901A;&#x8FC7;&#x8F6F;&#x4EF6;&#x65B9;&#x5F0F;&#x4EA4;&#x4E92;&#x7684;&#xFF0C;&#x6240;&#x4EE5;&#x5728;x2apic&#x5B9E;&#x73B0;&#x4E2D;&#x628A;<code>delivery status</code>
+&#x5220;&#x9664;&#x4E86;&#x3002;</p>
+</blockquote>
+
+                                
+                                </section>
+                            
+    </div>
+    <div class="search-results">
+        <div class="has-results">
+            
+            <h1 class="search-results-title"><span class='search-results-count'></span> results matching "<span class='search-query'></span>"</h1>
+            <ul class="search-results-list"></ul>
+            
+        </div>
+        <div class="no-results">
+            
+            <h1 class="search-results-title">No results matching "<span class='search-query'></span>"</h1>
+            
+        </div>
+    </div>
+</div>
+
+                        </div>
+                    </div>
+                
+            </div>
+
+            
+                
+                <a href="./" class="navigation navigation-prev " aria-label="Previous page: APIC">
+                    <i class="fa fa-angle-left"></i>
+                </a>
+                
+                
+                <a href="../kvm/" class="navigation navigation-next " aria-label="Next page: KVM">
+                    <i class="fa fa-angle-right"></i>
+                </a>
+                
+            
+        
+    </div>
+
+    <script>
+        var gitbook = gitbook || [];
+        gitbook.push(function() {
+            gitbook.page.hasChanged({"page":{"title":"xapic","level":"1.2.1","depth":2,"next":{"title":"KVM","level":"1.3","depth":1,"path":"kvm/README.md","ref":"./kvm/README.md","articles":[{"title":"apicv","level":"1.3.1","depth":2,"path":"kvm/vapic.md","ref":"./kvm/vapic.md","articles":[]},{"title":"kvm lapic timer virtualization","level":"1.3.2","depth":2,"path":"kvm/apic_timer.md","ref":"./kvm/apic_timer.md","articles":[]},{"title":"IPI virtualization","level":"1.3.3","depth":2,"path":"kvm/ipiv.md","ref":"./kvm/ipiv.md","articles":[]},{"title":"kvm patch","level":"1.3.4","depth":2,"path":"kvm/patch.md","ref":"./kvm/patch.md","articles":[]}]},"previous":{"title":"APIC","level":"1.2","depth":1,"path":"apic/README.md","ref":"./apic/README.md","articles":[{"title":"xapic","level":"1.2.1","depth":2,"path":"apic/x2apic.md","ref":"./apic/x2apic.md","articles":[]}]},"dir":"ltr"},"config":{"gitbook":"*","theme":"default","variables":{},"plugins":[],"pluginsConfig":{"highlight":{},"search":{},"lunr":{"maxIndexSize":1000000,"ignoreSpecialCharacters":false},"sharing":{"facebook":true,"twitter":true,"google":false,"weibo":false,"instapaper":false,"vk":false,"all":["facebook","google","twitter","weibo","instapaper"]},"fontsettings":{"theme":"white","family":"sans","size":2},"theme-default":{"styles":{"website":"styles/website.css","pdf":"styles/pdf.css","epub":"styles/epub.css","mobi":"styles/mobi.css","ebook":"styles/ebook.css","print":"styles/print.css"},"showLevel":false}},"structure":{"langs":"LANGS.md","readme":"README.md","glossary":"GLOSSARY.md","summary":"SUMMARY.md"},"pdf":{"pageNumbers":true,"fontSize":12,"fontFamily":"Arial","paperSize":"a4","chapterMark":"pagebreak","pageBreaksBefore":"/","margin":{"right":62,"left":62,"top":56,"bottom":56}},"styles":{"website":"styles/website.css","pdf":"styles/pdf.css","epub":"styles/epub.css","mobi":"styles/mobi.css","ebook":"styles/ebook.css","print":"styles/print.css"}},"file":{"path":"apic/x2apic.md","mtime":"2022-09-09T07:45:49.580Z","type":"markdown"},"gitbook":{"version":"3.2.3","time":"2022-09-13T00:02:00.954Z"},"basePath":"..","book":{"language":""}});
+        });
+    </script>
+</div>
+
+        
+    <script src="../gitbook/gitbook.js"></script>
+    <script src="../gitbook/theme.js"></script>
+    
+        
+        <script src="../gitbook/gitbook-plugin-search/search-engine.js"></script>
+        
+    
+        
+        <script src="../gitbook/gitbook-plugin-search/search.js"></script>
+        
+    
+        
+        <script src="../gitbook/gitbook-plugin-lunr/lunr.min.js"></script>
+        
+    
+        
+        <script src="../gitbook/gitbook-plugin-lunr/search-lunr.js"></script>
+        
+    
+        
+        <script src="../gitbook/gitbook-plugin-sharing/buttons.js"></script>
+        
+    
+        
+        <script src="../gitbook/gitbook-plugin-fontsettings/fontsettings.js"></script>
+        
+    
+
+    </body>
+</html>
+
