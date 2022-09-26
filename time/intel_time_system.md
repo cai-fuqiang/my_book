@@ -140,6 +140,11 @@ When ART hardware is reset, both invariant TSC and K are also reset.
 那么对于`TSC virtualization` 来说，我们不妨先来看看，
 和TSC相关的`VMX non-root operation`: `RDTSCP`, `RDTSC`
 是怎么个行为。
+
+> PS
+>
+> RDMSR IA32_TIME_STAMP_COUNTER也会有影响下面会讲到
+
 我们主要来看下, intel sdm `25.3  CHANGES TO INSTRUCTION 
 BEHAVIOR IN VMX NON-ROOT OPERATION`, 对于RDTSC和RDTSCP指令的说明:
 
@@ -147,21 +152,21 @@ BEHAVIOR IN VMX NON-ROOT OPERATION`, 对于RDTSC和RDTSCP指令的说明:
 Behavior of the RDTSC instruction is determined by 
 the settings of the “RDTSC exiting” and “use TSC offsetting” 
 VM-execution controls:
-    + If both controls are 0, RDTSC operates normally.
-    + If the “RDTSC exiting” VM-execution control is 0 and the 
-     "use TSC offsetting” VM-execution control is 1, the 
-     value returned is determined by the setting of the "use TSC 
-     scaling" VM-execution control:
-        * If the control is 0, RDTSC loads EAX:EDX with the sum of
-        the value of the IA32_TIME_STAMP_COUNTER MSR and the value
-        of the TSC offset.
-        * If the control is 1, RDTSC first computes the product of 
-        the value of the IA32_TIME_STAMP_COUNTER MSR and the value of
-        the TSC multiplier. It then shifts the value of the product
-        right 48 bits and loads EAX:EDX with the sum of that shifted
-        value and the value of the TSC offset.
-    + If the "RDTSC exiting" VM-execution control is 1, RDTSC causes 
-    a VM exit.
+* If both controls are 0, RDTSC operates normally.
+* If the “RDTSC exiting” VM-execution control is 0 and the 
+  "use TSC offsetting” VM-execution control is 1, the 
+  value returned is determined by the setting of the "use TSC 
+  scaling" VM-execution control:
+     + If the control is 0, RDTSC loads EAX:EDX with the sum of
+     the value of the IA32_TIME_STAMP_COUNTER MSR and the value
+     of the TSC offset.
+     + If the control is 1, RDTSC first computes the product of 
+     the value of the IA32_TIME_STAMP_COUNTER MSR and the value of
+     the TSC multiplier. It then shifts the value of the product
+     right 48 bits and loads EAX:EDX with the sum of that shifted
+     value and the value of the TSC offset.
+* If the "RDTSC exiting" VM-execution control is 1, RDTSC causes 
+ a VM exit.
 
 这里面主要提到以下控制位:
 * **RDTSC exiting**: 如果控制位为1, `RDTSC`指令则会产生 VM exit。
@@ -196,4 +201,197 @@ control 字段，关于存储offset和multiplier值的字段如下:
 
 这两个字段
 关于`TSC-offset`和`TSC-multiplier`在`intel sdm 24.6.5 Time-Stamp 
-Counter Offset and Multiplier` 有讲, 
+Counter Offset and Multiplier` 有讲, 和上面内容类似，不再赘述。
+
+## RDTSCP
+Behavior of the RDTSCP instruction is determined first by the
+setting of the "enable RDTSCP" VM-execution control:
+* If the "enable RDTSCP" VM-execution control is 0, RDTSCP 
+causes an invalid-opcode exception (#UD). This exception takes
+priority over any other exception the instruction may incur.
+* If the “enable RDTSCP” VM-execution control is 1, treatment
+ is based on the settings of the “RDTSC exiting” and “use TSC
+ offsetting” VM-execution controls:
+	+ If both controls are 0, RDTSCP operates normally.
+	+ If the “RDTSC exiting” VM-execution control is 0 and the 
+	“use TSC offsetting” VM-execution control is 1, the value 
+	returned is determined by the setting of the “use TSC scaling”
+	VM-execution control:
+		* If the control is 0, RDTSCP loads EAX:EDX with the sum of
+		the value of the IA32_TIME_STAMP_COUNTER MSR and the value 
+		of the TSC offset. Vol. 3C 25-9VMX NON-ROOT OPERATION
+		* If the control is 1, RDTSCP first computes the product of
+		the value of the IA32_TIME_STAMP_COUNTER MSR and the value 
+		of the TSC multiplier. It then shifts the value of the product
+		right 48 bits and loads EAX:EDX with the sum of that shifted
+		value and the value of the TSC offset.
+
+	In either case, RDTSCP also loads ECX with the value of bits
+	31:0 of the IA32_TSC_AUX MSR.
+* If the “RDTSC exiting” VM-execution control is 1, RDTSCP 
+causes a VM exit.
+
+处理逻辑和`RDTSC`的逻辑大致相同。
+
+## RDMSR IA32_TIME_STAMP_COUNTER
+手册中没有没有在`intel sdm 25.3`中解释,但是在`24.6.5 Time-Stamp 
+Counter Offset and Multiplier`中有说，`tsc offset`和`tsc multiplier`
+会影响到`VMX non-root operation`下`RDMSR  IA32_TIME_STAMP_COUNTER`
+的行为。
+
+处理逻辑和`RDTSC`和`RDTSCP`大致相同。
+
+# TIMER
+上面主要是讲的时钟，在intel 支持了`invariant TSC`之后，tsc时钟可以
+用于`wall clock`。但是软件层面还有另一种需求，就是`timer`。`timer`
+可以让软件配置，让其在既定的时间后产生一个`notification`（中断）。
+timer的类型有很多，我们这里主要介绍`local apic timer`。(也是精度
+最高的)。
+
+## local apic timer
+local apic timer 主要包含以下的寄存器:
+* divide configuration register
+* initial-count register
+* current-count register
+* LVT timer register
+
+其中还有一个CPUID指示它的工作的行为:
+```
+CPUID.06H.EAX.ARAT[bit2]
+```
+* ARAT = 1:  the processor’s APIC timer runs at a constant rate
+regardless of P-state transitions and it continues to run at 
+the same rate in deep C-states.
+* ARAT = 0/ CPUID 06H is not support: <br/>
+ the APIC timer may temporarily stop while the processor is in
+ deep C-states or during transitions caused by Enhanced Intel
+ SpeedStep® Technology.
+
+该CPUID指示`APIC timer`可以在P-state 或者是在deep C-states仍然能够以
+不变的频率工作。
+
+APIC timer 可以有几种工作方式:
+* one-shot mode
+* periodic mode
+* TSC-deadline mode
+
+配置apic timer 工作模式:
+
+![local vector table](pic/lvt.png)
+在用于timer entry的17,18比特，用于指定`timer mode`
+<table>
+	<th>LVT Bit[18:17]</th>
+	<th>Timer Mode</th>
+	<tr>
+		<td>00b</td>
+		<td></td>
+	</tr>
+	<tr>
+		<td>01b</td>
+		<td>
+			One-shot mode, program count-down value 
+			in an initial-count register. See Section 10.5.4
+		</td>
+	</tr>
+	<tr>
+		<td>10b</td>
+		<td>
+			Periodic mode, program interval value in an initial-count
+			register. See Section 10.5.4
+		</td>
+	</tr>
+	<tr>
+		<td>11b</td>
+		<td>
+			TSC-Deadline mode, program target value in 
+			IA32_TSC_DEADLINE MSR.
+		</td>
+	</tr>
+</table>
+
+### one-shot mode && periodic mode
+`one-shot mode`和`periodic mode`都是在`initial-count register`写入
+一个既定值，而随后cpu会将该值copy到`current-count register`，
+随后，`current-count register` count down。当timer为0的时候，
+会触发一个`timer interrupt`。
+
+这个count down是有一个频率的，该频率满足以下公式:
+```
+(processor bus clock/core crystal clock frequency) / divide configuration register
+```
+![divide configuration register](pic/divide_configuration_register.png)
+
+但是在触发timer interrupt后, one-shot mode和periodic mode
+行为不太一样。
+* **one-shot mode**: 在timer count down 为0 后，timer仍然会
+ 保持0直到reprogram。
+* **periodic mode**: 在timer count down为0后, `current-count
+ register`会atomic 从`initial-count register`中reload 其值,
+ 然后再次count down。如果在count down 的过程中`initial-count 
+ register`被设置，会重新count, 使用新的`initial-count` value。
+
+`initial-count register` : rw。<br/>
+`current-count register` : ro。
+
+![inital count/current count register](pic/initial_count_current_count_reg.png)
+
+向 `inital-count register`写0, 会stop local APIC timer, 适用于
+`one-shot/periodic mode`。
+
+> NOTE
+>
+> 通过write timer LVT entry 来改变 APIC timer mode (从 one-shot
+> ->periodic/vice versa), 不会 start timer。如果要start timer, 
+> 需要像前面描述的去写 initial-count register.
+
+## TSC-Deadline Mode
+上面说到local-APIC timer 的mode 由LVT Timer Register 中的[18:17]bits
+决定, 其中有一种模式叫做`TSC-deadline mode`,该模式还受`CPUID.01H:ECX.
+TSC_Deadline[bit 24]`控制。
+* 如果 = 0, mode由 register bit 17决定。
+* 如果 = 1, mode由 register bit 18:17 决定。
+
+TSC-deadline mode 允许软件使用local apic timer 去signal an interrupt
+at an absolute time。在TSC-deadline mode中，对initial-count register
+会被忽略; 读取 current-count register 总是0，相对的，使用`IA32_TSC_DEADLINE`
+MSR控制 timer behavior。
+
+`IA32_TSC_DEADLINE` MSR是一个per-logical processor MSR，用于指定一个时间，
+达到该时间时，会在该processor上产生一个timer interrupt。向`IA32_TSC_DEADLINE`
+写入一个64 bit非0值会arms timer。当logical processor's TSC >= `IA32_TSC_DEADLINE`
+时，会产生一个interrupt。当timer 生成了一个interrupt, 它将 disarms itself
+并且清空`IA32_TSC_DEADLINE` MSR。因此，每次写`IA32_TSC_DEADLINE` MSR会最多
+生成一个timer interrupt。
+
+在TSC-deadline mode, 向`IA32_TSC_DEADLINE` MSR写0 会disarm local-APIC timer。
+在TSC-deadline mode和其他的timer mode 转换也会 disarms 该timer。
+
+硬件重置 IA32_TSC_DEADLINE值为0。在其他的timer mode中(LVT BIT 18 = 0),
+IA32_TSC_DEADLINE MSR 读为0并且写操作被忽略。
+
+软件可以使用下面的算法去配置TSC-deadline timer 来 deliver a single interrupt。
+1. 通过核实`CPUID.1:ECX.24 =1`判断支持`TSC-deadline mode`
+2. 通过编程LVT timer register 为 10B 选择TSC-deadline mode.
+3. 在需要timer interrupt 的 processor 将`IA32_TSC_DEADLINE` MSR 设置为 
+target TSC value。这会导致 processor arms timer
+4. 当TSC >= IA32_TSC_DEADLINE 时，处理器产生一个timer interrupt。
+然后disarms timer并且清空IA32_TSC_DEADLINE MSR。（TSC和IA32_TSC_DEADLINE
+MSR都是64-bit unsigned integers)
+5. 软件可以 通过步骤 3 re-arm timer
+
+以下是 TSC-deadline 模式的使用指南(guideline)：
+* 向IA32_TSC_DEADLINE MSR执行写入操作是不被序列化的。因此，系统软件不应该将
+ `WRMSR IA32_TSC_DEADLINE`作为主 serializing instruction。对 IA32_TSC_DEADLINE
+ 和其他MSR register的读, 写访问将按照程序顺序执行。
+* 软件可以在任何时间通过向IA32_TSC_DEADLINE MSR 写0来 disarm timer。
+* 如果timer 被 armed, 软件可以通过 向`IA32_TSC_DEADLINE` MSR写入新值来
+改变 deadline (forward or backward)
+* 如果软件 disarms timer 或者 postpone(延期) deadline, race conditions 可能
+ 导致 delivery a spurious(虚假的) timer interrupt。软件应通过检查当前
+ TSC的值来确认该中断是否是需要的从而判断该中断是不是 spurious interrupt。
+* 在xAPIC mode中（在此模式中 local-APIC register 是 memory-mapped), 软件
+ 应该 order 向 LVT entry 执行memory-mapped  write(使能TSC-deadline mode)和
+ 之后任何WRMSR to IA32_TSC_DEADLINE MSR。软件应该在 memory-mapped write 后
+ 和 any WRMSR 之前，通过执行`MFENCE`指令来确保正确的顺序。(在 x2APIC mode，
+ WRMSR instruction 被用来写 LVT entry。处理器保证此次write 和之后的任意
+ WRMSR to deadline顺序; 不需要 fencing)
