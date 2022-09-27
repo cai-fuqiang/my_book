@@ -301,10 +301,10 @@ static void kvm_synchronize_tsc(struct kvm_vcpu *vcpu, u64 data)
     ¦* TSC, we add elapsed time in this computation.  We could let the
     ¦* compensation code attempt to catch up if we fall behind, but
     ¦* it's better to try to match offsets from the beginning.
-    ¦   ¦*/
+    ¦*/
 	////////////////////////////(7)
     if (synchronizing &&
-    ¦   vcpu->arch.virtual_tsc_khz == kvm->arch.last_tsc_khz) {
+    	vcpu->arch.virtual_tsc_khz == kvm->arch.last_tsc_khz) {
         if (!kvm_check_tsc_unstable()) {
             offset = kvm->arch.cur_tsc_offset;
         } else {
@@ -314,7 +314,7 @@ static void kvm_synchronize_tsc(struct kvm_vcpu *vcpu, u64 data)
         }
         matched = true;
     }
-
+	////////////////////////////(8)
     __kvm_synchronize_tsc(vcpu, offset, data, ns, matched);
     raw_spin_unlock_irqrestore(&kvm->arch.tsc_write_lock, flags);
 }
@@ -386,7 +386,95 @@ kvm_vm_ioctl_create_vcpu
 `tsc_exp`指的是计算出的期望的tsc, 而`tsc_hz`则指的是1s 的guest的
 tsc的cycle, 所以这里判断`|data - tsc_exp| <= 1s`
 
+7. 这里判断的是`synchronizing`, 并且guest tsc ratio 没有改变,
+如果是 tsc stable的情况 `offset = kvm->arch.cur_tsc_offset`
+所以，所有的vcpu 获取的 tsc offset都是相同的。
+如果是 tsc unstable的情况，说明有一段时间tsc 没有增加，那么
+这时就需要把elapsed 加上
 
+8. 看下相关子函数实现:
+```cpp
+static void __kvm_synchronize_tsc(struct kvm_vcpu *vcpu, u64 offset, u64 tsc,
+                  u64 ns, bool matched)
+{
+    struct kvm *kvm = vcpu->kvm;
+
+    lockdep_assert_held(&kvm->arch.tsc_write_lock);
+
+    /*
+     * We also track th most recent recorded KHZ, write and time to
+     * allow the matching interval to be extended at each write.
+     */
+    kvm->arch.last_tsc_nsec = ns;
+    kvm->arch.last_tsc_write = tsc;
+    kvm->arch.last_tsc_khz = vcpu->arch.virtual_tsc_khz;
+    kvm->arch.last_tsc_offset = offset;
+
+    vcpu->arch.last_guest_tsc = tsc;
+
+    kvm_vcpu_write_tsc_offset(vcpu, offset);
+
+    if (!matched) {
+        /*
+         * We split periods of matched TSC writes into generations.
+         * For each generation, we track the original measured
+         * nanosecond time, offset, and write, so if TSCs are in
+         * sync, we can match exact offset, and if not, we can match
+         * exact software computation in compute_guest_tsc()
+         *
+         * These values are tracked in kvm->arch.cur_xxx variables.
+         */
+		/*
+		 * 只有在!matched的情况下, 会更新cur_tsc_offset,
+		 * 而只有在 vcpu->arch.virtual_tsc_khz == kvm->arch.last_tsc_khz
+		 * 时会置matched, matched表示和上次的tsc khz匹配上了
+         * 关于 cur_tsc_generation得再看下
+		 */
+        kvm->arch.cur_tsc_generation++;
+        kvm->arch.cur_tsc_nsec = ns;
+        kvm->arch.cur_tsc_write = tsc;
+        kvm->arch.cur_tsc_offset = offset;
+        kvm->arch.nr_vcpus_matched_tsc = 0;
+    } else if (vcpu->arch.this_tsc_generation != kvm->arch.cur_tsc_generation)
+        kvm->arch.nr_vcpus_matched_tsc++;
+    }
+
+    /* Keep track of which generation this VCPU has synchronized to */
+    vcpu->arch.this_tsc_generation = kvm->arch.cur_tsc_generation;
+    vcpu->arch.this_tsc_nsec = kvm->arch.cur_tsc_nsec;
+    vcpu->arch.this_tsc_write = kvm->arch.cur_tsc_write;
+
+    kvm_track_tsc_matching(vcpu);
+}
+
+static void kvm_vcpu_write_tsc_offset(struct kvm_vcpu *vcpu, u64 l1_offset)
+{
+    trace_kvm_write_tsc_offset(vcpu->vcpu_id,
+                ¦  vcpu->arch.l1_tsc_offset,
+                ¦  l1_offset);
+
+    vcpu->arch.l1_tsc_offset = l1_offset;
+
+    /*
+    ¦* If we are here because L1 chose not to trap WRMSR to TSC then
+    ¦* according to the spec this should set L1's TSC (as opposed to
+    ¦* setting L1's offset for L2).
+    ¦*/
+    if (is_guest_mode(vcpu))
+        vcpu->arch.tsc_offset = kvm_calc_nested_tsc_offset(
+            l1_offset,
+            static_call(kvm_x86_get_l2_tsc_offset)(vcpu),
+            static_call(kvm_x86_get_l2_tsc_multiplier)(vcpu));
+    else
+        vcpu->arch.tsc_offset = l1_offset;
+
+    static_call(kvm_x86_write_tsc_offset)(vcpu, vcpu->arch.tsc_offset);
+}
+static void vmx_write_tsc_offset(struct kvm_vcpu *vcpu, u64 offset)
+{
+    vmcs_write64(TSC_OFFSET, offset);
+}
+```
 ### l1_tsc_scaling_ratio
 除了`offset`之外, `kvm_scale_tsc()`还根据host 和 guest之间，tsc的频率
 比例, 得到guest 频率的tsc值，当然，最终这个值，还需要加上`tsc_offset`
@@ -464,6 +552,7 @@ tsc * default_tsc_scaling_ratio >> kvm_caps.tsc_scaling_ratio_frac_bits
 > 关于elapsed 作用没有太看懂:
 > commit id : f38e098ff3a315bb74abbb4a35cba11bbea8e2fa
 > KVM: x86: TSC reset compensation
+
 # PS
 ## 相关资料
 * intel sdm `17.17 time-stamp counter`: 里面讲到了`invariant tsc`, 和tsc频率相关
