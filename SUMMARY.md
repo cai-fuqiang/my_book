@@ -14,3 +14,5 @@
   * [kvm lapic timer virtualization](./kvm/apic_timer.md)
   * [IPI virtualization](./kvm/ipiv.md)
   * [kvm patch](./kvm/patch.md)
+* [time subsystem](time/README.md)
+  * [intel time system](./time/intel_time_system.md)

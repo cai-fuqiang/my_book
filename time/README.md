@@ -1,8 +1,12 @@
 # time
-* [introduction](./introduction.md)
+<!--
 * [clock source](./clock_source.md)
 * [clock event](./clock_source.md)
 * [timer](./clock_source.md)
+-->
+
+* [introduction](./introduction.md)
+* [intel time system](./intel_time_system.md)
 
 > NOTE
 * 参考链接
@@ -14,4 +18,3 @@
 
 * 参考代码
 	* linux code tag v6.0-rc1
-
