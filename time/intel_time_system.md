@@ -344,7 +344,7 @@ APIC timer 可以有几种工作方式:
 > ->periodic/vice versa), 不会 start timer。如果要start timer, 
 > 需要像前面描述的去写 initial-count register.
 
-## TSC-Deadline Mode
+### TSC-Deadline Mode
 上面说到local-APIC timer 的mode 由LVT Timer Register 中的[18:17]bits
 决定, 其中有一种模式叫做`TSC-deadline mode`,该模式还受`CPUID.01H:ECX.
 TSC_Deadline[bit 24]`控制。
@@ -395,3 +395,33 @@ MSR都是64-bit unsigned integers)
  和 any WRMSR 之前，通过执行`MFENCE`指令来确保正确的顺序。(在 x2APIC mode，
  WRMSR instruction 被用来写 LVT entry。处理器保证此次write 和之后的任意
  WRMSR to deadline顺序; 不需要 fencing)
+
+## VMX-Preemption Timer
+该timer是给 VMX non-root operation 下用的，细节如下:
+
+如果设置了`active VMX-preemption timer`为1, `VMX-preemption timer` 就会在VMX
+non-root operation 中 count down(VM entry 时会load (详见intel sdm 26.7.4 ))。
+当timer count down 到 0, cpu将stop count down ,并且 产生一个 VM exit。
+
+> NOTE
+>
+> 可以看到该timer并不会让其在VMX non-root operation 下避免产生VM exit，所以
+> 感觉这个功能对性能提升不明显。但是官方对此进行了回答
+>
+> [Why are we using preemption timer on x86?](https://www.spinics.net/lists/kvm/msg193150.html)
+>
+> 大概的意思是，引入该功能可以避免使用 复杂的 OS's hrtimer system,
+> 并且避免了引host timer interrupt  handling cost，而该功能会有
+> a little math(不知道是不是可以翻译为转换)  (对于 guest->host TSC &&
+> host TSC -> preemption timer conversion) 和 a cheaper VM exit。
+> 并且更有利于 isolated pCPUs（独占的 vcpu ?)
+
+VMX-preemption timer 以 TSC 成比例的rate count down。明确的说，
+该timer count down 1 , TSC increment X。X 的范围是 [0,31]
+并且可以通过 VMX capability MSR `IA32_VMX_MISC`指定。
+
+VMX-preemption timer 运行在 c-states C0, C1, C2; 它也可以运行
+在 shutdown/ wait-for-SIPI state。如果timer 在除 wait-for-SIPI state
+的其他的任意状态下 count down 到0, logical processor 会转换到C0 C-state
+并且产生一个 VM exit。如果timer 在wait-for-SIPI state 中count down to 0,
+将不会产生vm-exit。timer 也不会在 deeper than C2 的C-state 下 decrement。
