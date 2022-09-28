@@ -1,0 +1,312 @@
+From cc578287e3224d0da196cc1d226bdae6b068faa7 Mon Sep 17 00:00:00 2001
+From: Zachary Amsden <zamsden@gmail.com>
+Date: Fri, 3 Feb 2012 15:43:50 -0200
+Subject: [PATCH 1/8] KVM: Infrastructure for software and hardware based TSC
+ rate scaling
+
+This requires some restructuring; rather than use 'virtual_tsc_khz'
+to indicate whether hardware rate scaling is in effect, we consider
+each VCPU to always have a virtual TSC rate.  Instead, there is new
+logic above the vendor-specific hardware scaling that decides whether
+it is even necessary to use and updates all rate variables used by
+common code.  This means we can simply query the virtual rate at
+any point, which is needed for software rate scaling.
+
+There is also now a threshold added to the TSC rate scaling; minor
+differences and variations of measured TSC rate can accidentally
+provoke rate scaling to be used when it is not needed.  Instead,
+we have a tolerance variable called tsc_tolerance_ppm, which is
+the maximum variation from user requested rate at which scaling
+will be used.  The default is 250ppm, which is the half the
+threshold for NTP adjustment, allowing for some hardware variation.
+
+In the event that hardware rate scaling is not available, we can
+kludge a bit by forcing TSC catchup to turn on when a faster than
+hardware speed has been requested, but there is nothing available
+yet for the reverse case; this requires a trap and emulate software
+implementation for RDTSC, which is still forthcoming.
+
+[avi: fix 64-bit division on i386]
+
+Signed-off-by: Zachary Amsden <zamsden@gmail.com>
+Signed-off-by: Marcelo Tosatti <mtosatti@redhat.com>
+Signed-off-by: Avi Kivity <avi@redhat.com>
+---
+ arch/x86/include/asm/kvm_host.h |  9 ++--
+ arch/x86/kvm/lapic.c            |  2 +-
+ arch/x86/kvm/svm.c              | 20 ++++----
+ arch/x86/kvm/vmx.c              | 16 +++++--
+ arch/x86/kvm/x86.c              | 82 +++++++++++++++++----------------
+ 5 files changed, 71 insertions(+), 58 deletions(-)
+
+diff --git a/arch/x86/include/asm/kvm_host.h b/arch/x86/include/asm/kvm_host.h
+index 782d973b0719..ddebbe01fff9 100644
+--- a/arch/x86/include/asm/kvm_host.h
++++ b/arch/x86/include/asm/kvm_host.h
+@@ -422,10 +422,11 @@ struct kvm_vcpu_arch {
+ 	u64 last_kernel_ns;
+ 	u64 last_tsc_nsec;
+ 	u64 last_tsc_write;
+-	u32 virtual_tsc_khz;
+ 	bool tsc_catchup;
+-	u32  tsc_catchup_mult;
+-	s8   tsc_catchup_shift;
++	bool tsc_always_catchup;
++	s8 virtual_tsc_shift;
++	u32 virtual_tsc_mult;
++	u32 virtual_tsc_khz;
+ 
+ 	atomic_t nmi_queued;  /* unprocessed asynchronous NMIs */
+ 	unsigned nmi_pending; /* NMI queued after currently running handler */
+@@ -651,7 +652,7 @@ struct kvm_x86_ops {
+ 
+ 	bool (*has_wbinvd_exit)(void);
+ 
+-	void (*set_tsc_khz)(struct kvm_vcpu *vcpu, u32 user_tsc_khz);
++	void (*set_tsc_khz)(struct kvm_vcpu *vcpu, u32 user_tsc_khz, bool scale);
+ 	void (*write_tsc_offset)(struct kvm_vcpu *vcpu, u64 offset);
+ 
+ 	u64 (*compute_tsc_offset)(struct kvm_vcpu *vcpu, u64 target_tsc);
+diff --git a/arch/x86/kvm/lapic.c b/arch/x86/kvm/lapic.c
+index 3ee1d83c695d..72975f758c83 100644
+--- a/arch/x86/kvm/lapic.c
++++ b/arch/x86/kvm/lapic.c
+@@ -731,7 +731,7 @@ static void start_apic_timer(struct kvm_lapic *apic)
+ 		u64 guest_tsc, tscdeadline = apic->lapic_timer.tscdeadline;
+ 		u64 ns = 0;
+ 		struct kvm_vcpu *vcpu = apic->vcpu;
+-		unsigned long this_tsc_khz = vcpu_tsc_khz(vcpu);
++		unsigned long this_tsc_khz = vcpu->arch.virtual_tsc_khz;
+ 		unsigned long flags;
+ 
+ 		if (unlikely(!tscdeadline || !this_tsc_khz))
+diff --git a/arch/x86/kvm/svm.c b/arch/x86/kvm/svm.c
+index 7bbd17cc3488..e12026e5244e 100644
+--- a/arch/x86/kvm/svm.c
++++ b/arch/x86/kvm/svm.c
+@@ -964,20 +964,25 @@ static u64 svm_scale_tsc(struct kvm_vcpu *vcpu, u64 tsc)
+ 	return _tsc;
+ }
+ 
+-static void svm_set_tsc_khz(struct kvm_vcpu *vcpu, u32 user_tsc_khz)
++static void svm_set_tsc_khz(struct kvm_vcpu *vcpu, u32 user_tsc_khz, bool scale)
+ {
+ 	struct vcpu_svm *svm = to_svm(vcpu);
+ 	u64 ratio;
+ 	u64 khz;
+ 
+-	/* TSC scaling supported? */
+-	if (!boot_cpu_has(X86_FEATURE_TSCRATEMSR))
++	/* Guest TSC same frequency as host TSC? */
++	if (!scale) {
++		svm->tsc_ratio = TSC_RATIO_DEFAULT;
+ 		return;
++	}
+ 
+-	/* TSC-Scaling disabled or guest TSC same frequency as host TSC? */
+-	if (user_tsc_khz == 0) {
+-		vcpu->arch.virtual_tsc_khz = 0;
+-		svm->tsc_ratio = TSC_RATIO_DEFAULT;
++	/* TSC scaling supported? */
++	if (!boot_cpu_has(X86_FEATURE_TSCRATEMSR)) {
++		if (user_tsc_khz > tsc_khz) {
++			vcpu->arch.tsc_catchup = 1;
++			vcpu->arch.tsc_always_catchup = 1;
++		} else
++			WARN(1, "user requested TSC rate below hardware speed\n");
+ 		return;
+ 	}
+ 
+@@ -992,7 +997,6 @@ static void svm_set_tsc_khz(struct kvm_vcpu *vcpu, u32 user_tsc_khz)
+ 				user_tsc_khz);
+ 		return;
+ 	}
+-	vcpu->arch.virtual_tsc_khz = user_tsc_khz;
+ 	svm->tsc_ratio             = ratio;
+ }
+ 
+diff --git a/arch/x86/kvm/vmx.c b/arch/x86/kvm/vmx.c
+index 3b4c8d8ad906..e6bf61fa1c03 100644
+--- a/arch/x86/kvm/vmx.c
++++ b/arch/x86/kvm/vmx.c
+@@ -1817,13 +1817,19 @@ u64 vmx_read_l1_tsc(struct kvm_vcpu *vcpu)
+ }
+ 
+ /*
+- * Empty call-back. Needs to be implemented when VMX enables the SET_TSC_KHZ
+- * ioctl. In this case the call-back should update internal vmx state to make
+- * the changes effective.
++ * Engage any workarounds for mis-matched TSC rates.  Currently limited to
++ * software catchup for faster rates on slower CPUs.
+  */
+-static void vmx_set_tsc_khz(struct kvm_vcpu *vcpu, u32 user_tsc_khz)
++static void vmx_set_tsc_khz(struct kvm_vcpu *vcpu, u32 user_tsc_khz, bool scale)
+ {
+-	/* Nothing to do here */
++	if (!scale)
++		return;
++
++	if (user_tsc_khz > tsc_khz) {
++		vcpu->arch.tsc_catchup = 1;
++		vcpu->arch.tsc_always_catchup = 1;
++	} else
++		WARN(1, "user requested TSC rate below hardware speed\n");
+ }
+ 
+ /*
+diff --git a/arch/x86/kvm/x86.c b/arch/x86/kvm/x86.c
+index 2bd77a3a41ed..41bb90acb238 100644
+--- a/arch/x86/kvm/x86.c
++++ b/arch/x86/kvm/x86.c
+@@ -96,6 +96,10 @@ EXPORT_SYMBOL_GPL(kvm_has_tsc_control);
+ u32  kvm_max_guest_tsc_khz;
+ EXPORT_SYMBOL_GPL(kvm_max_guest_tsc_khz);
+ 
++/* tsc tolerance in parts per million - default to 1/2 of the NTP threshold */
++static u32 tsc_tolerance_ppm = 250;
++module_param(tsc_tolerance_ppm, uint, S_IRUGO | S_IWUSR);
++
+ #define KVM_NR_SHARED_MSRS 16
+ 
+ struct kvm_shared_msrs_global {
+@@ -968,49 +972,50 @@ static inline u64 get_kernel_ns(void)
+ static DEFINE_PER_CPU(unsigned long, cpu_tsc_khz);
+ unsigned long max_tsc_khz;
+ 
+-static inline int kvm_tsc_changes_freq(void)
++static inline u64 nsec_to_cycles(struct kvm_vcpu *vcpu, u64 nsec)
+ {
+-	int cpu = get_cpu();
+-	int ret = !boot_cpu_has(X86_FEATURE_CONSTANT_TSC) &&
+-		  cpufreq_quick_get(cpu) != 0;
+-	put_cpu();
+-	return ret;
++	return pvclock_scale_delta(nsec, vcpu->arch.virtual_tsc_mult,
++				   vcpu->arch.virtual_tsc_shift);
+ }
+ 
+-u64 vcpu_tsc_khz(struct kvm_vcpu *vcpu)
++static u32 adjust_tsc_khz(u32 khz, s32 ppm)
+ {
+-	if (vcpu->arch.virtual_tsc_khz)
+-		return vcpu->arch.virtual_tsc_khz;
+-	else
+-		return __this_cpu_read(cpu_tsc_khz);
++	u64 v = (u64)khz * (1000000 + ppm);
++	do_div(v, 1000000);
++	return v;
+ }
+ 
+-static inline u64 nsec_to_cycles(struct kvm_vcpu *vcpu, u64 nsec)
++static void kvm_set_tsc_khz(struct kvm_vcpu *vcpu, u32 this_tsc_khz)
+ {
+-	u64 ret;
++	u32 thresh_lo, thresh_hi;
++	int use_scaling = 0;
+ 
+-	WARN_ON(preemptible());
+-	if (kvm_tsc_changes_freq())
+-		printk_once(KERN_WARNING
+-		 "kvm: unreliable cycle conversion on adjustable rate TSC\n");
+-	ret = nsec * vcpu_tsc_khz(vcpu);
+-	do_div(ret, USEC_PER_SEC);
+-	return ret;
+-}
+-
+-static void kvm_init_tsc_catchup(struct kvm_vcpu *vcpu, u32 this_tsc_khz)
+-{
+ 	/* Compute a scale to convert nanoseconds in TSC cycles */
+ 	kvm_get_time_scale(this_tsc_khz, NSEC_PER_SEC / 1000,
+-			   &vcpu->arch.tsc_catchup_shift,
+-			   &vcpu->arch.tsc_catchup_mult);
++			   &vcpu->arch.virtual_tsc_shift,
++			   &vcpu->arch.virtual_tsc_mult);
++	vcpu->arch.virtual_tsc_khz = this_tsc_khz;
++
++	/*
++	 * Compute the variation in TSC rate which is acceptable
++	 * within the range of tolerance and decide if the
++	 * rate being applied is within that bounds of the hardware
++	 * rate.  If so, no scaling or compensation need be done.
++	 */
++	thresh_lo = adjust_tsc_khz(tsc_khz, -tsc_tolerance_ppm);
++	thresh_hi = adjust_tsc_khz(tsc_khz, tsc_tolerance_ppm);
++	if (this_tsc_khz < thresh_lo || this_tsc_khz > thresh_hi) {
++		pr_debug("kvm: requested TSC rate %u falls outside tolerance [%u,%u]\n", this_tsc_khz, thresh_lo, thresh_hi);
++		use_scaling = 1;
++	}
++	kvm_x86_ops->set_tsc_khz(vcpu, this_tsc_khz, use_scaling);
+ }
+ 
+ static u64 compute_guest_tsc(struct kvm_vcpu *vcpu, s64 kernel_ns)
+ {
+ 	u64 tsc = pvclock_scale_delta(kernel_ns-vcpu->arch.last_tsc_nsec,
+-				      vcpu->arch.tsc_catchup_mult,
+-				      vcpu->arch.tsc_catchup_shift);
++				      vcpu->arch.virtual_tsc_mult,
++				      vcpu->arch.virtual_tsc_shift);
+ 	tsc += vcpu->arch.last_tsc_write;
+ 	return tsc;
+ }
+@@ -1077,7 +1082,7 @@ static int kvm_guest_time_update(struct kvm_vcpu *v)
+ 	local_irq_save(flags);
+ 	tsc_timestamp = kvm_x86_ops->read_l1_tsc(v);
+ 	kernel_ns = get_kernel_ns();
+-	this_tsc_khz = vcpu_tsc_khz(v);
++	this_tsc_khz = __get_cpu_var(cpu_tsc_khz);
+ 	if (unlikely(this_tsc_khz == 0)) {
+ 		local_irq_restore(flags);
+ 		kvm_make_request(KVM_REQ_CLOCK_UPDATE, v);
+@@ -2804,26 +2809,21 @@ long kvm_arch_vcpu_ioctl(struct file *filp,
+ 		u32 user_tsc_khz;
+ 
+ 		r = -EINVAL;
+-		if (!kvm_has_tsc_control)
+-			break;
+-
+ 		user_tsc_khz = (u32)arg;
+ 
+ 		if (user_tsc_khz >= kvm_max_guest_tsc_khz)
+ 			goto out;
+ 
+-		kvm_x86_ops->set_tsc_khz(vcpu, user_tsc_khz);
++		if (user_tsc_khz == 0)
++			user_tsc_khz = tsc_khz;
++
++		kvm_set_tsc_khz(vcpu, user_tsc_khz);
+ 
+ 		r = 0;
+ 		goto out;
+ 	}
+ 	case KVM_GET_TSC_KHZ: {
+-		r = -EIO;
+-		if (check_tsc_unstable())
+-			goto out;
+-
+-		r = vcpu_tsc_khz(vcpu);
+-
++		r = vcpu->arch.virtual_tsc_khz;
+ 		goto out;
+ 	}
+ 	default:
+@@ -5312,6 +5312,8 @@ static int vcpu_enter_guest(struct kvm_vcpu *vcpu)
+ 		profile_hit(KVM_PROFILING, (void *)rip);
+ 	}
+ 
++	if (unlikely(vcpu->arch.tsc_always_catchup))
++		kvm_make_request(KVM_REQ_CLOCK_UPDATE, vcpu);
+ 
+ 	kvm_lapic_sync_from_vapic(vcpu);
+ 
+@@ -6004,7 +6006,7 @@ int kvm_arch_vcpu_init(struct kvm_vcpu *vcpu)
+ 	}
+ 	vcpu->arch.pio_data = page_address(page);
+ 
+-	kvm_init_tsc_catchup(vcpu, max_tsc_khz);
++	kvm_set_tsc_khz(vcpu, max_tsc_khz);
+ 
+ 	r = kvm_mmu_create(vcpu);
+ 	if (r < 0)
+-- 
+2.37.3
+
