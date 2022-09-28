@@ -1,7 +1,7 @@
 From cc578287e3224d0da196cc1d226bdae6b068faa7 Mon Sep 17 00:00:00 2001
 From: Zachary Amsden <zamsden@gmail.com>
 Date: Fri, 3 Feb 2012 15:43:50 -0200
-Subject: [PATCH 1/8] KVM: Infrastructure for software and hardware based TSC
+Subject: [PATCH 1/8] KVM: Infrastructure(基础架构) for software and hardware based TSC
  rate scaling
 
 This requires some restructuring; rather than use 'virtual_tsc_khz'
@@ -12,19 +12,37 @@ it is even necessary to use and updates all rate variables used by
 common code.  This means we can simply query the virtual rate at
 any point, which is needed for software rate scaling.
 
-There is also now a threshold added to the TSC rate scaling; minor
-differences and variations of measured TSC rate can accidentally
-provoke rate scaling to be used when it is not needed.  Instead,
-we have a tolerance variable called tsc_tolerance_ppm, which is
+这需要一些调整: 我们认为每个 VCPU 始终具有virtual TSC rate,
+，而不是使用"virtual_tsc_khz"来指示haredware scaling 是否有效。
+相替代的，在 vendor-specific hardware scaling 上有一个新逻辑，
+它知识是否有必要使用并更新common code 使用的所有的rate variables。
+它意味着我们可以在任何时间点简单的查询 virtual rate, 这是 software
+rate scaling 所需要的。
+
+There is also now a threshold added to the TSC rate scaling; minor(小的)
+differences and variations(变化，变更) of measured TSC rate can accidentally(意外的，偶然的)
+provoke(引起) rate scaling to be used when it is not needed.  Instead,
+we have a tolerance(忍受) variable called tsc_tolerance_ppm, which is
 the maximum variation from user requested rate at which scaling
 will be used.  The default is 250ppm, which is the half the
 threshold for NTP adjustment, allowing for some hardware variation.
 
+增加一个TSC rate scaling 的 threshold; 测量到的TSC rate 微小差异和变化
+可能会意外的导致再不需要的时候进行 rate scaling。相反的，我们有一个
+tolerance variable 被称为 tsc_tolerance_ppm, 它是在使用scaling 过程中，
+允许来自于 用户需求的速率的 maximum variation。默认是250ppm, 他是 NTP
+adjustment threshold 的一半，允许一些硬件 variation。
+
 In the event that hardware rate scaling is not available, we can
 kludge a bit by forcing TSC catchup to turn on when a faster than
 hardware speed has been requested, but there is nothing available
-yet for the reverse case; this requires a trap and emulate software
+yet for the reverse(相反的) case; this requires a trap and emulate software
 implementation for RDTSC, which is still forthcoming.
+
+一些硬件不支持 rate scaling, 我们在当请求的速度超过硬件速度时，
+可以通过强制打开 TSC catchup 简单的拼凑这个功能，但是对于相反的情况
+目前还未支持; 它需要软件实现 对于RDTSC 的 trap 和 emulate, 现在
+还在进行中。
 
 [avi: fix 64-bit division on i386]
 
@@ -143,9 +161,14 @@ index 3b4c8d8ad906..e6bf61fa1c03 100644
 +static void vmx_set_tsc_khz(struct kvm_vcpu *vcpu, u32 user_tsc_khz, bool scale)
  {
 -	/* Nothing to do here */
+	//如果有scale == false 的话，表示本次不需要 rate scaling
 +	if (!scale)
 +		return;
 +
+	//如果 hardware 不支持 tsc rate scaling机制
+	//只能处理 use_tsc_khz 比 tsc_khz大的情况
+	//这个看不懂为什么
+	//????????????
 +	if (user_tsc_khz > tsc_khz) {
 +		vcpu->arch.tsc_catchup = 1;
 +		vcpu->arch.tsc_always_catchup = 1;
@@ -161,7 +184,8 @@ index 2bd77a3a41ed..41bb90acb238 100644
 @@ -96,6 +96,10 @@ EXPORT_SYMBOL_GPL(kvm_has_tsc_control);
  u32  kvm_max_guest_tsc_khz;
  EXPORT_SYMBOL_GPL(kvm_max_guest_tsc_khz);
- 
+//该值表示 tsc tolerance ,  是一个内核参数，默认为 NTP threshold 1/2,
+//单位是 million
 +/* tsc tolerance in parts per million - default to 1/2 of the NTP threshold */
 +static u32 tsc_tolerance_ppm = 250;
 +module_param(tsc_tolerance_ppm, uint, S_IRUGO | S_IWUSR);
@@ -181,6 +205,7 @@ index 2bd77a3a41ed..41bb90acb238 100644
 -		  cpufreq_quick_get(cpu) != 0;
 -	put_cpu();
 -	return ret;
+	//这个和pvclock相关, 可以将 nsec -> cpu cycle
 +	return pvclock_scale_delta(nsec, vcpu->arch.virtual_tsc_mult,
 +				   vcpu->arch.virtual_tsc_shift);
  }
@@ -221,6 +246,7 @@ index 2bd77a3a41ed..41bb90acb238 100644
 -			   &vcpu->arch.tsc_catchup_mult);
 +			   &vcpu->arch.virtual_tsc_shift,
 +			   &vcpu->arch.virtual_tsc_mult);
+	//先将 virtual_tsc_hkz 设置上
 +	vcpu->arch.virtual_tsc_khz = this_tsc_khz;
 +
 +	/*
@@ -229,9 +255,12 @@ index 2bd77a3a41ed..41bb90acb238 100644
 +	 * rate being applied is within that bounds of the hardware
 +	 * rate.  If so, no scaling or compensation need be done.
 +	 */
+	//计算可接受的thread_lo, 和 thread_hi,
+	//如果this_tsc_khz在这个区间内，则认为不需要进行 rate scaling
 +	thresh_lo = adjust_tsc_khz(tsc_khz, -tsc_tolerance_ppm);
 +	thresh_hi = adjust_tsc_khz(tsc_khz, tsc_tolerance_ppm);
 +	if (this_tsc_khz < thresh_lo || this_tsc_khz > thresh_hi) {
+		//需要调整
 +		pr_debug("kvm: requested TSC rate %u falls outside tolerance [%u,%u]\n", this_tsc_khz, thresh_lo, thresh_hi);
 +		use_scaling = 1;
 +	}
@@ -248,6 +277,7 @@ index 2bd77a3a41ed..41bb90acb238 100644
  	tsc += vcpu->arch.last_tsc_write;
  	return tsc;
  }
+ //这个得再看下
 @@ -1077,7 +1082,7 @@ static int kvm_guest_time_update(struct kvm_vcpu *v)
  	local_irq_save(flags);
  	tsc_timestamp = kvm_x86_ops->read_l1_tsc(v);
@@ -261,6 +291,7 @@ index 2bd77a3a41ed..41bb90acb238 100644
  		u32 user_tsc_khz;
  
  		r = -EINVAL;
+		//增加了不支持 tsc rate scaling处理方式
 -		if (!kvm_has_tsc_control)
 -			break;
 -
