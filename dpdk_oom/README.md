@@ -252,7 +252,9 @@ dump_mem_map(struct meminfo *mi)
 
 ## 分析kernel源码
 从上面信息可以看到`page._refcount = 0xffff`, 而kernel中设置`_refcount`的接口
-为`set_page_count()`
+为`set_page_count()`,`page_ref_add()`
+
+### set_page_count
 ```cpp
 static inline void set_page_count(struct page *page, int v)
 {
@@ -322,6 +324,9 @@ struct page_frag_cache {
 2. `set_page_count(page,size)`
 3. `nc->pagecnt_bias = size`
 
+而这里`page = virt_to_page(nc->va);`
+所以 page所代表页的虚拟地址肯定是存放在nc->va中，search 可以search到。
+
 page address 存放在`struct page_frag_cache`的0 offset, 我们尝试找一个特定的page来分析下:
 ```
 crash> kmem -m lru.next,flags,mapping,_mapcount,_refcount|grep 3dfffff000000000|grep 0000ffff|head -3
@@ -329,37 +334,16 @@ ffff7fee5b008000  dead000000000100  3dfffff000000000  0000000000000000  -1  0000
 ffff7fee5b008040  dead000000000100  3dfffff000000000  0000000000000000  -1  0000ffff
 ffff7fee5b008080  dead000000000100  3dfffff000000000  0000000000000000  -1  0000ffff
 
-crash> search ffff7fee5b008000
-ffff000061fa9ef0: ffff7fee5b008000
-crash> struct page_frag_cache ffff000061fa9ef0
-struct page_frag_cache {
-  va = 0xffff7fee5b008000,
-  offset = 66,
-  pagecnt_bias = 65535,
-  pfmemalloc = false
-}
-
-crash> search ffff7fee5b008040
-ffff000061fa9f10: ffff7fee5b008040
-crash> struct page_frag_cache ffff000061fa9f10
-struct page_frag_cache {
-  va = 0xffff7fee5b008040,
-  offset = 66,
-  pagecnt_bias = 65535,
-  pfmemalloc = false
-}
-
-crash> search ffff7fee5b008080
-ffff000061fa9f30: ffff7fee5b008080
-crash> struct page_frag_cache ffff000061fa9f30
-struct page_frag_cache {
-  va = 0xffff7fee5b008080,
-  offset = 66,
-  pagecnt_bias = 65535,
-  pfmemalloc = false
-}
+crash> kmem ffff7fee5b008000
+      PAGE         PHYSICAL      MAPPING       INDEX CNT FLAGS
+ffff7fee5b008000 37002000000                0        0 65535 3dfffff000000000
+crash> ptov 37002000000
+VIRTUAL           PHYSICAL
+ffffb96c02000000  37002000000
+crash> search ffffb96c02000000
+crash>
 ```
-可以看到
+可以看到search 该地址找不到，所以应该不是这个代码路径, 我们再继续验证下
 
 而调用`page_frag_alloc()`的函数有以下几个, 基本上是驱动(wireless,nvme)和网络模块，这里
 主要看下网络模块(因为场景业主要是在dpdk使用场景下
@@ -369,4 +353,431 @@ __netdev_alloc_frag
 __napi_alloc_frag
 __netdev_alloc_skb
 ```
-看起来像是一个连续的地址
+这里不展开代码，`__napi_alloc_skb`/`__napi_alloc_frag`使用的`struct page_frag_cache`
+是per cpu 变量 `napi_alloc_cache`, 而`__netdev_alloc_frag`, `__netdev_alloc_skb`
+使用的`struct page_frag_cache`是per cpu 变量`netdev_alloc_cache`
+
+我们这里随意看几个`napi_alloc_cache` per cpu变量
+```
+PER-CPU DATA TYPE:
+  struct napi_alloc_cache napi_alloc_cache;
+PER-CPU ADDRESSES:
+  [0]: ffffb707fde4cde0
+  [1]: ffffb707fde7cde0
+  [2]: ffffb707fdeacde0
+  [3]: ffffb707fdedcde0
+  ...
+crash> struct page_frag_cache ffffb707fde4cde0
+struct page_frag_cache {
+  va = 0x0,
+  offset = 0,
+  pagecnt_bias = 0,
+  pfmemalloc = false
+}
+crash> struct page_frag_cache ffffb707fde7cde0
+struct page_frag_cache {
+  va = 0x0,
+  offset = 0,
+  pagecnt_bias = 0,
+  pfmemalloc = false
+}
+crash> struct page_frag_cache ffffb707fdeacde0
+struct page_frag_cache {
+  va = 0x0,
+  offset = 0,
+  pagecnt_bias = 0,
+  pfmemalloc = false
+}
+crash> struct page_frag_cache ffffb707fdedcde0
+struct page_frag_cache {
+  va = 0x0,
+  offset = 0,
+  pagecnt_bias = 0,
+  pfmemalloc = false
+}
+```
+可见都是空的，我们再来看下`netdev_alloc_cache`
+```
+PER-CPU DATA TYPE:
+  struct page_frag_cache netdev_alloc_cache;
+PER-CPU ADDRESSES:
+  [0]: ffffb707fde4d000
+  [1]: ffffb707fde7d000
+  [2]: ffffb707fdead000
+  [3]: ffffb707fdedd000
+  ...
+crash> struct page_frag_cache ffffb707fde4d000
+struct page_frag_cache {
+  va = 0x0,
+  offset = 0,
+  pagecnt_bias = 0,
+  pfmemalloc = false
+}
+crash> struct page_frag_cache ffffb707fde7d000
+struct page_frag_cache {
+  va = 0x0,
+  offset = 0,
+  pagecnt_bias = 0,
+  pfmemalloc = false
+}
+crash> struct page_frag_cache ffffb707fdead000
+struct page_frag_cache {
+  va = 0x0,
+  offset = 0,
+  pagecnt_bias = 0,
+  pfmemalloc = false
+}
+crash> struct page_frag_cache ffffb707fdedd000
+struct page_frag_cache {
+  va = 0x0,
+  offset = 0,
+  pagecnt_bias = 0,
+  pfmemalloc = false
+}
+```
+我们这里简单判断，不是该代码路径导致。
+### page_ref_add
+在分析kernel代码之前，我们先看看上述提到的page在什么地址可以search到`struct page`
+address地址,拿上面提到的一个page 地址来说`ffff7fee5b008000`
+```
+crash> search ffff7fee5b008000
+ffff000061fa9ef0: ffff7fee5b008000
+
+crash> x/20xg 0xffff000061fa9ef0
+0xffff000061fa9ef0:     0xffff7fee5b008000      0x0000ffff00000042
+0xffff000061fa9f00:     0x0000000000000000      0x0000037002010000
+0xffff000061fa9f10:     0xffff7fee5b008040      0x0000ffff00000042
+0xffff000061fa9f20:     0x0000000000000000      0x0000037002020000
+0xffff000061fa9f30:     0xffff7fee5b008080      0x0000ffff00000042
+0xffff000061fa9f40:     0x0000000000000000      0x0000037002030000
+0xffff000061fa9f50:     0xffff7fee5b0080c0      0x0000ffff00000042
+0xffff000061fa9f60:     0x0000000000000000      0x0000037002040000
+0xffff000061fa9f70:     0xffff7fee5b008100      0x0000ffff00000042
+0xffff000061fa9f80:     0x0000000000000000      0x0000037002050000
+
+crash> p sizeof(struct page)
+$1 = 64
+```
+
+可以看到，上面的地址里面的数据包含了很多的page address
+```
+0xffff7fee5b008000
+0xffff7fee5b008040
+0xffff7fee5b008080
+0xffff7fee5b0080c0
+0xffff7fee5b008100
+```
+而且因为`sizeof(struct page)`为64(0x40),所以上面的page地址是连续的。
+那么这样的数据结构看起来像是一个数组，大小为32(0x20)
+
+那么我们再来看下有哪些函数调用了`page_ref_add`
+有很多网卡驱动调用了, 还有hugepage vhost, 这里我们
+主要分析下网卡驱动。
+
+看下53环境上网卡驱动类型:
+```
+[root@node-1 wangfuqiang_copy]# lspci |grep Net
+0000:07:00.0 Ethernet controller: Intel Corporation I350 Gigabit Network Connection (rev 01)
+0000:07:00.1 Ethernet controller: Intel Corporation I350 Gigabit Network Connection (rev 01)
+0000:0d:00.0 Ethernet controller: Intel Corporation I350 Gigabit Network Connection (rev 01)
+0000:0d:00.1 Ethernet controller: Intel Corporation I350 Gigabit Network Connection (rev 01)
+0000:0d:00.2 Ethernet controller: Intel Corporation I350 Gigabit Network Connection (rev 01)
+0000:0d:00.3 Ethernet controller: Intel Corporation I350 Gigabit Network Connection (rev 01)
+0001:01:00.0 Ethernet controller: Intel Corporation 82599ES 10-Gigabit SFI/SFP+ Network Connection (rev 01)
+0001:01:00.1 Ethernet controller: Intel Corporation 82599ES 10-Gigabit SFI/SFP+ Network Connection (rev 01)
+0001:03:00.0 Ethernet controller: Intel Corporation 82599ES 10-Gigabit SFI/SFP+ Network Connection (rev 01)
+0001:03:00.1 Ethernet controller: Intel Corporation 82599ES 10-Gigabit SFI/SFP+ Network Connection (rev 01)
+
+[root@node-1 wangfuqiang_copy]# lspci -v -s 0000:07:00.0
+0000:07:00.0 Ethernet controller: Intel Corporation I350 Gigabit Network Connection (rev 01)
+        Subsystem: Intel Corporation Ethernet Server Adapter I350-T2
+        Flags: bus master, fast devsel, latency 0, IRQ 12, NUMA node 0
+        Memory at 61a00000 (32-bit, non-prefetchable) [size=1M]
+        Memory at 61d00000 (32-bit, non-prefetchable) [size=16K]
+        Expansion ROM at 61c00000 [size=512K]
+        Capabilities: [40] Power Management version 3
+        Capabilities: [50] MSI: Enable- Count=1/1 Maskable+ 64bit+
+        Capabilities: [70] MSI-X: Enable+ Count=10 Masked-
+        Capabilities: [a0] Express Endpoint, MSI 00
+        Capabilities: [100] Advanced Error Reporting
+        Capabilities: [140] Device Serial Number 9c-69-b4-ff-ff-63-01-c0
+        Capabilities: [150] Alternative Routing-ID Interpretation (ARI)
+        Capabilities: [160] Single Root I/O Virtualization (SR-IOV)
+        Capabilities: [1a0] Transaction Processing Hints
+        Capabilities: [1c0] Latency Tolerance Reporting
+        Capabilities: [1d0] Access Control Services
+        Kernel driver in use: igb
+        Kernel modules: igb
+
+[root@node-1 wangfuqiang_copy]# lspci -v -s 0001:01:00.0
+0001:01:00.0 Ethernet controller: Intel Corporation 82599ES 10-Gigabit SFI/SFP+ Network Connection (rev 01)
+        Subsystem: Intel Corporation Ethernet Server Adapter X520-2
+        Flags: bus master, fast devsel, latency 0, IRQ 16, NUMA node 8, IOMMU group 1
+        Memory at 20060000000 (64-bit, non-prefetchable) [size=1M]
+        I/O ports at 800000 [virtual] [size=32]
+        Memory at 20060300000 (64-bit, non-prefetchable) [virtual] [size=16K]
+        Expansion ROM at 20060200000 [size=512K]
+        Capabilities: [40] Power Management version 3
+        Capabilities: [50] MSI: Enable- Count=1/1 Maskable+ 64bit+
+        Capabilities: [70] MSI-X: Enable+ Count=64 Masked-
+        Capabilities: [a0] Express Endpoint, MSI 00
+        Capabilities: [100] Advanced Error Reporting
+        Capabilities: [140] Device Serial Number 9c-69-b4-ff-ff-62-e1-48
+        Capabilities: [150] Alternative Routing-ID Interpretation (ARI)
+        Capabilities: [160] Single Root I/O Virtualization (SR-IOV)
+        Kernel driver in use: vfio-pci
+        Kernel modules: ixgbe
+```
+主要有`igb`,`ixgbe`两种网卡驱动驱动的网卡。
+
+找天浩了解了下，QA 同事测试的网卡是`82599ES`, `ixgbe`驱动的网卡
+我们这边主要分析下ixgbe驱动调用 `page_ref_add`的代码路径。
+拿其中一个代码路径举例
+```cpp
+static bool ixgbe_alloc_mapped_page(struct ixgbe_ring *rx_ring,
+                                ¦   struct ixgbe_rx_buffer *bi)
+{
+	struct page *page = bi->page;
+	dma_addr_t dma;
+	
+	/* since we are recycling buffers we should seldom need to alloc */
+	if (likely(page))
+	        return true;
+
+	page = dev_alloc_pages(ixgbe_rx_pg_order(rx_ring));
+	...
+	if (unlikely(!page)) {
+        rx_ring->rx_stats.alloc_rx_page_failed++;
+        return false;
+	}
+	
+	/* map page for use */
+	dma = dma_map_page_attrs(rx_ring->dev, page, 0,
+	                        ¦ixgbe_rx_pg_size(rx_ring),
+	                        ¦DMA_FROM_DEVICE,
+	                        ¦IXGBE_RX_DMA_ATTR);
+	
+	/*
+	¦* if mapping failed free memory back to system since
+	¦* there isn't much point in holding memory we can't 
+	¦*/
+	if (dma_mapping_error(rx_ring->dev, dma)) {
+	        __free_pages(page, ixgbe_rx_pg_order(rx_ring)
+	
+	        rx_ring->rx_stats.alloc_rx_page_failed++;
+	        return false;
+	}
+	
+	bi->dma = dma;
+	bi->page = page;
+	bi->page_offset = ixgbe_rx_offset(rx_ring);
+	page_ref_add(page, USHRT_MAX - 1);
+	bi->pagecnt_bias = USHRT_MAX;
+	rx_ring->rx_stats.alloc_rx_page++;
+	
+	return true;
+}
+static inline struct page *dev_alloc_pages(unsigned int order)
+{
+        return __dev_alloc_pages(GFP_ATOMIC | __GFP_NOWARN, order);
+}
+static inline struct page *__dev_alloc_pages(gfp_t gfp_mask,
+                                        ¦    unsigned int order)
+{
+        /* This piece of code contains several assumptions.
+        ¦* 1.  This is for device Rx, therefor a cold page is preferred.
+        ¦* 2.  The expectation is the user wants a compound page.
+        ¦* 3.  If requesting a order 0 page it will not be compound
+        ¦*     due to the check to see if order has a value in prep_new_page
+        ¦* 4.  __GFP_MEMALLOC is ignored if __GFP_NOMEMALLOC is set due to
+        ¦*     code in gfp_to_alloc_flags that should be enforcing this.
+        ¦*/
+        gfp_mask |= __GFP_COMP | __GFP_MEMALLOC;
+
+        return alloc_pages_node(NUMA_NO_NODE, gfp_mask, order);
+}
+static inline struct page *alloc_pages_node(int nid, gfp_t gfp_mask,
+                                                unsigned int order)
+{
+        if (nid == NUMA_NO_NODE)
+                nid = numa_mem_id();
+
+        return __alloc_pages_node(nid, gfp_mask, order);
+}
+///////////////struct ixgbe_rx_buffer
+struct ixgbe_rx_buffer {
+        struct sk_buff *skb;
+        dma_addr_t dma;
+        union {
+                struct {
+                        struct page *page;
+                        __u32 page_offset;
+                        __u16 pagecnt_bias;
+                };
+                struct {
+                        void *addr;
+                        u64 handle;
+                };
+        };
+};
+
+//ixgbe_alloc_rx_buffers()->ixgbe_alloc_mapped_page()
+void ixgbe_alloc_rx_buffers(struct ixgbe_ring *rx_ring, u16 cleaned_count)
+{
+	...
+	u16 i = rx_ring->next_to_use;
+	...
+	bi = &rx_ring->rx_buffer_info[i];
+	i -= rx_ring->count;
+	do {
+        	if (!ixgbe_alloc_mapped_page(rx_ring, bi))
+        	        break;
+		...
+		bi++;
+		i++;
+		if (unlikely(!i)) {
+		        rx_desc = IXGBE_RX_DESC(rx_ring, 0);
+		        bi = rx_ring->rx_buffer_info;
+		        i -= rx_ring->count;
+		}
+		...
+		cleaned_count--;
+	} while(cleaned_count);
+	i += rx_ring->count;
+
+	if (rx_ring->next_to_use != i) {
+	        rx_ring->next_to_use = i;
+	
+	        /* update next to alloc since we have filled the ring */
+	        rx_ring->next_to_alloc = i;
+	
+	        /* Force memory writes to complete before letting h/w
+	        ¦* know there are new descriptors to fetch.  (Only
+	        ¦* applicable for weak-ordered memory model archs,
+	        ¦* such as IA-64).
+	        ¦*/
+	        wmb();
+	        writel(i, rx_ring->tail);
+	}
+}
+//struct ixgbe_ring
+struct ixgbe_ring {
+	...
+	union {
+        	struct ixgbe_tx_buffer *tx_buffer_info;
+        	struct ixgbe_rx_buffer *rx_buffer_info;
+	};
+	...
+};
+//init struct ixgbe_ring->ixgbe_rx_buffer
+int ixgbe_setup_rx_resources(struct ixgbe_adapter *adapter,
+                        ¦    struct ixgbe_ring *rx_ring)
+{
+	...
+	rx_ring->rx_buffer_info = vmalloc_node(size, ring_node);
+	...
+}
+```
+从上面的函数我们能看出来几点:
+* 分配的page 是 根据numa id 分配的
+* `page_ref_add(page, USHRT_MAX -1)` 中`USHRT_MAX`为65535,
+ 而`bi->pagecnt_bias`也赋值了该值
+* `bi->dma`赋值的为`page`的物理地址
+* `sizeof(struct ixgbe_rx_buffer)` = 32
+* 通过`ixgbe_alloc_rx_buffers()`可以看出，bi来自于`struct ixgbe_ring->rx_buffer_info[i]`,
+而`rx_buffer_info`数组是通过`vmalloc_node`获得
+
+我们再来看下上面`ffff7fee5b008000`内存区间里面的值，满足
+* 每组数据大小为32
+* 拿`0xffff000061fa9f00`地址处的数据来看
+```
+bi->skb = 0x0
+bi->dma = 0x0000037002010000
+bi->page = 0xffff7fee5b008040
+bi->page_offset= 42
+bi->pagecnt_bias = 0xffff
+```
+我们再来看下`0xffff7fee5b008040`对应的物理地址:
+```
+crash> kmem 0xffff7fee5b008040
+      PAGE         PHYSICAL      MAPPING       INDEX CNT FLAGS
+ffff7fee5b008040 37002010000                0        0 65535 3dfffff000000000
+```
+可以看到满足`struct ixgbe_rx_buffer`的成员解释。
+
+我们再来看下`0xffff000061fa9ef0`所在的地址空间:
+```
+crash> kmem -v |grep ffff000061fa
+ffffb777cac15400  ffffb777cac1c080  ffff000061f70000 - ffff000061fa0000   196608
+ffffb777cac10d00  ffffb777cac16780  ffff000061fa0000 - ffff000061fd0000   196608
+```
+可以看到vmalloc的空间并没有释放。
+
+我们来看下ixgbe 驱动相关数据结构的构成，这里我们不在
+展开
+```
+struct ixgbe_ring->struct ixgbe_tx_buffer *tx_buffer_info
+struct ixgbe_adapter->struct ixgbe_ring *rx_ring[MAX_RX_QUEUES]
+
+//struct net_device 和 struct ixgbe_adapter 的关系
+
++------------------------------------------------------+
+|struct net_device                                     |
+|                                                      |
+|                                                      |
++------------------------------------------------------+ 
+|struct ixgbe_adapter                                  |
+|                                                      |
+|struct ixgbe_ring *rx_ring[MAX_RX_QUEUES]             +----------+
++------------------------------------------------------+          |
+                                                                  |
+                                                                  |
+                                                                  |
+                                    +-----------------------------+
+                                    |
+                                    |
++-----------------------------------+------------+
+|struct ixgbe_ring                               |
+|                                                |
+|struct ixgbe_rx_buffer * rx_buffer_info         |
++------------------------------------------------+
+```
+
+在crash工具中有`net` 命令可以查看 Ethernet device 的 `struct net_device`
+结构的地址:
+```
+crash> net |grep enP
+ffffb907c2ef4000  enP1p1s0f0
+ffffb907c2eac000  enP1p1s0f1
+ffffb907c2ec0000  enP1p3s0f0
+ffffb907c2ee0000  enP1p3s0f1
+```
+> PS: enP 开头的为 `82599ES`网卡
+
+我们以 `enP1p3s0f0`来看:
+```
+crash> p (char *)(0xffffb907c2ef4000 + sizeof(struct net_device))
+$1 = 0xffffb907c2ef4ac0 "\001"
+struct ixgbe_adapter {
+	...
+	rx_ring = {0xffffb70408d65d40, 0xffffb70408d72d40, 0xffffb70408d69d40,
+	...
+	},
+	...
+}
+
+struct ixgbe_ring {
+  next = 0x0,
+  q_vector = 0xffffb70408d65800,
+  netdev = 0xffffb907c2ef4000,
+  xdp_prog = 0x0,
+  dev = 0xffffb757c16710b0,
+  desc = 0xffffb747c9200000,
+  {
+    tx_buffer_info = 0xffff000063fe0000,
+    rx_buffer_info = 0xffff000063fe0000
+  },
+  ...
+}
+
+```
