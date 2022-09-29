@@ -758,11 +758,16 @@ ffffb907c2ee0000  enP1p3s0f1
 ```
 crash> p (char *)(0xffffb907c2ef4000 + sizeof(struct net_device))
 $1 = 0xffffb907c2ef4ac0 "\001"
+crash> struct ixgbe_adapter 0xffffb907c2ef4ac0
 struct ixgbe_adapter {
 	...
 	rx_ring = {0xffffb70408d65d40, 0xffffb70408d72d40, 0xffffb70408d69d40,
 	...
 	},
+	...
+	alloc_rx_page = 154006,
+	alloc_rx_page_failed = 16079,
+	alloc_rx_buff_failed = 0,
 	...
 }
 
@@ -780,4 +785,30 @@ struct ixgbe_ring {
   ...
 }
 
+crash> struct ixgbe_adapter ffffb907c2eacac0
+struct ixgbe_adapter {
+  ...
+  alloc_rx_page = 9851,
+  alloc_rx_page_failed = 43,
+  alloc_rx_buff_failed = 0,
+  ...
+}
+
+crash> struct ixgbe_adapter ffffb907c2ec0ac0
+struct ixgbe_adapter {
+  ...
+  alloc_rx_page = 273005,
+  alloc_rx_page_failed = 396,
+  alloc_rx_buff_failed = 0,
+  ...
+}
+crash> struct ixgbe_adapter ffffb907c2ee0ac0
+struct ixgbe_adapter {
+  alloc_rx_page = 273106,
+  alloc_rx_page_failed = 425,
+  alloc_rx_buff_failed = 0,
+}
 ```
+alloc_rx_page sum : 709968
+占用内存约43G
+alloc_rx_page_failed: 16943
