@@ -1,0 +1,70 @@
+From 46543ba45fc4b64ca32655efdc8d9c599b4164e2 Mon Sep 17 00:00:00 2001
+From: Zachary Amsden <zamsden@redhat.com>
+Date: Thu, 19 Aug 2010 22:07:26 -1000
+Subject: [PATCH] KVM: x86: Robust(强力的，强健的) TSC compensation(补偿)
+
+Make the match of TSC find TSC writes that are close to each other
+instead of perfectly(完全) identical(一直); this allows the compensator(补偿器) to also
+work in migration / suspend(暂停) scenarios(场景).
+
+Signed-off-by: Zachary Amsden <zamsden@redhat.com>
+Signed-off-by: Marcelo Tosatti <mtosatti@redhat.com>
+---
+ arch/x86/kvm/x86.c | 14 ++++++++++----
+ 1 file changed, 10 insertions(+), 4 deletions(-)
+
+diff --git a/arch/x86/kvm/x86.c b/arch/x86/kvm/x86.c
+index 4bcb120cc76a..4ff0c271f125 100644
+--- a/arch/x86/kvm/x86.c
++++ b/arch/x86/kvm/x86.c
+@@ -928,21 +928,27 @@ void kvm_write_tsc(struct kvm_vcpu *vcpu, u64 data)
+ 	struct kvm *kvm = vcpu->kvm;
+ 	u64 offset, ns, elapsed;
+ 	unsigned long flags;
++	s64 sdiff;
+ 
+ 	spin_lock_irqsave(&kvm->arch.tsc_write_lock, flags);
+ 	offset = data - native_read_tsc();
+ 	ns = get_kernel_ns();
+ 	elapsed = ns - kvm->arch.last_tsc_nsec;
++	sdiff = data - kvm->arch.last_tsc_write;
++	if (sdiff < 0)
++		sdiff = -sdiff;
+ 
+ 	/*
+-	 * Special case: identical write to TSC within 5 seconds of
++	 * Special case: close write to TSC within 5 seconds of
+ 	 * another CPU is interpreted as an attempt to synchronize
+-	 * (the 5 seconds is to accomodate host load / swapping).
++	 * The 5 seconds is to accomodate(容纳?) host load / swapping as
++	 * well as any reset of TSC during the boot process.
+ 	 *
+ 	 * In that case, for a reliable TSC, we can match TSC offsets,
+-	 * or make a best guest using kernel_ns value.
++	 * or make a best guest using elapsed value.
+ 	 */
+-	if (data == kvm->arch.last_tsc_write && elapsed < 5ULL * NSEC_PER_SEC) {
++	if (sdiff < nsec_to_cycles(5ULL * NSEC_PER_SEC) &&
++	    elapsed < 5ULL * NSEC_PER_SEC) {
+ 		if (!check_tsc_unstable()) {
+ 			offset = kvm->arch.last_tsc_offset;
+ 			pr_debug("kvm: matched tsc offset for %llu\n", data);
+-- 
+2.37.3
+
+
+mail list
+https://www.mail-archive.com/kvm@vger.kernel.org/msg39981.html
+
+关于这个5s这个时间长短在mail list中有讨论:
+Q: 
+Isn't 5 way too long for this case?
+
+A: 
+It was actually too short for a while, and I didn't realize 
+why until I discovered on SVM, the APs were getting the TSC 
+reset after the startup IPI.
+
+In any case, the value is certainly(当然;无疑) up for debate(讨论). I chose a 
+large number because who knows how badly things can get off(下车;在这里是指事情发生)
+in the case of host overcommit(过载使用) / swapping.

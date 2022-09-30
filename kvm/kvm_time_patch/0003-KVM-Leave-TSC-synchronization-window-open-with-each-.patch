@@ -6,13 +6,22 @@ Subject: [PATCH 3/8] KVM: Leave TSC synchronization window open with each new
 
 Currently, when the TSC is written by the guest, the variable
 ns is updated to force the current write to appear to have taken
-place at the time of the first write in this sync phase.  This
-leaves a cliff at the end of the match window where updates will
-fall of the end.  There are two scenarios where this can be a
-problem in practe - first, on a system with a large number of
+place at the time of the first write in this sync phase(阶段;时期).  This
+leaves a cliff(峭壁;悬崖) at the end of the match window where updates will
+fall of the end.  There are two scenarios(情节;情景) where this can be a
+problem in practe(在实践中) - first, on a system with a large number of
 VCPUs, the sync period may last for an extended period of time.
 
-The second way this can happen is if the VM reboots very rapidly
+appear to do: 似乎做，可能做
+have taken place: 已经发生了
+
+现在，当guest write TSC, 变量ns 将被更新, 强制当前的写入的值可能是
+在 sync 阶段第一次写入的值。在 match window 的最后，留下了一个 悬崖（感觉
+意思就是很突然, 并且不能调整，没有弹性), 在这里 update 可能会发生
+在最后的这个位置. 在实践中, 有两种场景可能会出现问题, 首先，系统中
+有大量的VCPU， sync 阶段可能会持续很长一段时间。
+
+The second way this can happen is if the VM reboots very rapidly(快的)
 and we catch a VCPU TSC synchronization just around the edge.
 We may be unaware of the reboot, and thus the first VCPU might
 synchronize with an old set of the timer (at, say 0.97 seconds
@@ -20,24 +29,42 @@ ago, when first powered on).  The second VCPU can come in 0.04
 seconds later to try to synchronize, but it misses the window
 because it is just over the threshold.
 
-Instead, stop doing this artificial setback of the ns variable
+第二种, 可能VM reboot 发生的很快，我们在 边缘捕捉到了 VCPU TSC sync。
+我们可能不知道是在reboot, 因此 first VCPU 可能使用timer的旧的设置
+同步的(举例，当first power on 时，过了0.97s)。second VCPU 在0.04s
+之后尝试同步，但是它已经错过了window，因为它刚刚超过了阈值(0.04+0.97=1.01)
+
+Instead, stop doing this artificial(人造的;人工的) setback of the ns variable
 and just update it with every write of the TSC.
 
+相反的，停止这种人工的对 ns 变量的setback，并且在每次write TSC时更新它。
+
 It may be observed that doing so causes values computed by
-compute_guest_tsc to diverge slightly across CPUs - note that
+compute_guest_tsc to diverge(分叉) slightly(不严重) across CPUs - note that
 the last_tsc_ns and last_tsc_write variable are used here, and
-now they last_tsc_ns will be different for each VCPU, reflecting
+now they last_tsc_ns will be different for each VCPU, reflecting(反映; 映射)
 the actual time of the update.
 
+可以观察到，这样做会造成由 compute_guest_tsc计算的值在cpu之间有
+轻微的差别 - 注意这里使用到了 last_tsc_ns 和 last_tsc_write, 
+现在 last_tsc_ns 可能会在每个VCPU上不同，反映了更新的实际时间。
+
 However, compute_guest_tsc is used only for guests which already
-have TSC stability issues, and further, note that the previous
+have TSC stability(稳定的) issues, and further, note that the previous
 patch has caused last_tsc_write to be incremented by the difference
-in nanoseconds, converted back into guest cycles.  As such, only
+in nanoseconds, converted(转换;换回) back into guest cycles.  As such, only
 boundary rounding errors should be visible, which given the
-resolution in nanoseconds, is going to only be a few cycles and
+resolution(决定;决议) in nanoseconds, is going to only be a few cycles and
 only visible in cross-CPU consistency tests.  The problem can be
 fixed by adding a new set of variables to track the start offset
 and start write value for the current sync cycle.
+
+但是 compute_guest_tsc 只用于 有 TSC stability issues的guest，进一步说，
+之前的patch 会造成 last_tsc_write 以ns为单位的增量, 并转换回 guest cycles。
+因此，只有 boundary rounding error 可以被看到, 考虑到以ns为单位，将会有
+few cycles 并且 只能被 cross-CPU consistency test看到。该问题 可以通过
+增加一些变量来 track 当前sync cycle 的 start offset 和 start write 的值
+来解决。
 
 Signed-off-by: Zachary Amsden <zamsden@gmail.com>
 Signed-off-by: Marcelo Tosatti <mtosatti@redhat.com>
@@ -61,3 +88,16 @@ index 4390f42b371f..030d495e5c78 100644
 -- 
 2.37.3
 
+PS: 我觉得这里有问题，在
+e26101b116a6235bcd80b3a4c38c9fe91286cd79
+KVM: Track TSC synchronization in generations
+
+patch中，像commit message中说的那样，增加了一系列新的变量
+用于保存本轮 sync 中最开始的 的一些信息，例如: cur_tsc_write,
+而在该patch中, 将 compute_guest_tsc 中的， 
+kvm->arch.last_tsc_write ---> kvm->arch.cur_tsc_write
+
+在这之后，计算的 guest tsc 都是以本轮sync最早的 tsc write value
+但是，在这个patch之后，elapsed 计算，总是以ns - kvm->arch.last_tsc_nsec,
+而last_tsc_nsec 却一直在更新中，而不是本轮sync 中最早的 write nsec,
+这样就导致，tsc cannot catch up。（elapsed 值有点小)。
