@@ -1,0 +1,83 @@
+From f38e098ff3a315bb74abbb4a35cba11bbea8e2fa Mon Sep 17 00:00:00 2001
+From: Zachary Amsden <zamsden@redhat.com>
+Date: Thu, 19 Aug 2010 22:07:20 -1000
+Subject: [PATCH] KVM: x86: TSC reset compensation(补偿)
+
+Attempt to synchronize TSCs which are reset to the same value.  In the
+case of a reliable(可靠的) hardware TSC, we can just re-use the same offset, but
+on non-reliable hardware, we can get closer by adjusting the offset to
+match the elapsed(流逝的, 消逝的) time.
+
+Signed-off-by: Zachary Amsden <zamsden@redhat.com>
+Signed-off-by: Marcelo Tosatti <mtosatti@redhat.com>
+---
+ arch/x86/include/asm/kvm_host.h |  3 +++
+ arch/x86/kvm/x86.c              | 31 ++++++++++++++++++++++++++++++-
+ 2 files changed, 33 insertions(+), 1 deletion(-)
+
+diff --git a/arch/x86/include/asm/kvm_host.h b/arch/x86/include/asm/kvm_host.h
+index a215153f1ff6..57b4394491ec 100644
+--- a/arch/x86/include/asm/kvm_host.h
++++ b/arch/x86/include/asm/kvm_host.h
+@@ -396,6 +396,9 @@ struct kvm_arch {
+ 	unsigned long irq_sources_bitmap;
+ 	s64 kvmclock_offset;
+ 	spinlock_t tsc_write_lock;
++	u64 last_tsc_nsec;
++	u64 last_tsc_offset;
++	u64 last_tsc_write;
+ 
+ 	struct kvm_xen_hvm_config xen_hvm_config;
+ 
+diff --git a/arch/x86/kvm/x86.c b/arch/x86/kvm/x86.c
+index 886132b6ef14..e7da14c317e6 100644
+--- a/arch/x86/kvm/x86.c
++++ b/arch/x86/kvm/x86.c
+@@ -898,11 +898,40 @@ static DEFINE_PER_CPU(unsigned long, cpu_tsc_khz);
+ void kvm_write_tsc(struct kvm_vcpu *vcpu, u64 data)
+ {
+ 	struct kvm *kvm = vcpu->kvm;
+-	u64 offset;
++	u64 offset, ns, elapsed;
+ 	unsigned long flags;
++	struct timespec ts;
+ 
+ 	spin_lock_irqsave(&kvm->arch.tsc_write_lock, flags);
+ 	offset = data - native_read_tsc();
++	ktime_get_ts(&ts);
++	monotonic_to_bootbased(&ts);
++	ns = timespec_to_ns(&ts);
++	elapsed = ns - kvm->arch.last_tsc_nsec;
++
++	/*
++	 * Special case: identical(完全相同的; 一模一样的) write to TSC within 5 seconds of
++	 * another CPU is interpreted(解释) as an attempt to synchronize
++	 * (the 5 seconds is to accomodate(协调) host load / swapping).
++	 *
++	 * In that case, for a reliable TSC, we can match TSC offsets,
++	 * or make a best guest using kernel_ns value.
++	 */
++	if (data == kvm->arch.last_tsc_write && elapsed < 5ULL * NSEC_PER_SEC) {
++		if (!check_tsc_unstable()) {
++			offset = kvm->arch.last_tsc_offset;
++			pr_debug("kvm: matched tsc offset for %llu\n", data);
++		} else {
++			u64 tsc_delta = elapsed * __get_cpu_var(cpu_tsc_khz);
++			tsc_delta = tsc_delta / USEC_PER_SEC;
++			offset += tsc_delta;
++			pr_debug("kvm: adjusted tsc offset by %llu\n", tsc_delta);
++		}
++		ns = kvm->arch.last_tsc_nsec;
++	}
++	kvm->arch.last_tsc_nsec = ns;
++	kvm->arch.last_tsc_write = data;
++	kvm->arch.last_tsc_offset = offset;
+ 	kvm_x86_ops->write_tsc_offset(vcpu, offset);
+ 	spin_unlock_irqrestore(&kvm->arch.tsc_write_lock, flags);
+ 
+-- 
+2.37.3
+
+
+mail-list:
+https://www.mail-archive.com/kvm@vger.kernel.org/msg38360.html
