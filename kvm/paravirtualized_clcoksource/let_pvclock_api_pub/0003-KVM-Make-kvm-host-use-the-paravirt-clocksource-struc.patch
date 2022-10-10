@@ -42,8 +42,15 @@ index b08812d6b34c..63a77caa59f1 100644
 +	 * wall clock specified here.  guest system time equals host
 +	 * system time for us, thus we must fill in host boot time here.
 +	 */
-+	now = current_kernel_time();
-+	ktime_get_ts(&sys);
+MY NOTE:
+这里改计算方式的原因:在于pvclock_read_wallclock(), 计算方式变化了
+pvclock_read_wallclock() 中 需要将 wc 中返回的时间再加上
+pvclock_clocksource_read(), 而pvclock_clocksource_read()获取的时间，是
+基于ktime_get_ts() 也就是CLOCK_MONOTONIC获取的，所以这样得到的实际上还是,
+current_kernel_time() 也就是 REALTIME， 所以对于pvclock而言，实际上是前端
+驱动有变化，我觉得可能是为了适配xen做的改变。
++	now = current_kernel_time();		//MY NOTE: CLOCK_REALTIME
++	ktime_get_ts(&sys);					//MY NOTE: CLOCK_MONOTONIC
 +	boot = ns_to_timespec(timespec_to_ns(&now) - timespec_to_ns(&sys));
 +
 +	wc.sec = boot.tv_sec;

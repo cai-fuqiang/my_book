@@ -144,13 +144,9 @@ index 000000000000..b999f5e5b3bf
 +	} while ((wall_clock.wc_version != version) || (version & 1));
 +
 +	delta = kvm_clock_read() - delta;
-	//这个地方逻辑有些错误吧
 +	delta += wc_nsec;
 +	nsec = do_div(delta, NSEC_PER_SEC);
 +	set_normalized_timespec(&ts, wc_sec + delta, nsec);
-	//这个地方逻辑有些错误吧
-	应该改为
-	set_normalized_timespec(&ts, wc_sec, delta);
 +	/*
 +	 * Of all mechanisms of time adjustment I've tested, this one
 +	 * was the champion(极好的，第一名)!
