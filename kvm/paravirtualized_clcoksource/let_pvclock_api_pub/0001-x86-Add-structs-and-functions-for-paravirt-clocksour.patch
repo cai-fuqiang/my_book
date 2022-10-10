@@ -1,0 +1,275 @@
+From 7af192c954017499ec163bc9dbaaee2e593d7ef2 Mon Sep 17 00:00:00 2001
+From: Gerd Hoffmann <kraxel@redhat.com>
+Date: Tue, 3 Jun 2008 16:17:29 +0200
+Subject: [PATCH 1/5] x86: Add structs and functions for paravirt clocksource
+
+This patch adds structs for the paravirt clocksource ABI
+used by both xen and kvm (pvclock-abi.h).
+
+It also adds some helper functions to read system time and
+wall clock time from a paravirtual clocksource (pvclock.[ch]).
+They are based on the xen code.  They are enabled using
+CONFIG_PARAVIRT_CLOCK.
+
+Subsequent(随后的,接下来的) patches of this series(系列) will put the code in use.
+
+MY NOTE: put ... in use  将...投入使用
+
+Signed-off-by: Gerd Hoffmann <kraxel@redhat.com>
+Acked-by: Jeremy Fitzhardinge <jeremy.fitzhardinge@citrix.com>
+Signed-off-by: Avi Kivity <avi@qumranet.com>
+---
+ arch/x86/Kconfig              |   4 +
+ arch/x86/kernel/Makefile      |   1 +
+ arch/x86/kernel/pvclock.c     | 141 ++++++++++++++++++++++++++++++++++
+ include/asm-x86/pvclock-abi.h |  42 ++++++++++
+ include/asm-x86/pvclock.h     |  13 ++++
+ 5 files changed, 201 insertions(+)
+ create mode 100644 arch/x86/kernel/pvclock.c
+ create mode 100644 include/asm-x86/pvclock-abi.h
+ create mode 100644 include/asm-x86/pvclock.h
+
+diff --git a/arch/x86/Kconfig b/arch/x86/Kconfig
+index 52e18e6d2ba0..f94bca6ff47f 100644
+--- a/arch/x86/Kconfig
++++ b/arch/x86/Kconfig
+@@ -410,6 +410,10 @@ config PARAVIRT
+ 	  over full virtualization.  However, when run without a hypervisor
+ 	  the kernel is theoretically slower and slightly larger.
+ 
++config PARAVIRT_CLOCK
++	bool
++	default n
++
+ endif
+ 
+ config MEMTEST_BOOTPARAM
+diff --git a/arch/x86/kernel/Makefile b/arch/x86/kernel/Makefile
+index 5e618c3b4720..77807d4769c9 100644
+--- a/arch/x86/kernel/Makefile
++++ b/arch/x86/kernel/Makefile
+@@ -82,6 +82,7 @@ obj-$(CONFIG_VMI)		+= vmi_32.o vmiclock_32.o
+ obj-$(CONFIG_KVM_GUEST)		+= kvm.o
+ obj-$(CONFIG_KVM_CLOCK)		+= kvmclock.o
+ obj-$(CONFIG_PARAVIRT)		+= paravirt.o paravirt_patch_$(BITS).o
++obj-$(CONFIG_PARAVIRT_CLOCK)	+= pvclock.o
+ 
+ obj-$(CONFIG_PCSPKR_PLATFORM)	+= pcspeaker.o
+ 
+diff --git a/arch/x86/kernel/pvclock.c b/arch/x86/kernel/pvclock.c
+new file mode 100644
+index 000000000000..05fbe9a0325a
+--- /dev/null
++++ b/arch/x86/kernel/pvclock.c
+@@ -0,0 +1,141 @@
++/*  paravirtual clock -- common code used by kvm/xen
++
++    This program is free software; you can redistribute it and/or modify
++    it under the terms of the GNU General Public License as published by
++    the Free Software Foundation; either version 2 of the License, or
++    (at your option) any later version.
++
++    This program is distributed in the hope that it will be useful,
++    but WITHOUT ANY WARRANTY; without even the implied warranty of
++    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++    GNU General Public License for more details.
++
++    You should have received a copy of the GNU General Public License
++    along with this program; if not, write to the Free Software
++    Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
++*/
++
++#include <linux/kernel.h>
++#include <linux/percpu.h>
++#include <asm/pvclock.h>
++
++/*
++ * These are perodically updated
++ *    xen: magic shared_info page
++ *    kvm: gpa registered via msr
++ * and then copied here.
++ */
++struct pvclock_shadow_time {
++	u64 tsc_timestamp;     /* TSC at last update of time vals.  */
++	u64 system_timestamp;  /* Time, in nanosecs, since boot.    */
++	u32 tsc_to_nsec_mul;
++	int tsc_shift;
++	u32 version;
++};
++
++/*
++ * Scale a 64-bit delta by scaling and multiplying by a 32-bit fraction,
++ * yielding a 64-bit result.
++ */
++static inline u64 scale_delta(u64 delta, u32 mul_frac, int shift)
++{
++	u64 product;
++#ifdef __i386__
++	u32 tmp1, tmp2;
++#endif
++
++	if (shift < 0)
++		delta >>= -shift;
++	else
++		delta <<= shift;
++
++#ifdef __i386__
++	__asm__ (
++		"mul  %5       ; "
++		"mov  %4,%%eax ; "
++		"mov  %%edx,%4 ; "
++		"mul  %5       ; "
++		"xor  %5,%5    ; "
++		"add  %4,%%eax ; "
++		"adc  %5,%%edx ; "
++		: "=A" (product), "=r" (tmp1), "=r" (tmp2)
++		: "a" ((u32)delta), "1" ((u32)(delta >> 32)), "2" (mul_frac) );
++#elif __x86_64__
++	__asm__ (
++		"mul %%rdx ; shrd $32,%%rdx,%%rax"
++		: "=a" (product) : "0" (delta), "d" ((u64)mul_frac) );
++#else
++#error implement me!
++#endif
++
++	return product;
++}
++
++static u64 pvclock_get_nsec_offset(struct pvclock_shadow_time *shadow)
++{
++	u64 delta = native_read_tsc() - shadow->tsc_timestamp;
++	return scale_delta(delta, shadow->tsc_to_nsec_mul, shadow->tsc_shift);
++}
++
++/*
++ * Reads a consistent set of time-base values from hypervisor,
++ * into a shadow data area.
++ */
++static unsigned pvclock_get_time_values(struct pvclock_shadow_time *dst,
++					struct pvclock_vcpu_time_info *src)
++{
++	do {
++		dst->version = src->version;
++		rmb();		/* fetch version before data */
++		dst->tsc_timestamp     = src->tsc_timestamp;
++		dst->system_timestamp  = src->system_time;
++		dst->tsc_to_nsec_mul   = src->tsc_to_system_mul;
++		dst->tsc_shift         = src->tsc_shift;
++		rmb();		/* test version after fetching data */
++	} while ((src->version & 1) || (dst->version != src->version));
++
++	return dst->version;
++}
++
++cycle_t pvclock_clocksource_read(struct pvclock_vcpu_time_info *src)
++{
++	struct pvclock_shadow_time shadow;
++	unsigned version;
++	cycle_t ret, offset;
++
++	do {
++		version = pvclock_get_time_values(&shadow, src);
++		barrier();
++		offset = pvclock_get_nsec_offset(&shadow);
++		ret = shadow.system_timestamp + offset;
++		barrier();
++	} while (version != src->version);
++
++	return ret;
++}
++
++void pvclock_read_wallclock(struct pvclock_wall_clock *wall_clock,
++			    struct pvclock_vcpu_time_info *vcpu_time,
++			    struct timespec *ts)
++{
++	u32 version;
++	u64 delta;
++	struct timespec now;
++
++	/* get wallclock at system boot */
++	do {
++		version = wall_clock->version;
++		rmb();		/* fetch version before time */
++		now.tv_sec  = wall_clock->sec;
++		now.tv_nsec = wall_clock->nsec;
++		rmb();		/* fetch time before checking version */
++	} while ((wall_clock->version & 1) || (version != wall_clock->version));
++
++	delta = pvclock_clocksource_read(vcpu_time);	/* time since system boot */
++	delta += now.tv_sec * (u64)NSEC_PER_SEC + now.tv_nsec;
++
++	now.tv_nsec = do_div(delta, NSEC_PER_SEC);
++	now.tv_sec = delta;
++
++	set_normalized_timespec(ts, now.tv_sec, now.tv_nsec);
++}
+diff --git a/include/asm-x86/pvclock-abi.h b/include/asm-x86/pvclock-abi.h
+new file mode 100644
+index 000000000000..6857f840b243
+--- /dev/null
++++ b/include/asm-x86/pvclock-abi.h
+@@ -0,0 +1,42 @@
++#ifndef _ASM_X86_PVCLOCK_ABI_H_
++#define _ASM_X86_PVCLOCK_ABI_H_
++#ifndef __ASSEMBLY__
++
++/*
++ * These structs MUST NOT be changed.
++ * They are the ABI between hypervisor and guest OS.
++ * Both Xen and KVM are using this.
++ *
++ * pvclock_vcpu_time_info holds the system time and the tsc timestamp
++ * of the last update. So the guest can use the tsc delta to get a
++ * more precise(精确的) system time.  There is one per virtual cpu.
++ *
++ * pvclock_wall_clock references the point in time when the system
++ * time was zero (usually boot time), thus the guest calculates the
++ * current wall clock by adding the system time.
++ *
++ * Protocol for the "version" fields is: hypervisor raises it (making
++ * it uneven(不平坦)) before it starts updating the fields and raises it again
++ * (making it even) when it is done.  Thus the guest can make sure the
++ * time values it got are consistent by checking the version before
++ * and after reading them.
++ */
++
++struct pvclock_vcpu_time_info {
++	u32   version;
++	u32   pad0;
++	u64   tsc_timestamp;
++	u64   system_time;
++	u32   tsc_to_system_mul;
++	s8    tsc_shift;
++	u8    pad[3];
++} __attribute__((__packed__)); /* 32 bytes */
++
++struct pvclock_wall_clock {
++	u32   version;
++	u32   sec;
++	u32   nsec;
++} __attribute__((__packed__));
++
++#endif /* __ASSEMBLY__ */
++#endif /* _ASM_X86_PVCLOCK_ABI_H_ */
+diff --git a/include/asm-x86/pvclock.h b/include/asm-x86/pvclock.h
+new file mode 100644
+index 000000000000..85b1bba8e0a3
+--- /dev/null
++++ b/include/asm-x86/pvclock.h
+@@ -0,0 +1,13 @@
++#ifndef _ASM_X86_PVCLOCK_H_
++#define _ASM_X86_PVCLOCK_H_
++
++#include <linux/clocksource.h>
++#include <asm/pvclock-abi.h>
++
++/* some helper functions for xen and kvm pv clock sources */
++cycle_t pvclock_clocksource_read(struct pvclock_vcpu_time_info *src);
++void pvclock_read_wallclock(struct pvclock_wall_clock *wall,
++			    struct pvclock_vcpu_time_info *vcpu,
++			    struct timespec *ts);
++
++#endif /* _ASM_X86_PVCLOCK_H_ */
+-- 
+2.25.1
+

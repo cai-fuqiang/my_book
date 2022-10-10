@@ -27,17 +27,17 @@ index 0000000..21008bb
 +basic mode of operation, usually done by older guests, assumes a fixed length
 +between timer interrupts. It then counts the number of interrupts and
 +calculates elapsed(消逝) time. This method fails easily in virtual machines, since
-+we can't guarantee that the virtual interrupt will be delivered in time.
++we can't guarantee that the virtual interrupt will be delivered [in time](及时).
 +
 +Another possibility is to emulate modern devices like HPET, or any other we
-+see fit. A modern guest which implements something like the clocksource
-+infrastructure, can then ask this virtual device about current time when it
-+needs to. The problem with this approach, is that it bumps the guest out
++[see fit](认为合适，看起来合适). A modern guest which implements something like the clocksource
++infrastructure(基础设施), can then ask this virtual device about current time when it
++needs to. The problem with this approach, is that it bumps(挤出,拽出) the guest out
 +of guest mode operation, and in some cases, even to userspace very frequently.
 +
 +In this context, the best approach is to provide the guest with a
 +virtualization-aware (paravirtual) clock device. It the asks the hypervisor
-+about current time, guaranteeing both stable and accurate timekeeping.
++about current time, guaranteeing both stable and accurate(精准的) timekeeping.
 +
 +2. kvmclock basics 
 +===========================
@@ -65,9 +65,9 @@ index 0000000..21008bb
 + * MSR_KVM_WALL_CLOCK, value 0x4b564d00 and
 + * MSR_KVM_SYSTEM_TIME, value 0x4b564d01.
 +
-+The first one is only used in rare situations, like boot-time and a
-+suspend-resume cycle. Data is disposable, and after used, the guest
-+may use it for something else. This is hardly a hot path for anything.
++The first one is only used in rare(少见的) situations, like boot-time and a
++suspend-resume cycle. Data is disposable(一次性的), and after used, the guest
++may use it for something else. This is hardly a hot path for anything.(很难在其他的场景上有使用)
 +The Hypervisor fills in the address provided through this MSR with the
 +following structure:
 +
@@ -78,17 +78,21 @@ index 0000000..21008bb
 +} __attribute__((__packed__));
 +
 +Guest should only trust data to be valid when version haven't changed before
-+and after reads of sec and nsec. Besides not changing, it has to be an even
-+number. Hypervisor may write an odd number to version field to indicate that
++and after reads of sec and nsec. Besides not changing, it has to be an even(偶)
++number. Hypervisor may write an odd(奇) number to version field to indicate that
 +an update is in progress.
 +
-+MSR_KVM_SYSTEM_TIME, on the other hand, has persistent data, and is
++MSR_KVM_SYSTEM_TIME, on the other hand, has persistent(持久的, 反复出现的) data, and is
 +constantly updated by the hypervisor with time information. The data
 +written in this MSR contains two pieces of information: the address in which
-+the guests expects time data to be present 4-byte aligned or'ed with an
++the guests expects time data to be present 4-byte aligned or'ed(或运算) with an
 +enabled bit. If one wants to shutdown kvmclock, it just needs to write
 +anything that has 0 as its last bit.
 +
+
+or'ed:
+https://zhidao.baidu.com/question/462911560.html
+
 +Time information presented by the hypervisor follows the structure:
 +
 +struct pvclock_vcpu_time_info {
@@ -101,22 +105,22 @@ index 0000000..21008bb
 +        u8    pad[3];
 +} __attribute__((__packed__)); 
 +
-+The version field plays the same role as with the one in struct
++The version field plays the same role(角色) as with the one in struct
 +pvclock_wall_clock. The other fields, are:
 +
 + a. tsc_timestamp: the guest-visible tsc (result of rdtsc + tsc_offset) of
 +    this cpu at the moment we recorded system_time. Note that some time is
-+    inevitably spent between system_time and tsc_timestamp measurements.
-+    Guests can subtract this quantity from the current value of tsc to obtain
++    inevitably(不可避免) spent(消耗) between system_time and tsc_timestamp measurements(测量).
++    Guests can subtract(减) this quantity(值;数量) from the current value of tsc to obtain
 +    a delta to be added to system_time
 +
-+ b. system_time: this is the most recent host-time we could be provided with.
++ b. system_time: this is the most recent(最近的) host-time we could be provided with.
 +    host gets it through ktime_get_ts, using whichever clocksource is
 +    registered at the moment
 +
 + c. tsc_to_system_mul: this is the number that tsc delta has to be multiplied
-+    by in order to obtain time in nanoseconds. Hypervisor is free to change
-+    this value in face of events like cpu frequency change, pcpu migration,
++    by in order to obtain time in nanoseconds. Hypervisor [is free to](自由去做) change
++    this value [in face of](面对;迎着) events like cpu frequency change, pcpu migration,
 +    etc.
 + 
 + d. tsc_shift: guests must shift 
@@ -130,25 +134,25 @@ index 0000000..21008bb
 +
 +Guests running on top of older hypervisors may have to use a different set of
 +MSRs. This is because originally, kvmclock MSRs were exported within a
-+reserved range by accident. Guests should check cpuid leaf 0x40000001 for the
++reserved range [by accident](偶然，意外地). Guests should check cpuid leaf 0x40000001 for the
 +presence of kvmclock. If bit 3 is disabled, but bit 0 is enabled, guests can
 +have access to kvmclock functionality through
 +
 + * MSR_KVM_WALL_CLOCK_OLD, value 0x11 and
 + * MSR_KVM_SYSTEM_TIME_OLD, value 0x12.
 +
-+Note, however, that this is deprecated.
++Note, however, that this is deprecated(弃用).
 +
 +3. Migration
 +============
 +
-+Two ioctls are provided to aid the task of migration: 
++Two ioctls are provided to aid(帮助;协助) the task of migration: 
 +
 + * KVM_GET_CLOCK and
 + * KVM_SET_CLOCK
 +
-+Their aim is to control an offset that can be summed to system_time, in order
-+to guarantee monotonicity on the time over guest migration. Source host
++Their aim(目标) is to control an offset that can be summed to system_time, in order
++to guarantee monotonicity(单调的) on the time over guest migration. Source host
 +executes KVM_GET_CLOCK, obtaining the last valid timestamp in this host, while
 +destination sets it with KVM_SET_CLOCK. It's the destination responsibility to
 +never return time that is less than that.

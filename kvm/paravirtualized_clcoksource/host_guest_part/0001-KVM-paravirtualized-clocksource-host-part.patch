@@ -58,6 +58,9 @@ index 0c910c774a9b..256c0fc92b67 100644
 +	if (!wall_clock)
 +		return;
 +
+	//MY_NOTE
+	//在update 之前++, 在update之后++，这样
+	//保证了奇数时代表它在update
 +	version++;
 +
 +	down_read(&kvm->slots_lock);
@@ -86,6 +89,9 @@ index 0c910c774a9b..256c0fc92b67 100644
 +		return;
 +
 +	/* Keep irq disabled to prevent changes to the clock */
+	//MY NOTE: 这里关中断的目的是防止哪个步骤更新clock呢?
+	//ktime_get_ts()的值，是会和时钟中断相关么?
+	//???
 +	local_irq_save(flags);
 +	kvm_get_msr(v, MSR_IA32_TIME_STAMP_COUNTER,
 +			  &vcpu->hv_clock.tsc_timestamp);
@@ -98,7 +104,7 @@ index 0c910c774a9b..256c0fc92b67 100644
 +				     (NSEC_PER_SEC * (u64)ts.tv_sec);
 +	/*
 +	 * The interface expects us to write an even number signaling that the
-+	 * update is finished. Since the guest won't see the intermediate
++	 * update is finished. Since the guest won't see the intermediate(中间的)
 +	 * state, we just write "2" at the end
 +	 */
 +	vcpu->hv_clock.version = 2;
@@ -133,10 +139,12 @@ index 0c910c774a9b..256c0fc92b67 100644
 +		vcpu->arch.time = data;
 +
 +		/* we verify if the enable bit is set... */
+		//MY_NOTE: enable bit, 如果设置为0, 表示disable
 +		if (!(data & 1))
 +			break;
 +
 +		/* ...but clean it before doing the actual write */
+		//页内偏移，该该地址为4-byte aligned, 而不是以页对齐
 +		vcpu->arch.time_offset = data & ~(PAGE_MASK | 1);
 +
 +		vcpu->arch.hv_clock.tsc_to_system_mul =
@@ -270,3 +278,43 @@ index c1ec04fd000d..94540b3c6872 100644
 -- 
 2.25.1
 
+
+
+
+
+
+===========================
+NOTE CODE 
+NOTE CODE clocksource_khz2mult
+NOTE CODE
+===========================
+static inline u32 clocksource_khz2mult(u32 khz, u32 shift_constant)
+{
+        /*  khz = cyc/(Million ns)
+        ¦*  mult/2^shift  = ns/cyc
+        ¦*  mult = ns/cyc * 2^shift
+        ¦*  mult = 1Million/khz * 2^shift
+        ¦*  mult = 1000000 * 2^shift / khz
+        ¦*  mult = (1000000<<shift) / khz
+        ¦*/
+	/* MY NOTE
+	 * 	ns = cyc * mult >> shift
+	 * mult/2^shift = ns/cyc
+	 * 	mult/2^shift = (1/(cyc/ns)) = (1/(khz/1Million)) = 
+	 *				1Million/khz
+         * mult = 1Million/khz * 2^shift
+         * mult = 1000000 * 2^shift / khz
+         * mult = (1000000<<shift) / khz
+	 */
+        u64 tmp = ((u64)1000000) << shift_constant;
+
+        tmp += khz/2; /* round for do_div */
+	/*
+	 * MY NOTE:
+	 * (tmp + khz /2) / khz = tmp/khz + 0.5
+	 * 所以，这个是四舍五入?
+	 */
+        do_div(tmp, khz);
+
+        return (u32)tmp;
+}

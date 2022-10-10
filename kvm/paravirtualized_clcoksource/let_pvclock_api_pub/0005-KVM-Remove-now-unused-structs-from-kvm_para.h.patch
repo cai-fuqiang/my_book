@@ -1,0 +1,47 @@
+From 6b1ed9086592fd4b066daae222751bb6757ca5eb Mon Sep 17 00:00:00 2001
+From: Gerd Hoffmann <kraxel@redhat.com>
+Date: Tue, 3 Jun 2008 16:17:33 +0200
+Subject: [PATCH 5/5] KVM: Remove now unused structs from kvm_para.h
+
+The kvm_* structs are obsoleted by the pvclock_* ones.
+Now all users have been switched over and the old structs
+can be dropped.
+
+Signed-off-by: Gerd Hoffmann <kraxel@redhat.com>
+Signed-off-by: Avi Kivity <avi@qumranet.com>
+---
+ include/asm-x86/kvm_para.h | 18 ------------------
+ 1 file changed, 18 deletions(-)
+
+diff --git a/include/asm-x86/kvm_para.h b/include/asm-x86/kvm_para.h
+index 509845942070..bfd9900742bf 100644
+--- a/include/asm-x86/kvm_para.h
++++ b/include/asm-x86/kvm_para.h
+@@ -48,24 +48,6 @@ struct kvm_mmu_op_release_pt {
+ #ifdef __KERNEL__
+ #include <asm/processor.h>
+ 
+-/* xen binary-compatible interface. See xen headers for details */
+-struct kvm_vcpu_time_info {
+-	uint32_t version;
+-	uint32_t pad0;
+-	uint64_t tsc_timestamp;
+-	uint64_t system_time;
+-	uint32_t tsc_to_system_mul;
+-	int8_t   tsc_shift;
+-	int8_t	 pad[3];
+-} __attribute__((__packed__)); /* 32 bytes */
+-
+-struct kvm_wall_clock {
+-	uint32_t wc_version;
+-	uint32_t wc_sec;
+-	uint32_t wc_nsec;
+-} __attribute__((__packed__));
+-
+-
+ extern void kvmclock_init(void);
+ 
+ 
+-- 
+2.25.1
+
