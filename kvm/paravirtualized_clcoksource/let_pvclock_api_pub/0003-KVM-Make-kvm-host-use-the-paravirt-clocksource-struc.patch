@@ -83,7 +83,7 @@ current_kernel_time() 也就是 REALTIME， 所以对于pvclock而言，实际�
 +	uint32_t tps32;
 +
 +	tps64 = tsc_khz * 1000LL;
-+	while (tps64 > nsecs*2) {
++	while (tps64 > nsecs*2) { 	//tps64 < nsec
 +		tps64 >>= 1;
 +		shift--;
 +	}
