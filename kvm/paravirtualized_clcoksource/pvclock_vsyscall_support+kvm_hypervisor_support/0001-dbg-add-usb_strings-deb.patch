@@ -1,0 +1,150 @@
+From 67de65ddb52cc2593c39e53820103eedbda3ec5b Mon Sep 17 00:00:00 2001
+From: "fuqiang.wang" <fuqiang.wang@easystack.cn>
+Date: Thu, 23 Jun 2022 07:38:32 +0800
+Subject: [PATCH] dbg: add usb_strings deb
+
+1. add usb_strings function  deb print msg
+2. modify tbufsize  256-->512
+3. add kmalloc kfree debug
+---
+ drivers/usb/core/message.c | 21 +++++++++++++++++--
+ mm/slub.c                  | 43 ++++++++++++++++++++++++++++++++++++--
+ 2 files changed, 60 insertions(+), 4 deletions(-)
+
+diff --git a/drivers/usb/core/message.c b/drivers/usb/core/message.c
+index 228672f2c..6141b8f74 100644
+--- a/drivers/usb/core/message.c
++++ b/drivers/usb/core/message.c
+@@ -817,13 +817,17 @@ int usb_string(struct usb_device *dev, int index, char *buf, size_t size)
+ {
+ 	unsigned char *tbuf;
+ 	int err;
++	int tbuf_len;
++	int loop_print_count = 0;
++	int i = 0;
+ 
+ 	if (dev->state == USB_STATE_SUSPENDED)
+ 		return -EHOSTUNREACH;
+ 	if (size <= 0 || !buf || !index)
+ 		return -EINVAL;
+ 	buf[0] = 0;
+-	tbuf = kmalloc(256, GFP_NOIO);
++	//tbuf = kmalloc(256, GFP_NOIO);
++	tbuf = kmalloc(512, GFP_NOIO);
+ 	if (!tbuf)
+ 		return -ENOMEM;
+ 
+@@ -834,7 +838,7 @@ int usb_string(struct usb_device *dev, int index, char *buf, size_t size)
+ 	err = usb_string_sub(dev, dev->string_langid, index, tbuf);
+ 	if (err < 0)
+ 		goto errout;
+-
++	tbuf_len = err;
+ 	size--;		/* leave room for trailing NULL char in output buffer */
+ 	err = utf16s_to_utf8s((wchar_t *) &tbuf[2], (err - 2) / 2,
+ 			UTF16_LITTLE_ENDIAN, buf, size);
+@@ -845,6 +849,19 @@ int usb_string(struct usb_device *dev, int index, char *buf, size_t size)
+ 			"wrong descriptor type %02x for string %d (\"%s\")\n",
+ 			tbuf[1], index, buf);
+ 
++	dev_info(&dev->dev, "tbuf_ptr:(%lx) tbuf_index:(%d) "
++			"tbuf_len(%d)\n",
++			(unsigned long )tbuf,
++			index, tbuf_len);
++
++	loop_print_count = tbuf_len / 8;
++	if (loop_print_count > 4) 
++		loop_print_count = 4;
++
++	for (i = 0; i < loop_print_count; i++) {
++		dev_info(&dev->dev, "tbuf_data[%d](%lx)\n",
++			i, *((unsigned long *)(tbuf + 8 * i)) );
++	}
+  errout:
+ 	kfree(tbuf);
+ 	return err;
+diff --git a/mm/slub.c b/mm/slub.c
+index 948f1f495..809366553 100644
+--- a/mm/slub.c
++++ b/mm/slub.c
+@@ -2693,9 +2693,7 @@ redo:
+ 
+ 	if (unlikely(gfpflags & __GFP_ZERO) && object)
+ 		memset(object, 0, s->object_size);
+-
+ 	slab_post_alloc_hook(s, gfpflags, 1, &object);
+-
+ 	return object;
+ }
+ 
+@@ -3722,6 +3720,42 @@ static int __init setup_slub_min_objects(char *str)
+ 
+ __setup("slub_min_objects=", setup_slub_min_objects);
+ 
++#ifdef CONFIG_ARM64
++unsigned long chk_usb_value[] = {
++	0x790065004b0332,
++	0
++};
++#else
++unsigned long chk_usb_value[] = {
++	0x72006900560338,
++	0x6200750048031e,
++	0x42005300550310,
++	0
++};
++#endif
++
++static __always_inline void kmem_test_print(char *pre_str, void *object) {
++	int i;
++	unsigned long object_value;
++
++	object_value = *((unsigned long*) object);
++	for (i = 0; i < sizeof(chk_usb_value); i++) {
++		if (chk_usb_value[i] == 0)
++			break;
++
++		if (chk_usb_value[i] == object_value) {
++			//printk("[KMEM_DEBUG]:%s====[BEG]\n", pre_str);
++			//printk("object_value = %lx\n", object_value);
++			//dump_stack();
++			printk("hello, test\n");
++		}
++	}
++}
++
++static __always_inline void kmalloc_test_debug(void *object) {
++	kmem_test_print("kmalloc_test", object);
++}
++
+ void *__kmalloc(size_t size, gfp_t flags)
+ {
+ 	struct kmem_cache *s;
+@@ -3738,6 +3772,7 @@ void *__kmalloc(size_t size, gfp_t flags)
+ 	ret = slab_alloc(s, flags, _RET_IP_);
+ 
+ 	trace_kmalloc(_RET_IP_, ret, size, s->size, flags);
++	kmalloc_test_debug(ret);
+ 
+ 	kasan_kmalloc(s, ret, size, flags);
+ 
+@@ -3877,12 +3912,16 @@ size_t ksize(const void *object)
+ }
+ EXPORT_SYMBOL(ksize);
+ 
++static __always_inline void kfree_test_debug(void *object) {
++	kmem_test_print("kfree_test", object);
++}
+ void kfree(const void *x)
+ {
+ 	struct page *page;
+ 	void *object = (void *)x;
+ 
+ 	trace_kfree(_RET_IP_, x);
++	kfree_test_debug(x);
+ 
+ 	if (unlikely(ZERO_OR_NULL_PTR(x)))
+ 		return;
+-- 
+2.36.1
+

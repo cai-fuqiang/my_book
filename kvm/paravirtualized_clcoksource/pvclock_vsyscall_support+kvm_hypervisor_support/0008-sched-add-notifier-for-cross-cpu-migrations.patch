@@ -1,0 +1,71 @@
+From 582b336ec2c0f0076f5650a029fcc9abd4a906f7 Mon Sep 17 00:00:00 2001
+From: Marcelo Tosatti <mtosatti@redhat.com>
+Date: Tue, 27 Nov 2012 23:28:54 -0200
+Subject: [PATCH 08/18] sched: add notifier for cross-cpu migrations
+
+Originally from Jeremy Fitzhardinge.
+
+Acked-by: Ingo Molnar <mingo@redhat.com>
+Signed-off-by: Marcelo Tosatti <mtosatti@redhat.com>
+---
+ include/linux/sched.h |  8 ++++++++
+ kernel/sched/core.c   | 15 +++++++++++++++
+ 2 files changed, 23 insertions(+)
+
+diff --git a/include/linux/sched.h b/include/linux/sched.h
+index 0dd42a02df2e..6eb2ed819e36 100644
+--- a/include/linux/sched.h
++++ b/include/linux/sched.h
+@@ -107,6 +107,14 @@ extern unsigned long this_cpu_load(void);
+ extern void calc_global_load(unsigned long ticks);
+ extern void update_cpu_load_nohz(void);
+ 
++/* Notifier for when a task gets migrated to a new CPU */
++struct task_migration_notifier {
++	struct task_struct *task;
++	int from_cpu;
++	int to_cpu;
++};
++extern void register_task_migration_notifier(struct notifier_block *n);
++
+ extern unsigned long get_parent_ip(unsigned long addr);
+ 
+ struct seq_file;
+diff --git a/kernel/sched/core.c b/kernel/sched/core.c
+index 2d8927fda712..c86b8b6e70f4 100644
+--- a/kernel/sched/core.c
++++ b/kernel/sched/core.c
+@@ -922,6 +922,13 @@ void check_preempt_curr(struct rq *rq, struct task_struct *p, int flags)
+ 		rq->skip_clock_update = 1;
+ }
+ 
++static ATOMIC_NOTIFIER_HEAD(task_migration_notifier);
++
++void register_task_migration_notifier(struct notifier_block *n)
++{
++	atomic_notifier_chain_register(&task_migration_notifier, n);
++}
++
+ #ifdef CONFIG_SMP
+ void set_task_cpu(struct task_struct *p, unsigned int new_cpu)
+ {
+@@ -952,8 +959,16 @@ void set_task_cpu(struct task_struct *p, unsigned int new_cpu)
+ 	trace_sched_migrate_task(p, new_cpu);
+ 
+ 	if (task_cpu(p) != new_cpu) {
++		struct task_migration_notifier tmn;
++
+ 		p->se.nr_migrations++;
+ 		perf_sw_event(PERF_COUNT_SW_CPU_MIGRATIONS, 1, NULL, 0);
++
++		tmn.task = p;
++		tmn.from_cpu = task_cpu(p);
++		tmn.to_cpu = new_cpu;
++
++		atomic_notifier_call_chain(&task_migration_notifier, 0, &tmn);
+ 	}
+ 
+ 	__set_task_cpu(p, new_cpu);
+-- 
+2.37.3
+

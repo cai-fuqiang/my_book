@@ -1,0 +1,51 @@
+From 2697902be89d7f38e9736dfe946cd0e5d4f47b80 Mon Sep 17 00:00:00 2001
+From: Marcelo Tosatti <mtosatti@redhat.com>
+Date: Tue, 27 Nov 2012 23:28:52 -0200
+Subject: [PATCH 06/18] x86: pvclock: introduce helper to read flags
+
+Acked-by: Glauber Costa <glommer@parallels.com>
+Signed-off-by: Marcelo Tosatti <mtosatti@redhat.com>
+---
+ arch/x86/include/asm/pvclock.h |  1 +
+ arch/x86/kernel/pvclock.c      | 13 +++++++++++++
+ 2 files changed, 14 insertions(+)
+
+diff --git a/arch/x86/include/asm/pvclock.h b/arch/x86/include/asm/pvclock.h
+index 47e25d464104..ea27a8dd189c 100644
+--- a/arch/x86/include/asm/pvclock.h
++++ b/arch/x86/include/asm/pvclock.h
+@@ -6,6 +6,7 @@
+ 
+ /* some helper functions for xen and kvm pv clock sources */
+ cycle_t pvclock_clocksource_read(struct pvclock_vcpu_time_info *src);
++u8 pvclock_read_flags(struct pvclock_vcpu_time_info *src);
+ void pvclock_set_flags(u8 flags);
+ unsigned long pvclock_tsc_khz(struct pvclock_vcpu_time_info *src);
+ void pvclock_read_wallclock(struct pvclock_wall_clock *wall,
+diff --git a/arch/x86/kernel/pvclock.c b/arch/x86/kernel/pvclock.c
+index a7d90910c61a..c8fb043a8695 100644
+--- a/arch/x86/kernel/pvclock.c
++++ b/arch/x86/kernel/pvclock.c
+@@ -45,6 +45,19 @@ void pvclock_resume(void)
+ 	atomic64_set(&last_value, 0);
+ }
+ 
++u8 pvclock_read_flags(struct pvclock_vcpu_time_info *src)
++{
++	unsigned version;
++	cycle_t ret;
++	u8 flags;
++
++	do {
++		version = __pvclock_read_cycles(src, &ret, &flags);
++	} while ((src->version & 1) || version != src->version);
++
++	return flags & valid_flags;
++}
++
+ cycle_t pvclock_clocksource_read(struct pvclock_vcpu_time_info *src)
+ {
+ 	unsigned version;
+-- 
+2.37.3
+

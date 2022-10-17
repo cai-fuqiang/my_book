@@ -1,0 +1,144 @@
+From 42897d866b120547777ae1fd316680ec53356d9c Mon Sep 17 00:00:00 2001
+From: Marcelo Tosatti <mtosatti@redhat.com>
+Date: Tue, 27 Nov 2012 23:29:02 -0200
+Subject: [PATCH 16/18] KVM: x86: add kvm_arch_vcpu_postcreate callback, move
+ TSC initialization
+
+TSC initialization will soon make use of online_vcpus.
+
+Signed-off-by: Marcelo Tosatti <mtosatti@redhat.com>
+---
+ arch/ia64/kvm/kvm-ia64.c   |  5 +++++
+ arch/powerpc/kvm/powerpc.c |  5 +++++
+ arch/s390/kvm/kvm-s390.c   |  5 +++++
+ arch/x86/kvm/svm.c         |  1 -
+ arch/x86/kvm/vmx.c         |  2 --
+ arch/x86/kvm/x86.c         | 13 +++++++++++++
+ include/linux/kvm_host.h   |  1 +
+ virt/kvm/kvm_main.c        |  1 +
+ 8 files changed, 30 insertions(+), 3 deletions(-)
+
+diff --git a/arch/ia64/kvm/kvm-ia64.c b/arch/ia64/kvm/kvm-ia64.c
+index c71acd7f9a13..83b54530916e 100644
+--- a/arch/ia64/kvm/kvm-ia64.c
++++ b/arch/ia64/kvm/kvm-ia64.c
+@@ -1330,6 +1330,11 @@ int kvm_arch_vcpu_setup(struct kvm_vcpu *vcpu)
+ 	return 0;
+ }
+ 
++int kvm_arch_vcpu_postcreate(struct kvm_vcpu *vcpu)
++{
++	return 0;
++}
++
+ int kvm_arch_vcpu_ioctl_get_fpu(struct kvm_vcpu *vcpu, struct kvm_fpu *fpu)
+ {
+ 	return -EINVAL;
+diff --git a/arch/powerpc/kvm/powerpc.c b/arch/powerpc/kvm/powerpc.c
+index deb0d596d815..f9ab12aea829 100644
+--- a/arch/powerpc/kvm/powerpc.c
++++ b/arch/powerpc/kvm/powerpc.c
+@@ -439,6 +439,11 @@ struct kvm_vcpu *kvm_arch_vcpu_create(struct kvm *kvm, unsigned int id)
+ 	return vcpu;
+ }
+ 
++int kvm_arch_vcpu_postcreate(struct kvm_vcpu *vcpu)
++{
++	return 0;
++}
++
+ void kvm_arch_vcpu_free(struct kvm_vcpu *vcpu)
+ {
+ 	/* Make sure we're not using the vcpu anymore */
+diff --git a/arch/s390/kvm/kvm-s390.c b/arch/s390/kvm/kvm-s390.c
+index 38883f0bf27e..731ddeee32e4 100644
+--- a/arch/s390/kvm/kvm-s390.c
++++ b/arch/s390/kvm/kvm-s390.c
+@@ -355,6 +355,11 @@ static void kvm_s390_vcpu_initial_reset(struct kvm_vcpu *vcpu)
+ 	atomic_set_mask(CPUSTAT_STOPPED, &vcpu->arch.sie_block->cpuflags);
+ }
+ 
++int kvm_arch_vcpu_postcreate(struct kvm_vcpu *vcpu)
++{
++	return 0;
++}
++
+ int kvm_arch_vcpu_setup(struct kvm_vcpu *vcpu)
+ {
+ 	atomic_set(&vcpu->arch.sie_block->cpuflags, CPUSTAT_ZARCH |
+diff --git a/arch/x86/kvm/svm.c b/arch/x86/kvm/svm.c
+index 94f5ceba7e1e..161a5fa66d82 100644
+--- a/arch/x86/kvm/svm.c
++++ b/arch/x86/kvm/svm.c
+@@ -1251,7 +1251,6 @@ static struct kvm_vcpu *svm_create_vcpu(struct kvm *kvm, unsigned int id)
+ 	svm->vmcb_pa = page_to_pfn(page) << PAGE_SHIFT;
+ 	svm->asid_generation = 0;
+ 	init_vmcb(svm);
+-	kvm_write_tsc(&svm->vcpu, 0);
+ 
+ 	err = fx_init(&svm->vcpu);
+ 	if (err)
+diff --git a/arch/x86/kvm/vmx.c b/arch/x86/kvm/vmx.c
+index 896efd4842e7..bb18923bf632 100644
+--- a/arch/x86/kvm/vmx.c
++++ b/arch/x86/kvm/vmx.c
+@@ -3896,8 +3896,6 @@ static int vmx_vcpu_setup(struct vcpu_vmx *vmx)
+ 	vmcs_writel(CR0_GUEST_HOST_MASK, ~0UL);
+ 	set_cr4_guest_host_mask(vmx);
+ 
+-	kvm_write_tsc(&vmx->vcpu, 0);
+-
+ 	return 0;
+ }
+ 
+diff --git a/arch/x86/kvm/x86.c b/arch/x86/kvm/x86.c
+index a7b97a49d8ad..f3c069efc72a 100644
+--- a/arch/x86/kvm/x86.c
++++ b/arch/x86/kvm/x86.c
+@@ -6320,6 +6320,19 @@ int kvm_arch_vcpu_setup(struct kvm_vcpu *vcpu)
+ 	return r;
+ }
+ 
++int kvm_arch_vcpu_postcreate(struct kvm_vcpu *vcpu)
++{
++	int r;
++
++	r = vcpu_load(vcpu);
++	if (r)
++		return r;
++	kvm_write_tsc(vcpu, 0);
++	vcpu_put(vcpu);
++
++	return r;
++}
++
+ void kvm_arch_vcpu_destroy(struct kvm_vcpu *vcpu)
+ {
+ 	int r;
+diff --git a/include/linux/kvm_host.h b/include/linux/kvm_host.h
+index c94c9985dee0..8e5c7b651655 100644
+--- a/include/linux/kvm_host.h
++++ b/include/linux/kvm_host.h
+@@ -596,6 +596,7 @@ void kvm_arch_vcpu_load(struct kvm_vcpu *vcpu, int cpu);
+ void kvm_arch_vcpu_put(struct kvm_vcpu *vcpu);
+ struct kvm_vcpu *kvm_arch_vcpu_create(struct kvm *kvm, unsigned int id);
+ int kvm_arch_vcpu_setup(struct kvm_vcpu *vcpu);
++int kvm_arch_vcpu_postcreate(struct kvm_vcpu *vcpu);
+ void kvm_arch_vcpu_destroy(struct kvm_vcpu *vcpu);
+ 
+ int kvm_arch_hardware_enable(void *garbage);
+diff --git a/virt/kvm/kvm_main.c b/virt/kvm/kvm_main.c
+index be3e7bb73b10..e6cfd4344d28 100644
+--- a/virt/kvm/kvm_main.c
++++ b/virt/kvm/kvm_main.c
+@@ -1853,6 +1853,7 @@ static int kvm_vm_ioctl_create_vcpu(struct kvm *kvm, u32 id)
+ 	atomic_inc(&kvm->online_vcpus);
+ 
+ 	mutex_unlock(&kvm->lock);
++	kvm_arch_vcpu_postcreate(vcpu);
+ 	return r;
+ 
+ unlock_vcpu_destroy:
+-- 
+2.37.3
+

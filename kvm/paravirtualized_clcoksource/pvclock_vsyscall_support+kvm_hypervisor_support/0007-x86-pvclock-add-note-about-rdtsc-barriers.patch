@@ -1,0 +1,33 @@
+From 189e11731aa858597095fbe1e6d243bad26bd96b Mon Sep 17 00:00:00 2001
+From: Marcelo Tosatti <mtosatti@redhat.com>
+Date: Tue, 27 Nov 2012 23:28:53 -0200
+Subject: [PATCH 07/18] x86: pvclock: add note about rdtsc barriers
+
+As noted by Gleb, not advertising SSE2 support implies
+no RDTSC barriers.
+
+Signed-off-by: Marcelo Tosatti <mtosatti@redhat.com>
+---
+ arch/x86/include/asm/pvclock.h | 6 ++++++
+ 1 file changed, 6 insertions(+)
+
+diff --git a/arch/x86/include/asm/pvclock.h b/arch/x86/include/asm/pvclock.h
+index ea27a8dd189c..63f91679af73 100644
+--- a/arch/x86/include/asm/pvclock.h
++++ b/arch/x86/include/asm/pvclock.h
+@@ -74,6 +74,12 @@ unsigned __pvclock_read_cycles(const struct pvclock_vcpu_time_info *src,
+ 	u8 ret_flags;
+ 
+ 	version = src->version;
++	/* Note: emulated platforms which do not advertise SSE2 support
++	 * result in kvmclock not using the necessary RDTSC barriers.
++	 * Without barriers, it is possible that RDTSC instruction reads from
++	 * the time stamp counter outside rdtsc_barrier protected section
++	 * below, resulting in violation of monotonicity.
++	 */
+ 	rdtsc_barrier();
+ 	offset = pvclock_get_nsec_offset(src);
+ 	ret = src->system_time + offset;
+-- 
+2.37.3
+

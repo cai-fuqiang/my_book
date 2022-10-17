@@ -1,0 +1,38 @@
+From d98d07ca7e0347d712d54a865af323c4aee04bc2 Mon Sep 17 00:00:00 2001
+From: Marcelo Tosatti <mtosatti@redhat.com>
+Date: Tue, 27 Nov 2012 23:29:04 -0200
+Subject: [PATCH 18/18] KVM: x86: update pvclock area conditionally, on cpu
+ migration
+
+As requested by Glauber, do not update kvmclock area on vcpu->pcpu
+migration, in case the host has stable TSC.
+
+This is to reduce cacheline bouncing.
+
+Acked-by: Glauber Costa <glommer@parallels.com>
+Signed-off-by: Marcelo Tosatti <mtosatti@redhat.com>
+---
+ arch/x86/kvm/x86.c | 7 ++++++-
+ 1 file changed, 6 insertions(+), 1 deletion(-)
+
+diff --git a/arch/x86/kvm/x86.c b/arch/x86/kvm/x86.c
+index 422ef5ed2194..fd766214d9da 100644
+--- a/arch/x86/kvm/x86.c
++++ b/arch/x86/kvm/x86.c
+@@ -2627,7 +2627,12 @@ void kvm_arch_vcpu_load(struct kvm_vcpu *vcpu, int cpu)
+ 			kvm_x86_ops->write_tsc_offset(vcpu, offset);
+ 			vcpu->arch.tsc_catchup = 1;
+ 		}
+-		kvm_make_request(KVM_REQ_CLOCK_UPDATE, vcpu);
++		/*
++		 * On a host with synchronized TSC, there is no need to update
++		 * kvmclock on vcpu->cpu migration
++		 */
++		if (!vcpu->kvm->arch.use_master_clock || vcpu->cpu == -1)
++			kvm_make_request(KVM_REQ_CLOCK_UPDATE, vcpu);
+ 		if (vcpu->cpu != cpu)
+ 			kvm_migrate_timers(vcpu);
+ 		vcpu->cpu = cpu;
+-- 
+2.37.3
+
