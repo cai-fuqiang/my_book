@@ -95,6 +95,7 @@ index 0c910c774a9b..256c0fc92b67 100644
 +	local_irq_save(flags);
 +	kvm_get_msr(v, MSR_IA32_TIME_STAMP_COUNTER,
 +			  &vcpu->hv_clock.tsc_timestamp);
+	//get monotonic time
 +	ktime_get_ts(&ts);
 +	local_irq_restore(flags);
 +

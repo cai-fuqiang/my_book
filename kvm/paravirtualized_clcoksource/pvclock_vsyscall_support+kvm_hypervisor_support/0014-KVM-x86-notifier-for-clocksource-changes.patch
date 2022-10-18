@@ -162,3 +162,40 @@ index 1155059c512e..c077b817d1c3 100644
 -- 
 2.37.3
 
+MY OTHER CODE:
+int do_settimeofday(const struct timespec *tv)                                  
+{                                                                               
+        struct timekeeper *tk = &timekeeper;                                    
+        struct timespec ts_delta, xt;                                           
+        unsigned long flags;                                                    
+  
+        if (!timespec_valid_strict(tv))                                         
+                return -EINVAL;                                                 
+ 
+        write_seqlock_irqsave(&tk->lock, flags);                                
+
+        timekeeping_forward_now(tk);                                            
+
+        xt = tk_xtime(tk);
+        ts_delta.tv_sec = tv->tv_sec - xt.tv_sec;                               
+        ts_delta.tv_nsec = tv->tv_nsec - xt.tv_nsec;                            
+
+	//MY NOTE
+	//wall + w2m = monotonic
+	//ts_delta = wall_new - wall_old
+	//
+	//wall_old + ts_delta + w2m_old - ts_delta = monotonic
+	//w2m_new = w2m_old - ts_dalta
+        tk_set_wall_to_mono(tk, timespec_sub(tk->wall_to_monotonic, ts_delta)); 
+
+        tk_set_xtime(tk, tv);                                                   
+
+        timekeeping_update(tk, true);
+
+        write_sequnlock_irqrestore(&tk->lock, flags);                           
+
+        /* signal hrtimers about time change */                                 
+        clock_was_set();                                                        
+
+        return 0;                                                               
+}
