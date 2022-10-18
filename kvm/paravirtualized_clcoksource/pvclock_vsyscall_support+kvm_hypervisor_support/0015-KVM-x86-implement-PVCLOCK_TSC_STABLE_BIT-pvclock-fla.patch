@@ -3,13 +3,13 @@ From: Marcelo Tosatti <mtosatti@redhat.com>
 Date: Tue, 27 Nov 2012 23:29:01 -0200
 Subject: [PATCH 15/18] KVM: x86: implement PVCLOCK_TSC_STABLE_BIT pvclock flag
 
-KVM added a global variable to guarantee monotonicity in the guest.
+KVM added a global variable to guarantee monotonicity(单调性) in the guest.
 One of the reasons for that is that the time between
 
 	1. ktime_get_ts(&timespec);
 	2. rdtscll(tsc);
 
-Is variable. That is, given a host with stable TSC, suppose that
+Is variable. That is, given a host with stable TSC, suppose(认为) that
 two VCPUs read the same time via ktime_get_ts() above.
 
 The time required to execute 2. is not the same on those two instances
