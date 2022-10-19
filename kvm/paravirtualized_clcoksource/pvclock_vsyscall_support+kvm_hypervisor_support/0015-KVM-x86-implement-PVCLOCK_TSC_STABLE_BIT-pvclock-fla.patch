@@ -240,7 +240,7 @@ index c077b817d1c3..a7b97a49d8ad 100644
 + *	- 0 < N - M => M < N
 + *
 + * That is, when timespec0 != timespec1, M < N. Unfortunately that is not
-+ * always the lase (the difference between two distinct(不同的) xtime instances
++ * always the case (the difference between two distinct(不同的) xtime instances
 + * might be smaller then the difference between corresponding TSC reads,
 + * when updating guest vcpus pvclock areas).
 + *
