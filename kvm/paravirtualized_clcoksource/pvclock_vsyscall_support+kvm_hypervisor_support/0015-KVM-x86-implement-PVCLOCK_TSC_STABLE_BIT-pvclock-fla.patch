@@ -470,3 +470,37 @@ index e3f5b143158e..be3e7bb73b10 100644
 -- 
 2.37.3
 
+MY_NOTE:
+关于 pvclock_update_vm_gtod_copy function 上面的注释, 里面提到了一些事件，
+但是感觉有些问题, 4.5 在理想状态下返回的 ret0 < ret1, 
+应该满足 ret1 - ret0 = rdtsc1 - rdtsc0
+所以得出的结论应该是M=N
+
+这里作者的观点没有问题，如果M!=N的情况下，不同vcpu 获取的 monotonic clock,
+不一定是 monotonicity, patch 本身也没有问题，就是说明问题的时候，注释
+有些问题。
+这里应该这么改比较好:
+- * 4. ret0 = timespec0 + (rdtsc - tsc0) |
+- * 5.				        | ret1 = timespec1 + (rdtsc - tsc1)
+- * 				        | ret1 = timespec0 + N + (rdtsc - (tsc0 + M))
+- *
+- * Since ret0 update is visible to VCPU1 at time 5, to obey monotonicity:
+- *
+- * 	- ret0 < ret1
+- *	- timespec0 + (rdtsc - tsc0) < timespec0 + N + (rdtsc - (tsc0 + M))
+- *		...
+- *	- 0 < N - M => M < N
+- *
+- * That is, when timespec0 != timespec1, M < N. Unfortunately that is not
++ * 4. ret0 = timespec0 + (rdtsc - tsc0) | ret1 = timespec1 + (rdtsc - tsc1)
++ * 				        | ret1 = timespec0 + N + (rdtsc - (tsc0 + M))
++ *
++ * Since ret0 update is visible to VCPU1 at time 5, to obey monotonicity:
++ *
++ * 	- ret0 = ret1
++ *	- timespec0 + (rdtsc - tsc0) = timespec0 + N + (rdtsc - (tsc0 + M))
++ *		...
++ *	- 0 = N - M => M = N
++ *
+
+所以，如果M!=N就可能出问题，开头的commit中也提到了，如果M!=N，
