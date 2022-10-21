@@ -5,6 +5,7 @@ Subject: [PATCH] KVM: Fix kvmclock on !constant_tsc boxes
 
 kvmclock currently falls apart(相隔;相距) on machines without constant tsc.
 This patch fixes it.  Changes:
+falls apart: 崩溃?
 
   * keep tsc frequency in a per-cpu variable.
   * handle kvmclock update using a new request flag, thus checking
@@ -222,3 +223,43 @@ index 339eda3ca6ee..18b4df8264cf 100644
 -- 
 2.25.1
 
+
+
+
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+>>>>>>>>>>>>>NOTE>>>>>>>>>>>>>>>>>
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+static void kvm_set_time_scale(uint32_t tsc_khz, struct pvclock_vcpu_time_info *hv_clock)
+{
+    uint64_t nsecs = 1000000000LL;
+    int32_t  shift = 0;
+    uint64_t tps64;
+    uint32_t tps32;
+	//MY NOTE
+	//tsc_khz * 1000 = hz/s
+	//tsc_khz * 1000 >> shift * mult = 1000000000LL
+	//
+
+    tps64 = tsc_khz * 1000LL;
+	//这里这样做的目的是可以得出一个更加精确的倍数关系
+	//如果只有shift，那只能得到2,4,8,16 
+	//但是如果要是 / 2, 就会预留一个空间，然后再用除法计算
+	//例如
+    while (tps64 > nsecs*2) {
+        tps64 >>= 1;
+        shift--;
+    }
+
+    tps32 = (uint32_t)tps64;
+    while (tps32 <= (uint32_t)nsecs) {
+        tps32 <<= 1;
+        shift++;
+    }
+
+    hv_clock->tsc_shift = shift;
+    hv_clock->tsc_to_system_mul = div_frac(nsecs, tps32);
+
+    pr_debug("%s: tsc_khz %u, tsc_shift %d, tsc_mul %u\n",
+        ¦__FUNCTION__, tsc_khz, hv_clock->tsc_shift,
+        ¦hv_clock->tsc_to_system_mul);
+}
