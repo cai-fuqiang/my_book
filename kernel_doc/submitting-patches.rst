@@ -104,6 +104,7 @@ costs.  Optimizations usually aren't free but trade-offs between CPU,
 memory, and readability; or, when it comes to heuristics, between
 different workloads.  Describe the expected downsides of your
 optimization so that the reviewer can weigh costs against benefits.
+
 quantify: 量化
 trade-offs: 衡量
 consumption: 消耗
@@ -115,13 +116,21 @@ about it in technical detail.  It's important to describe the change
 in plain English for the reviewer to verify that the code is behaving
 as you intend it to.
 
+establish: 建立, 确立; 确定, 证实
+technical: 技术的
+plain: 朴素的, 直白的
+
 The maintainer will thank you if you write your patch description in a
 form which can be easily pulled into Linux's source code management
 system, ``git``, as a "commit log".  See :ref:`the_canonical_patch_format`.
 
+canonical: 典型的
+
 Solve only one problem per patch.  If your description starts to get
 long, that's a sign that you probably need to split up your patch.
 See :ref:`split_changes`.
+
+sign: 迹象，征兆
 
 When you submit or resubmit a patch or patch series, include the
 complete patch description and justification for it.  Don't just
@@ -131,6 +140,8 @@ URLs to find the patch description and put that into the patch.
 I.e., the patch (series) and its description should be self-contained.
 This benefits both the maintainers and reviewers.  Some reviewers
 probably didn't even receive earlier versions of the patch.
+
+justification: 正当理由
 
 Describe your changes in imperative mood, e.g. "make xyzzy do frotz"
 instead of "[This patch] makes xyzzy do frotz" or "[I] changed xyzzy
