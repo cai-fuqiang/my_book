@@ -8,9 +8,9 @@ essential: 基本的;基础的
 For a person or company who wishes to submit a change to the Linux
 kernel, the process can sometimes be daunting if you're not familiar
 with "the system."  This text is a collection of suggestions which
-can greatly increase the chances of your change being accepted.
+can greatly increase the chances of your change being accepted.::
 
-daunting: 使人生畏，令人气馁
+  daunting ==> [dɔːntɪŋ] adj.令人畏惧的 动词daunt的现在分词.
 
 This document contains a large number of suggestions in a relatively terse
 format.  For detailed information on how the kernel development process
@@ -18,9 +18,9 @@ works, see Documentation/process/development-process.rst. Also, read
 Documentation/process/submit-checklist.rst
 for a list of items to check before submitting code.
 For device tree binding patches, read
-Documentation/devicetree/bindings/submitting-patches.rst.
+Documentation/devicetree/bindings/submitting-patches.rst.::
 
-relatively: 相对地
+relatively ==> ['relətɪvli] adv.相对地；比较地
 terse: 简洁
 
 This documentation assumes that you're using ``git`` to prepare your patches.
@@ -148,6 +148,9 @@ instead of "[This patch] makes xyzzy do frotz" or "[I] changed xyzzy
 to do frotz", as if you are giving orders to the codebase to change
 its behaviour.
 
+imperative: 极重要的;必要的;命令的
+imperative mood: 祈使语气; 命令语气; 祁使式
+
 If you want to refer to a specific commit, don't just refer to the
 SHA-1 ID of the commit. Please also include the oneline summary of
 the commit, to make it easier for reviewers to know what it is about.
@@ -164,12 +167,17 @@ collisions with shorter IDs a real possibility.  Bear in mind that, even if
 there is no collision with your six-character ID now, that condition may
 change five years from now.
 
+collisions: 冲突,碰撞
+bear in mind that：请记住
+
 If related discussions or any other background information behind the change
 can be found on the web, add 'Link:' tags pointing to it. In case your patch
 fixes a bug, for example, add a tag with a URL referencing the report in the
 mailing list archives or a bug tracker; if the patch is a result of some
 earlier mailing list discussion or something documented on the web, point to
 it.
+
+archives : ['ɑːkaɪvz] n.档案；档案馆
 
 When linking to mailing list archives, preferably use the lore.kernel.org
 message archiver service. To create the link URL, use the contents of the
@@ -178,13 +186,26 @@ For example::
 
     Link: https://lore.kernel.org/r/30th.anniversary.repost@klaava.Helsinki.FI/
 
+preferably ==> ['prefrəbli] adv.更好地；宁可；宁愿
+contents ==> ['kɒntents] n.内容；目录；内有的物品 名词content的复数形式.
+surrounding ==> [sə'raʊndɪŋ] adj.周围的 n.环境；周围的事物
+angle ==> ['æ ŋ ɡl] n.角度；角；观点 v.形成或转变角度；歪曲 v.钓鱼；谋取 Angle. n.盎格鲁人
+brackets ==> [bræ kəts] n.括号 名词bracket的复数形式.
+
+angle bracket ==> 尖角括号
+
 Please check the link to make sure that it is actually working and points
 to the relevant message.
+
+relevant ==> ['reləvənt] adj.相关的；切题的；中肯的；有重大关系的；有意义的，目的明确的
 
 However, try to make your explanation understandable without external
 resources. In addition to giving a URL to a mailing list archive or bug,
 summarize the relevant points of the discussion that led to the
 patch as submitted.
+"
+explanation ==> [ˌeksplə'neɪʃn] n.解释；说明
+understandable ==> [ˌʌndər'st æ ndəbl] adj.可理解的；能够懂的
 
 If your patch fixes a bug in a specific commit, e.g. you found an issue using
 ``git bisect``, please use the 'Fixes:' tag with the first 12 characters of
@@ -193,6 +214,8 @@ lines, tags are exempt from the "wrap at 75 columns" rule in order to simplify
 parsing scripts.  For example::
 
 	Fixes: 54a4f0239f2e ("KVM: MMU: make kvm_mmu_zap_page() return the number of pages it actually freed")
+
+exempt ==> [ɪɡ'zempt] adj.免除的 vt.免除 n.免税者；被免除义务者
 
 The following ``git config`` settings can be used to add a pretty format for
 outputting the above style in the ``git log`` or ``git show`` commands::
@@ -214,18 +237,27 @@ Separate your changes
 
 Separate each **logical change** into a separate patch.
 
+separate ==> ['sepərət] adj.分开的；不同的；单独的；各自的 v.分开；隔开；区分；分居；脱离 n.分开；抽印本
+
 For example, if your changes include both bug fixes and performance
 enhancements for a single driver, separate those changes into two
 or more patches.  If your changes include an API update, and a new
 driver which uses that new API, separate those into two patches.
 
+enhancements ==> [ɪn'hɑːnsmənts] n.增强；提高 名词enhancement的复数形式.
+
 On the other hand, if you make a single change to numerous files,
 group those changes into a single patch.  Thus a single logical change
 is contained within a single patch.
 
+numerous ==> ['nuːmərəs] adj.为数众多的；许多
+
 The point to remember is that each patch should make an easily understood
 change that can be verified by reviewers.  Each patch should be justifiable
 on its own merits.
+
+justifiable ==> ['dʒʌstɪfaɪəbl] adj.可辩解的；可证明为正当的；有理的
+merits ==> ['merɪts] n.功绩 名词merit的复数形式.
 
 If one patch depends on another patch in order for a change to be
 complete, that is OK.  Simply note **"this patch depends on patch X"**
@@ -237,10 +269,18 @@ series.  Developers using ``git bisect`` to track down a problem can end up
 splitting your patch series at any point; they will not thank you if you
 introduce bugs in the middle.
 
+track down : 追踪到
+split ==> [splɪt] v.分裂；将…分成若干部分；分摊；分离；劈开；裂开；
+splitting ==> ['splɪtɪŋ] adj.剧烈的 动词split的现在分词.
+
+NOTE: 假如说一系列的patch，要做到每个patch kernel build 和 runs  properly。
+否则可能影响到developer 使用 ``git bisect`` 来track down 问题
+
 If you cannot condense your patch set into a smaller set of patches,
 then only post say 15 or so at a time and wait for review and integration.
 
-
+condense ==> [kən'dens] v.浓缩；凝结；缩短
+integration ==> [ˌɪntɪ'ɡreɪʃn] n.集成；综合；同化
 
 Style-check your changes
 ------------------------
@@ -251,6 +291,10 @@ Failure to do so simply wastes
 the reviewers time and will get your patch rejected, probably
 without even being read.
 
+violations ==> [vaɪə'leɪʃnz] n.侵害，违反（名词violation的复数形式）
+failure ==> ['feɪljər] n.失败；失败者；不及格；疏忽；失灵；未能；悲惨的事
+wastes ==> ['weɪsts] n.废料 名词waste的复数形式.
+
 One significant exception is when moving code from one file to
 another -- in this case you should not modify the moved code at all in
 the same patch which moves it.  This clearly delineates the act of
@@ -258,10 +302,19 @@ moving the code and your changes.  This greatly aids review of the
 actual differences and allows tools to better track the history of
 the code itself.
 
+at all ==> 根本，完全
+delineates ==> [dɪ'lɪnieɪt] vt.描绘；叙述；画出
+aid ==> [eɪd] n.援助；帮助；救援；助手；辅助物 v.辅助；援助；接济
+
 Check your patches with the patch style checker prior to submission
 (scripts/checkpatch.pl).  Note, though, that the style checker should be
 viewed as a guide, not as a replacement for human judgment.  If your code
 looks better with a violation then its probably best left alone.
+
+prior ==> ['praɪər] adj.优先的；在前的；更重要的 adv.居先；在前
+judgment ==> ['dʒʌdʒmənt] n.裁判；判断；判断力；意见；判决书
+violation ==> [ˌvaɪə'leɪʃn] n.违反；违背；妨碍
+judgment ==> ['dʒʌdʒmənt] n.裁判；判断；判断力；意见；判决书
 
 The checker reports at three levels:
  - ERROR: things that are very likely to be wrong
@@ -271,10 +324,13 @@ The checker reports at three levels:
 You should be able to justify all violations that remain in your
 patch.
 
+justify ==> ['dʒʌstɪfaɪ] vt.替 ... 辩护；证明 ... 正当；调整版面
 
 Select the recipients for your patch
 ------------------------------------
 
+recipients ==> [rɪ'sɪpiənt] n.接受者；收信人
+Linus Torvalds is the final arbiter of all changes accepted into the Linux kernel.
 You should always copy the appropriate subsystem maintainer(s) on any patch
 to code that they maintain; look through the MAINTAINERS file and the
 source code revision history to see who those maintainers are.  The
@@ -283,6 +339,9 @@ your patches as arguments to scripts/get_maintainer.pl).  If you cannot find a
 maintainer for the subsystem you are working on, Andrew Morton
 (akpm@linux-foundation.org) serves as a maintainer of last resort.
 
+appropriate ==> [ə'proʊpriət] adj.适当的；相称的 vt.占用；拨出(款项)
+resort ==> [rɪ'zɔːrt] n.(度假)胜地；手段；凭借 vi.诉诸；常去
+
 You should also normally choose at least one mailing list to receive a copy
 of your patch set.  linux-kernel@vger.kernel.org should be used by default
 for all patches, but the volume on that list has caused a number of
@@ -290,9 +349,16 @@ developers to tune it out.  Look in the MAINTAINERS file for a
 subsystem-specific list; your patch will probably get more attention there.
 Please do not spam unrelated lists, though.
 
+attention ==> [ə'tenʃn] n.注意；注意力；照料；留心；关怀；(口令)立正
+though ==> 可是，不过, 然而
+spam ==> [spæm] n.斯帕姆午餐肉（商标名） spam. n.垃圾电子邮件 v.兜售信息（邮件或广告等）
+unrelated ==> [ˌʌnrɪ'leɪtɪd] adj.不相关的；无亲属关系的
+
 Many kernel-related lists are hosted on vger.kernel.org; you can find a
 list of them at http://vger.kernel.org/vger-lists.html.  There are
 kernel-related lists hosted elsewhere as well, though.
+
+hosted ==> [hoʊst] n.主人；主持人；主办方；大量；寄主；主机 v.主办；主持；做东;托管
 
 Do not send more than 15 patches at once to the vger mailing lists!!!
 
@@ -302,11 +368,20 @@ He gets a lot of e-mail, and, at this point, very few patches go through
 Linus directly, so typically you should do your best to -avoid-
 sending him e-mail.
 
+arbiter ==> ['ɑːrbɪtər] n.仲裁人；主宰者
+typically ==> ['tɪpɪkli] adv.典型地；代表性地；通常，一般；不出所料地
+
 If you have a patch that fixes an exploitable security bug, send that patch
 to security@kernel.org.  For severe bugs, a short embargo may be considered
 to allow distributors to get the patch out to users; in such cases,
 obviously, the patch should not be sent to any public lists. See also
 Documentation/admin-guide/security-bugs.rst.
+
+exploitable ==> [ɪks'plɔɪtəbəl] adj.可开发的；可利用的
+severe ==> [sɪ'vɪr] adj.严厉的；严重的；剧烈的；严格的；严峻的
+embargo ==> [ɪm'bɑːrɡoʊ] n.封港令；禁运；禁止（通商）
+distributors ==> [dɪst'rɪbjuːtəz] n.分发器，承销商（distributor的复数形式）
+obviously ==> ['ɑːbviəsli] adv.显然地
 
 Patches that fix a severe bug in a released kernel should be directed
 toward the stable maintainers by putting a line like this::
@@ -316,6 +391,9 @@ toward the stable maintainers by putting a line like this::
 into the sign-off area of your patch (note, NOT an email recipient).  You
 should also read Documentation/process/stable-kernel-rules.rst
 in addition to this document.
+
+sign-off : 签收
+recipient ==> [rɪ'sɪpiənt] n.接受者；收信人
 
 If changes affect userland-kernel interfaces, please send the MAN-PAGES
 maintainer (as listed in the MAINTAINERS file) a man-pages patch, or at
@@ -332,10 +410,20 @@ on the changes you are submitting.  It is important for a kernel
 developer to be able to "quote" your changes, using standard e-mail
 tools, so that they may comment on specific portions of your code.
 
+mime ==> [maɪm] n.哑剧；丑角；模仿 vt.做哑剧表演；模仿 vi.演出哑剧角色
+MIME ==> MIME邮件就是符合MIME规范的电子邮件，或者说根据MIME规范编码而成的电子邮件。
+compression ==> [kəm'preʃn] n.压缩；浓缩；压紧
+attachments ==> [ə'tæ tʃmənts] n.附属物；附属装置 名词attachment的复数形式.
+quote ==> [kwoʊt] v.引述；报价；举证 n.引用
+
 For this reason, all patches should be submitted by e-mail "inline". The
 easiest way to do this is with ``git send-email``, which is strongly
 recommended.  An interactive tutorial for ``git send-email`` is available at
 https://git-send-email.io.
+
+recommended ==> [rekə'mendɪd] adj.被推荐的 动词recommend的过去式和过去分词.
+interactive ==> [ˌɪntər'æ ktɪv] adj.相互作用的；交互的
+tutorial ==> [tuː'tɔːriəl] n.指南；教程；辅导班 adj.辅导的；个别指导的
 
 If you choose not to use ``git send-email``:
 
@@ -344,17 +432,30 @@ If you choose not to use ``git send-email``:
   Be wary of your editor's word-wrap corrupting your patch,
   if you choose to cut-n-paste your patch.
 
+wary ==> ['weri] adj.小心的；机警的
+corrupting ==> [kə'rʌpt] adj.腐败的；堕落的；讹误的 vt.贿赂；使恶化；使腐烂 vi.腐败；腐烂
+word-wrap ==> 自动换行 ?
+
 Do not attach the patch as a MIME attachment, compressed or not.
 Many popular e-mail applications will not always transmit a MIME
 attachment as plain text, making it impossible to comment on your
 code.  A MIME attachment also takes Linus a bit more time to process,
 decreasing the likelihood of your MIME-attached change being accepted.
 
+attachment ==> [ə'tætʃmənt] n.附件；附属物；忠诚；依恋；附著；依赖 n.[法律]扣押令
+plain ==> [pleɪn] adj.清楚的；简单的；坦白的；平常的；朴素的；纯的 n.平原；广阔的区域 adv.完全地；纯粹地
+decreasing ==> [diː'kriːsɪŋ] adj.递减的；减少的 动词decrease的现在分词.
+likelihood ==> ['laɪklihʊd] n.可能性
+
 Exception:  If your mailer is mangling patches then someone may ask
 you to re-send them using MIME.
 
+mangle ==> ['mæ ŋɡl] v.碾压；损坏；糟蹋；乱切 n.碾压机
+
 See Documentation/process/email-clients.rst for hints about configuring
 your e-mail client so that it sends your patches untouched.
+
+hints ==> [hɪnt] n.暗示 v.暗示；示意
 
 Respond to review comments
 --------------------------
@@ -367,6 +468,9 @@ comments or questions that do not lead to a code change should almost certainly
 bring about a comment or changelog entry so that the next reviewer better
 understands what is going on.
 
+in which ==> 表示定于从句，类似于where
+ignoring reviewers is a good way to get ignored in return ==> 真幽默
+
 Be sure to tell the reviewers what changes you are making and to thank them
 for their time.  Code review is a tiring and time-consuming process, and
 reviewers sometimes get grumpy.  Even in that case, though, respond
@@ -375,16 +479,34 @@ version, add a ``patch changelog`` to the cover letter or to individual patches
 explaining difference aganst previous submission (see
 :ref:`the_canonical_patch_format`).
 
+consuming ==> [kən'suːmɪŋ] adj.消费的；强烈的；引人入胜的 动词consume的现在分词.
+time-consuming ==> 消耗时间的
+grumpy ==> ['ɡrʌmpi] adj.性情乖戾的；脾气暴躁的
+politely ==> [pə'laɪtli] adv.有礼貌地
+point out ==> 指出
+cover ==> ['kʌvər] n.封面；盖子；套子；表面 v.覆盖；涉及；包含；掩护；给…保险
+letter ==> ['letər] n.信；字母 v.写下；印刷 n.租赁人
+canonical == > [kə'nɑːnɪkl] adj.依教规的；圣典的；权威的；牧师的
+
 See Documentation/process/email-clients.rst for recommendations on email
 clients and mailing list etiquette.
+
+recommendations ==> 建议
+etiquette ==> ['etɪket] n.礼仪；礼节；规矩
 
 .. _resend_reminders:
 
 Don't get discouraged - or impatient
 ------------------------------------
 
+discouraged ==> [dɪs'kʌrɪdʒd] adj.泄气的 动词discourage的过去式和过去分词形式.
+impatient ==> [ɪm'peɪʃnt] adj.不耐烦的；急躁的
+
 After you have submitted your change, be patient and wait.  Reviewers are
 busy people and may not get to your patch right away.
+
+patient ==> ['peɪʃnt] adj.有耐心的；能忍耐的 n.病人
+get to sth ==> 也是获取, 获得的意思。(达到(某一阶段)/到达(某地)/口语中还有收买贿赂的意思)
 
 Once upon a time, patches used to disappear into the void without comment,
 but the development process works more smoothly than that now.  You should
@@ -393,10 +515,16 @@ that you have sent your patches to the right place.  Wait for a minimum of
 one week before resubmitting or pinging reviewers - possibly longer during
 busy times like merge windows.
 
+Once upon a time ==> 从前, 曾经
+or so ==> 大约
+
 It's also ok to resend the patch or the patch series after a couple of
 weeks with the word "RESEND" added to the subject line::
 
    [PATCH Vx RESEND] sub/sys: Condensed patch summary
+
+a couple of ==> 几个
+condensed ==> [kən'denst] adj.浓缩的 动词condense的过去式和过去分词形式.
 
 Don't add "RESEND" when you are submitting a modified version of your
 patch or patch series - "RESEND" only applies to resubmission of a
@@ -412,26 +540,46 @@ convention to prefix your subject line with [PATCH].  This lets Linus
 and other kernel developers more easily distinguish patches from other
 e-mail discussions.
 
+traffic ==> ['træfɪk] n.（人或车等）交通流量；不正当生意（走私） v.做生意（多指违法的）；游览
+convention ==> [kən'venʃn] n.大会；协定；惯例；公约
+prefix ==> ['priːfɪks] n.前缀；(人名前的)称谓 vt.加 ... 作为前缀；置于前面
+distinguish ==> [dɪ'stɪŋɡwɪʃ] vt.区别；辨认；使显著
+
 ``git send-email`` will do this for you automatically.
 
+automatically ==> [ˌɔːtə'mætɪkli] adv.自动地；机械地
 
 Sign your work - the Developer's Certificate of Origin
 ------------------------------------------------------
+
+origin ==> ['ɔːrɪdʒɪn] n.起源；出身；[数]原点；起因
+certificate ==> [sər'tɪfɪkət] n.执照；证(明)书 vt.认可；批准；发证书给 ...
 
 To improve tracking of who did what, especially with patches that can
 percolate to their final resting place in the kernel through several
 layers of maintainers, we've introduced a "sign-off" procedure on
 patches that are being emailed around.
 
+percolate ==> ['pɜːrkəleɪt] v.过滤；渗透；浸透
+resting ==> ['restɪŋ] adj.静止的；死的；休眠的 动词rest的现在分词形式.
+
 The sign-off is a simple line at the end of the explanation for the
 patch, which certifies that you wrote it or otherwise have the right to
 pass it on as an open-source patch.  The rules are pretty simple: if you
 can certify the below:
 
+explanation ==> [ˌeksplə'neɪʃn] n.解释；说明
+certifies ==> ['sɜːrtɪfaɪ] vt.证明；保证；证实；颁发证书
+
 Developer's Certificate of Origin 1.1
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+certificate ==> [sər'tɪfɪkət] n.执照；证(明)书 vt.认可；批准；发证书给 ...
+
 By making a contribution to this project, I certify that:
+
+certify ==> ['sɜːrtɪfaɪ] vt.证明；保证；证实；颁发证书
+contribution ==> [ˌkɑːntrɪ'bjuːʃn] n.贡献；捐款(赠)；投稿
 
         (a) The contribution was created in whole or in part by me and I
             have the right to submit it under the open source license
@@ -443,17 +591,28 @@ By making a contribution to this project, I certify that:
             work with modifications, whether created in whole or in part
             by me, under the same open source license (unless I am
             permitted to submit under a different license), as indicated
-            in the file; or
+            in the file; or::
+
+              to the best of my acknowledge ==> 据我所知
+              covered ==> ['kʌvərd] adj.被覆盖的；有屋顶的 动词cover的过去式及过去分词.
+              right ==> [raɪt] adj.正确的；对的；右边的；合适的；重要的；完全的 adv.正确地；
+                直接地；向右；恰恰，就；立即；完全地 n.权利；道理；正确；右边；右派 v.扶直；
+                纠正；公正对待；补偿；恢复平衡 （这里指权限，权力)
 
         (c) The contribution was provided directly to me by some other
             person who certified (a), (b) or (c) and I have not modified
-            it.
+            it.::
+
+              certified ==> ['sɜːtɪˌfaɪd] adj.经证明的；经认证的；有保证的，保证合格的
 
         (d) I understand and agree that this project and the contribution
             are public and that a record of the contribution (including all
             personal information I submit with it, including my sign-off) is
             maintained indefinitely and may be redistributed consistent with
-            this project or the open source license(s) involved.
+            this project or the open source license(s) involved.::
+
+              indefinitely ==> [ɪn'defɪnətli] adv.无限地；不确定地；模糊地
+              consistent ==> [kən'sɪstənt] adj.始终如一的；持续的；一致的
 
 then you just add a line saying::
 
@@ -462,18 +621,26 @@ then you just add a line saying::
 using your real name (sorry, no pseudonyms or anonymous contributions.)
 This will be done for you automatically if you use ``git commit -s``.
 Reverts should also include "Signed-off-by". ``git revert -s`` does that
-for you.
+for you.::
+
+        pseudonyms ==> 假名
 
 Some people also put extra tags at the end.  They'll just be ignored for
 now, but you can do this to mark internal company procedures or just
-point out some special detail about the sign-off.
+point out some special detail about the sign-off.::
+
+        procedures ==> [prə'si:dʒəz] 操作
 
 Any further SoBs (Signed-off-by:'s) following the author's SoB are from
 people handling and transporting the patch, but were not involved in its
 development. SoB chains should reflect the **real** route a patch took
 as it was propagated to the maintainers and ultimately to Linus, with
-the first SoB entry signalling primary authorship of a single author.
+the first SoB entry signalling primary authorship of a single author.::
 
+  reflect ==> [rɪ'flekt] v.反映；反射；反省；归咎；显示
+  propagated ==> ['prɑːpəɡeɪt] v.繁殖；增殖；传播；传送
+  ultimately ==> ['ʌltɪmətli] adv.最后；最终
+  authorship ==> ['ɔːθərʃɪp] n.著述；来源；作家职业
 
 When to use Acked-by:, Cc:, and Co-developed-by:
 ------------------------------------------------
@@ -483,16 +650,23 @@ development of the patch, or that he/she was in the patch's delivery path.
 
 If a person was not directly involved in the preparation or handling of a
 patch but wishes to signify and record their approval of it then they can
-ask to have an Acked-by: line added to the patch's changelog.
+ask to have an Acked-by: line added to the patch's changelog.::
+
+  approval ==> [ə'pruːvl] n.同意；批准；认可；赞同
 
 Acked-by: is often used by the maintainer of the affected code when that
-maintainer neither contributed to nor forwarded the patch.
+maintainer neither contributed to nor forwarded the patch.::
+
+  forwarded ==> ['fɔːwədɪd] adj.转运的 动词forward的过去式和过去分词.
 
 Acked-by: is not as formal as Signed-off-by:.  It is a record that the acker
 has at least reviewed the patch and has indicated acceptance.  Hence patch
 mergers will sometimes manually convert an acker's "yep, looks good to me"
 into an Acked-by: (but note that it is usually better to ask for an
-explicit ack).
+explicit ack).::
+
+  formal ==> ['fɔːrml] adj.正式的；正规的；形式的；公开的；拘谨的；有条理的
+  acceptance ==> [ək'septəns] n.认可；同意；承兑；接受（礼物、邀请、建议等）
 
 Acked-by: does not necessarily indicate acknowledgement of the entire patch.
 For example, if a patch affects multiple subsystems and has an Acked-by: from
