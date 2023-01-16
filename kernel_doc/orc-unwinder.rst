@@ -53,6 +53,9 @@ Ingo Molnar says:
   whose cache locality is borderline."
 
 locality :  位置，地点，现场
+saving : 节省
+footprint : 足迹
+borderline : 临界区域
 
 Another benefit of ORC compared to frame pointers is that it can
 reliably unwind across interrupts and exceptions.  Frame pointer based
@@ -64,6 +67,7 @@ The main disadvantage of the ORC unwinder compared to frame pointers is
 that it needs more memory to store the ORC unwind tables: roughly 2-4MB
 depending on the kernel config.
 
+NOTE: 缺点是需要2-4MB的内存保存ORC unwind tables
 
 ORC vs DWARF
 ============
