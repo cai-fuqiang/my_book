@@ -76,7 +76,10 @@ ORC debuginfo's advantage over DWARF itself is that it's much simpler.
 It gets rid of the complex DWARF CFI state machine and also gets rid of
 the tracking of unnecessary registers.  This allows the unwinder to be
 much simpler, meaning fewer bugs, which is especially important for
-mission critical oops code.
+mission critical oops code.  
+advantage : 优势
+get rid of : 去除
+mission : 使命，任务
 
 The simpler debuginfo format also enables the unwinder to be much faster
 than DWARF, which is important for perf and lockdep.  In a basic
@@ -84,6 +87,8 @@ performance test by Jiri Slaby [2]_, the ORC unwinder was about 20x
 faster than an out-of-tree DWARF unwinder.  (Note: That measurement was
 taken before some performance tweaks were added, which doubled
 performance, so the speedup over DWARF may be closer to 40x.)
+
+performance tweaks : 性能优化?
 
 The ORC data format does have a few downsides compared to DWARF.  ORC
 unwind tables take up ~50% more RAM (+1.3MB on an x86 defconfig kernel)
@@ -98,6 +103,14 @@ pointer and the frame pointer between call frames.  But even if we do
 end up having to track all the registers DWARF tracks, at least we will
 still be able to control the format, e.g. no complex state machines.
 
+potential : 潜在的
+evolves : [iˈvɑːlvz] 进化
+conceivable : [kənˈsiːvəbl] 可想到的，可预见的
+IMO: 依我所见
+unusual : 不常见的，不寻常的
+suspect : 怀疑
+only ever need to : 在任何情况下，只需要
+have to : 不得不
 
 ORC unwind table generation
 ===========================
@@ -107,6 +120,8 @@ stack metadata validation feature, objtool already follows all code
 paths, and so it already has all the information it needs to be able to
 generate ORC data from scratch.  So it's an easy step to go from stack
 validation to ORC data generation.
+
+from scratch: 从零开始，从头开始
 
 It should be possible to instead generate the ORC data with a simple
 tool which converts DWARF to ORC data.  However, such a solution would
@@ -121,6 +136,11 @@ incorrect/incomplete and made the code harder to read and keep updated.
 And based on looking at glibc code, annotating inline asm in .c files
 might be even worse.
 
+rectify : 调整
+annotating : 注解, 注释
+homegrown: 土生土长的
+unmaintainable : 不可维护的
+
 Objtool still needs a few annotations, but only in code which does
 unusual things to the stack like entry code.  And even then, far fewer
 annotations are needed than what DWARF would need, so they're much more
@@ -132,12 +152,19 @@ insulates the kernel from toolchain bugs which can be very painful to
 deal with in the kernel since we often have to workaround issues in
 older versions of the toolchain for years.
 
+accurate : 准确的
+insulates : 使隔音，使隔离，免受
+painful : 痛苦的
+
 The downside is that the unwinder now becomes dependent on objtool's
 ability to reverse engineer GCC code flow.  If GCC optimizations become
 too complicated for objtool to follow, the ORC data generation might
 stop working or become incomplete.  (It's worth noting that livepatch
 already has such a dependency on objtool's ability to follow GCC code
 flow.)
+
+complicated : 使复杂，使难以理解
+It's worth noting : 值得注意的是
 
 If newer versions of GCC come up with some optimizations which break
 objtool, we may need to revisit the current implementation.  Some
@@ -146,6 +173,7 @@ palatable, or having objtool use DWARF as an additional input, or
 creating a GCC plugin to assist objtool with its analysis.  But for now,
 objtool follows GCC code quite well.
 
+palatable: 可口的，愉快的, (容易接受)
 
 Unwinder implementation details
 ===============================
@@ -158,15 +186,21 @@ and a parallel array of instruction addresses associated with those
 structs, and writes them to the .orc_unwind and .orc_unwind_ip sections
 respectively.
 
+integrating : 整合; 集成
+parallel : 平行的
+
 The ORC data is split into the two arrays for performance reasons, to
 make the searchable part of the data (.orc_unwind_ip) more compact.  The
 arrays are sorted in parallel at boot time.
+
+compact : 小型的，紧凑的
 
 Performance is further improved by the use of a fast lookup table which
 is created at runtime.  The fast lookup table associates a given address
 with a range of indices for the .orc_unwind table, so that only a small
 subset of the table needs to be searched.
 
+NOTE : 这里主要指的是创建的hash表
 
 Etymology
 =========
@@ -175,19 +209,39 @@ Orcs, fearsome creatures of medieval folklore, are the Dwarves' natural
 enemies.  Similarly, the ORC unwinder was created in opposition to the
 complexity and slowness of DWARF.
 
+fearsome : 可怕的
+creatures : 生物
+medieval : 中世纪的
+folklore : 民间传说
+enemies : 敌人
+
 "Although Orcs rarely consider multiple solutions to a problem, they do
 excel at getting things done because they are creatures of action, not
 thought." [3]_  Similarly, unlike the esoteric DWARF unwinder, the
 veracious ORC unwinder wastes no time or siloconic effort decoding
-variable-length zero-extended unsigned-integer byte-coded
+variable-lengkh zero-extended unsigned-integer byte-coded
 state-machine-based debug information entries.
+
+rarely : 罕见的，很少
+excel at : 擅长
+get things done : 把事情做好; 做一些事情
+creature : 生物
+esoteric : 深奥的
+veracious : 诚实的，真实的
+wastes no time : 争分夺秒
 
 Similar to how Orcs frequently unravel the well-intentioned plans of
 their adversaries, the ORC unwinder frequently unravels stacks with
 brutal, unyielding efficiency.
 
+unravel : 揭穿，拆穿, 解开，松开，阐明
+dversaries: 敌人, 对手
+brutal: 野蛮的
+unyielding: 不屈
+
 ORC stands for Oops Rewind Capability.
 
+Rewind : 倒带, 回退
 
 .. [1] https://lore.kernel.org/r/20170602104048.jkkzssljsompjdwy@suse.de
 .. [2] https://lore.kernel.org/r/d2ca5435-6386-29b8-db87-7f227c2b713a@suse.cz
