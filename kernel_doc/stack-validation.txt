@@ -121,6 +121,9 @@ c) Higher live patching compatibility rate
    stack traces need to be reliable (or an unreliable condition needs to
    be detectable).  Objtool makes that possible.
 
+detectable : 发现，发觉
+consistency [kənˈsɪstənsi] : 一致性
+
    For more details, see the livepatch documentation in the Linux kernel
    source tree at Documentation/livepatch/livepatch.txt.
 
@@ -135,12 +138,16 @@ To achieve the validation, objtool enforces the following rules:
    outside of a function, it flags an error since that usually indicates
    callable code which should be annotated accordingly.
 
+accordingly: 按照已知所说的情形
+
    This rule is needed so that objtool can properly identify each
    callable function in order to analyze its stack metadata.
 
 2. Conversely, each section of code which is *not* callable should *not*
    be annotated as an ELF function.  The ENDPROC macro shouldn't be used
    in this case.
+
+Conversely: [kɒnvɜːsli] 相反的
 
    This rule is needed so that objtool can ignore non-callable code.
    Such code doesn't have to follow any of the other rules.
