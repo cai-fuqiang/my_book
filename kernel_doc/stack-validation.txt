@@ -11,8 +11,14 @@ analyzes every .o file and ensures the validity of its stack metadata.
 It enforces a set of rules on asm code and C inline assembly code so
 that stack traces can be reliable.
 
+validity : 合法性
+
 For each function, it recursively follows all possible code paths and
 validates the correct frame pointer state at each instruction.
+
+validates : 确认;验证
+
+recursively : 递归的
 
 It also follows code paths involving special sections, like
 .altinstructions, __jump_table, and __ex_table, which can add
@@ -47,6 +53,8 @@ a) More reliable stack traces for frame pointer enabled kernels
    But for asm code, the frame setup instructions have to be written by
    hand, which most people don't do.  So the end result is that
    CONFIG_FRAME_POINTER is honored for C code but not for most asm code.
+
+honor : 执行承诺
 
    For stack traces based on frame pointers to be reliable, all
    functions which call other functions must first create a stack frame
@@ -93,6 +101,7 @@ a) More reliable stack traces for frame pointer enabled kernels
        beginning of a function before the stack frame has been created,
        or at the very end of the function after the stack frame has been
        destroyed.  This is an inherent limitation of frame pointers.
+inherent : 天生的, 内在的
 
 b) ORC (Oops Rewind Capability) unwind table generation
 
@@ -102,6 +111,8 @@ b) ORC (Oops Rewind Capability) unwind table generation
    reliable even when interrupts or exceptions are involved.
 
    For more details, see Documentation/x86/orc-unwinder.txt.
+
+alternative : 可替代的
 
 c) Higher live patching compatibility rate
 
