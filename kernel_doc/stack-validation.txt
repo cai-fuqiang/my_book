@@ -169,6 +169,8 @@ Conversely: [kɒnvɜːsli] 相反的
    b) the jump matches sibling call semantics and the frame pointer has
       the same value it had on function entry.
 
+sibling call : https://www.zhihu.com/question/33206616
+
    This rule is needed so that objtool can reliably analyze all of a
    function's code paths.  If a function jumps to code in another file,
    and it's not a sibling call, objtool has no way to follow the jump
@@ -181,6 +183,7 @@ Conversely: [kɒnvɜːsli] 相反的
    This rule is just a sanity check to ensure that callable functions
    return normally.
 
+sanity : 通情达理的，理智的
 
 Objtool warnings
 ----------------
@@ -188,15 +191,20 @@ Objtool warnings
 For asm files, if you're getting an error which doesn't make sense,
 first make sure that the affected code follows the above rules.
 
+make sense: 有道理，合乎情理
+
 For C files, the common culprits are inline asm statements and calls to
 "noreturn" functions.  See below for more details.
+
+culprits : 问题的起因, 犯人, 罪犯
 
 Another possible cause for errors in C code is if the Makefile removes
 -fno-omit-frame-pointer or adds -fomit-frame-pointer to the gcc options.
 
+PS : omit: 省去，遗留，不做. -fno-omit-frame-pointer 意思是保留frame-pointer
+
 Here are some examples of common warnings reported by objtool, what
 they mean, and suggestions for how to fix them.
-
 
 1. file.o: warning: objtool: func()+0x128: call without frame pointer save/setup
 
@@ -209,6 +217,8 @@ they mean, and suggestions for how to fix them.
    its ELF function annotation by changing ENDPROC to END, and instead
    use the manual unwind hint macros in asm/unwind_hints.h.
 
+indeed:确实
+
    If it's a GCC-compiled .c file, the error may be because the function
    uses an inline asm() statement which has a "call" instruction.  An
    asm() statement with a call instruction must declare the use of the
@@ -216,6 +226,8 @@ they mean, and suggestions for how to fix them.
    the ASM_CALL_CONSTRAINT as an output constraint:
 
      asm volatile("call func" : ASM_CALL_CONSTRAINT);
+
+NOTE: sync_core , 可以看下这个函数，但是没有太看懂
 
    Otherwise the stack frame may not get created before the call.
 
@@ -287,6 +299,8 @@ they mean, and suggestions for how to fix them.
    cases it's probably appropriate to use the unwind hint macros in
    asm/unwind_hints.h.
 
+inconsistent: 不一致的,  rbp在+0x5c 改变了?
+probably : 很大概率，很可能
 
 8. file.o: warning: objtool: funcA() falls through to next function funcB()
 
@@ -299,6 +313,9 @@ they mean, and suggestions for how to fix them.
       panic().  In this case the noreturn function needs to be added to
       objtool's hard-coded global_noreturns array.  Feel free to bug the
       objtool maintainer, or you can submit a patch.
+
+需要加到一个array中?
+feel free: 随便做
 
    2) funcA() uses the unreachable() annotation in a section of code
       that is actually reachable.
