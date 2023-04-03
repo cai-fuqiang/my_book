@@ -64,3 +64,67 @@ and the VMX extensions, respectively.
 > Section 9.8.2 Secion 9.9 描述了 user interrupt 如何分别的通过 XSAVE feature set支持以及被 VMX extensions 支持
 
 
+## 9.2 ENUMERATION AND ENABLING
+Software enables user interrupts by setting bit 25 (UINTR) in control register CR4. Setting CR4.UINTR enables
+user-interrupt delivery (Section 9.4.2), user-interrupt notification identification (Section 9.5.1), and the user-
+interrupt instructions (Section 9.6). It does not affect the accessibility of the user-interrupt MSRs (Section 9.3) by
+RDMSR, WRMSR or the XSAVE feature set.
+> 软件通过设置 CR4 bit 25(UINTR) 来enable user interrupt。设置CR4.UINTR将enables user-interrupt delivery(Section 9.4.2)
+> user-interrupt notification identification(Section 9.5.1)和 user-interrupt instructions(Section 9.6)。它不会
+> 影响通过RDMSR,WRMSR,以及XSAVE feature set 等指令 对user-interrupt MSRs（Section 9.3)访问(设不设置CR4.UINTR不会影响这些
+> MSR的访问?)
+>
+Processor support for user interrupts is enumerated by CPUID.(EAX=7,ECX=0):EDX[5]. If this bit is set, software
+can set CR4.UINTR to 1 and can access the user-interrupt MSRs using RDMSR and WRMSR (see Section 9.3 and
+Section 9.8.1).
+> 处理器支持 通过CPUID.(EAX=7,ECX=0):EDX[5] 枚举对user interrupts的支持。如果该位设置了, 润见可以设置
+> CR4.UINTR为1, 并且可以使用RDMSR，WRMSR 访问 user-interrupt MSR（可见Section 9.3 和Section 9.8.1)
+
+The user-interrupt feature is XSAVE-managed (see Section 9.8.2). This implies that aspects of the feature are
+enumerated as part of enumeration of the XSAVE feature set. See Section 9.8.2.2 for details.
+> user-interrupt feature  是 XSAVE-managed(见 Section 9.8.2)。它意味着该功能一些（各个）方面作为
+> XSAVE feature set 的枚举一部分被枚举
+
+## 9.3 USER-INTERRUPT STATE AND USER-INTERRUPT MSRS
+The user-interrupt architecture defines the following new state. Some of this state can be accessed via the RDMSR
+> user interrupt architecture 定义了下面的new state。这些state中的一部分可以通过RDMSR访问
+
+### 9.3.1 User-Interrupt State
+The following are the elements of the new state (enumerated here independent of how they are accessed):
+> 下面是new state的 元素(此处列举的内容与访问方式无关)
+
+* UIRR: user-interrupt request register.<br/>
+This value includes one bit for each of the 64 user-interrupt vectors. If UIRR[i] = 1, a user interrupt with
+vector i is requesting service. The notation UIRRV is used to refer to the position of the most significant bit
+set in UIRR; if UIRR = 0, UIRRV = 0.
+> 该值包含了每一个64 user-interrupt vector的one bit。如果UIRR[i] = 1, 带有vector i 的 user interrupt
+> 是正在请求的service。符号`UIRRV`用于表明 UIRR中的最高位的位置; 如果`UIRR` = 0,`UIRRV`=0
+* UIF: user-interrupt flag.<br/>
+If UIF = 0, user-interrupt delivery is blocked; if UIF = 1, user interrupts may be delivered. User-interrupt
+delivery clears UIF, and the new UIRET instruction sets it. Section 9.6 defines other new instructions for
+accessing UIF.
+> 如果UIF = 0, user-interrupt delivery 将被 blocked; 如果UIF=1, user interrupt 可能会被 delivered。User-interrupt
+> delivery 会清空 UIF, 并且new UIRET 指令会设置该位。Section 9.6 定义了新的指令用于访问UIF
+
+* UIHANDLER: user-interrupt handler.<br/>
+This is the linear address of the user-interrupt handler. User-interrupt delivery loads this address into RIP.
+> 这时一个 user interrupt handler 的线性地址。 user-interrupt delivery会将该地值 load到 RIP
+* UISTACKADJUST: user-interrupt stack adjustment.<br/>
+This value controls adjustment to the stack pointer (RSP) prior to user-interrupt delivery. It can account for
+an OS ABI’s “red zone” or be configured to load RSP with an alternate stack pointer.<br/>
+The value UISTACKADJUST must be canonical. If bit 0 is 1, user-interrupt delivery loads RSP with UISTACK-
+ADJUST; otherwise, it subtracts UISTACKADJUST from RSP. Either way, user-interrupt delivery then aligns
+RSP to a 16-byte boundary. See Section 9.4.2 for details.
+> 
+* UINV: user-interrupt notification vector.<br/>
+This is the vector of those ordinary interrupts that are treated as user-interrupt notifications (Section 9.5.1).
+When the logical processor receives user-interrupt notification, it processes the user interrupts in the user
+posted-interrupt descriptor (UPID) referenced by UPIDADDR (see below and Section 9.5.2).
+* UPIDADDR: user posted-interrupt descriptor address.<br/>
+This is the linear address of the UPID that the logical processor consults upon receiving an ordinary interrupt
+with vector UINV.
+* UITTADDR: user-interrupt target table address.<br/>
+This is the linear address of user-interrupt target table (UITT), which the logical processor consults when
+software invokes the SENDUIPI instruction (see Section 9.7).
+* UITTSZ: user-interrupt target table size.<br/>
+This value is the highest index of a valid entry in the UITT (see Section 9.7).
