@@ -7,7 +7,7 @@ Author: Steve Capper <steve.capper@arm.com>
 Date:   Wed Aug 7 16:55:14 2019 +0100
 
 # 4
-## 04-23
+## 04-03
 * [kernel commit] 20a166243328c14a0c24bd8c7919223ab4174917 arm64: kdump: add VMCOREINFO's for user-space tools
 > Author: AKASHI Takahiro <takahiro.akashi@linaro.org>
 > Date:   Mon Apr 3 11:24:37 2017 +0900
@@ -17,3 +17,6 @@ Date:   Wed Aug 7 16:55:14 2019 +0100
 * [makedumpfile commit] 67d0e1d68f28c567a704fd6b9b8fd696ad3df183
 Author: Kazuhito Hagio <k-hagio-ab@nec.com>
 Date:   Fri Jan 29 11:40:24 2021 +0900
+
+## 04-11
+* [task state](https://zhuanlan.zhihu.com/p/42097408)
