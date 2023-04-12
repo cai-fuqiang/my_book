@@ -4,12 +4,20 @@ Date: Tue, 25 May 2021 16:57:37 -0700
 Subject: [PATCH 01/18] x86/uintr/man-page: Include man pages draft for
  reference
 
+draft : 草稿，草案
+
 Included here in plain text format for reference and review.
 
 <Eventually, send the man pages in groff format separately to the
 man-pages repository.>
 
+Eventually : 最终
+separately : 单独的
+repository : 仓库
+
 The formatting for the man pages still needs a little bit of work.
+
+a little bit : 一点点
 
 TODO: The manpages still need to be updated with the latest syscalls.
 
@@ -54,12 +62,22 @@ index 000000000000..28b77fdbbf83
 +       User Interrupts (Uintr) provides a low latency event delivery and inter
 +       process communication mechanism. These events can be delivered directly
 +       to userspace without a transition to the kernel.
+	
+	uintr 提供了一个递延迟的event delivery 和进程间通信的机制。这些事件可以在
+	不经由kernel的情况下直接delivery到用户态
+
 +
 +       In  the  User  Interrupts  hardware  architecture, a receiver is always
 +       expected to be a user space task. However, a user interrupt can be sent
 +       by  another  user  space  task,  kernel  or  an external source (like a
 +       device). The feature that allows another  userspace  task  to  send  an
 +       interrupt is referred to as User IPI.
+	
+	在uintr hardware architecture中, receiver 总是被期望为 userspace task。
+	然而，user interrupt 可以被另一个 user space task, kernel 或者
+	external source (例如device) 发送。允许另一个userspace task 发送 interrupt 
+	的feature 成为 User IPI.
+
 +
 +       Uintr  is  a  hardware  dependent,  opt-in  feature. Application aren't
 +       expected or able to send or receive  interrupts  unless  they  register
@@ -67,12 +85,23 @@ index 000000000000..28b77fdbbf83
 +       It is recommended that applications wanting to use User Interrupts call
 +       uintr_register_handler(2) and test whether the call succeeds.
 +
+	
+	Uintr 是一个依赖硬件的，可选择的feature。除非应用程序使用下面描述的syscall 
+	interface 向内核注册自己, 否则，它不应该或无法 send/receive interrupts。
+
 +       Hardware  support  for  User  interrupts  may  be  detected using other
 +       mechanisms but that could be misleading and is generally not needed:
 +        - Using the cpuid instruction (Refer  the  Intel  Software  Developers
 +       Manual).
 +        -  Checking  for the "uintr" string in /proc/cpuinfo under the "flags"
 +       field.
+
+	misleading :误导
+
+	可以使用其他的一些机制来检测 uintr 的硬件支持,但是这可能会产生误导，
+	并且通常不需要
+	- 使用cpuid instruction (见 SDM)
+	- 在 /proc/cpuinfo 中的flags字段，检测 "uintr" string
 +
 +
 +       Applications wanting to use Uintr  should  also  be  able  to  function
@@ -81,22 +110,46 @@ index 000000000000..28b77fdbbf83
 +        - the kernel code does not contain support
 +        - the kernel support has been disabled
 +        - the hardware does not support it
+
+	想要使用uintr的应用程序，也应该能够在没有它的情况下运行。Uintr
+	support 可能由于下面的一些原因 不被支持:
+	- kernel code 没有包含这个支持
+	- kernel support 被disabled
+	- hardware 不支持
 +
 +
 +   Uintr syscall interface
 +       Applications can use and manage Uintr using the system calls  described
 +       here.   The  Uintr  system  calls  are  available only if the kernel is
 +       configured with the CONFIG_X86_USER_INTERRUPTS option.
+	Application 可以通过这里描述的system calls 来使用并且管理 Uintr。Uintr system
+	call 只有在kernel 配置了 CONFIG_X86_USER_INTERRUPTS option 的情况下才 available。
+
 +
 +       1)  A  user  application   registers   an   interrupt   handler   using
 +       uintr_register_handler(2).  The  registered  interrupt  handler will be
 +       invoked when a user interrupt is delivered to  that  thread.  Only  one
 +       interrupt  handler  can  be  registered by a particular thread within a
 +       process.
+
+	1) 用户程序使用 `uintr_register_handler` 来注册 interrupt handler。这个注册的
+	interrupt handler 将在 user interrupt delivery 到 该thread时候，被调用。
+	进程中的一个特定的线程只能注册一个 interrupt handler。
+
 +
 +       2) Each thread that registers a handler has its own unique vector space
 +       of 64 vectors. The thread can then use uintr_vector_fd(2) to register a
 +       vector and create a user interrupt file descriptor - uvec_fd.
+	
+	2) 每个thread 可以注册一个handler，该 handler 有自己单独的 64
+	vectors中的 vector space。进程可以使用`uintr_vector_fd`来注册一个vector, 并且 
+	创建一个 user interrupt fd - uvec_fd.
+
+	NOTE:
+	这里 unique 可能是指与众不同的意思。例如，A进程可以注册, 2 3vector, 
+	B进程可以注册 4 5 vector, 但是一个thread只能注册一个handler,
+	这个handler负责处理该进程注册的所有的vector。
+	
 +
 +       3a) The uvec_fd is only associated with only one Uintr vector.   A  new
 +       uvec_fd  must  be  created  for  each  of  the  64  vectors. uvec_fd is
@@ -107,6 +160,12 @@ index 000000000000..28b77fdbbf83
 +       vector. Upon interrupt delivery, the interrupt handler is invoked  with
 +       the  vector  number pushed onto the stack to identify the source of the
 +       interrupt.
+
+	uvec_fd 只和一个Uintr vector相关联。必须为 64vectors中的每个vector创建一
+	个新的uvec_fd ??? uvec_fd将在 fork 时被自动继承，但是receiver可以通过 任意
+	现有的 existing FD sharing mechanism ( pidfd_getfd()/socketsendmeg)向潜在的
+	senders共享 uvec_fd
+
 +
 +       4) Each thread has a local flag called User Interrupt flag  (UIF).  The
 +       thread  can set or clear this flag to enable or disable interrupts. The
@@ -115,6 +174,15 @@ index 000000000000..28b77fdbbf83
 +       anytime after registration) to  start  receiving  user  interrupts.  To
 +       disable  interrupts  during  critical  sections the thread can call the
 +       _clui() instruction to clear UIF.
+
+	intrinsic: 内部的
+
+	每个thread 有一个称为 User Iuterrupt flags 的local flags . 该thread可以设置/
+	清空该flags来 enable/disable interrupts。UIF默认值为0(interrupt disabled)。
+	receiver 必须在某些时刻(注册前或者注册后的任何时间)执行 _stui() 内部指令来
+	开始接收 user interrupts. 当在critical sections thread可以执行_clui()指令
+	clear UIF
+
 +
 +       5a) For sending a user IPI, the sender task registers with  the  kernel
 +       using  uintr_register_sender(2).  The  kernel  would  setup the routing
@@ -123,11 +191,26 @@ index 000000000000..28b77fdbbf83
 +       IPI.  If the receiver is running, the interrupt is  delivered  directly
 +       to  the  receiver  without  any  kernel  intervention.  See  9) for the
 +       behavior when the receiver is not running.
+
+	intervention : 介入
+
+	对于sending 一个 user IPI , sender task 通过uintr_register_sender 向 kernel
+	注册。kernel 应该初始化 routing table 来连接 sender 和 receiver。syscall
+	返回一个index, 来用作 `SENDUIPI <index>` instruction 指令使用来发送 一个 user 
+	IPI。如果receiver 是 running的， interrupt 将被直接delivery 到 recevier, 并且没有
+	任何kernel的介入. 请见 9) 来了解 当 receiver 不在 running 时的行为。
+
 +
 +       5b) If the sender is the kernel or an external source, the uvec_fd  can
 +       be  passed  onto the related kernel entity to allow them to connect and
 +       generate the user interrupt. The specifics of this mechanism  would  be
 +       defined by the kernel entity being connected to.
+
+	entity : 实体
+
+	如果sender 时kernel 或者是 external source, uvec_fd可以被传递到相应的
+	kernel entity 来允许他们去connect 和生成 user interrupt。这个机制的 
+	specifics 应该由 将要连接的  kernel entity 定义
 +
 +       6)  If  a  sender task is part of the same process as the receiver then
 +       the FD based connection setup can  be  avoided.  uintr_register_self(2)
@@ -135,9 +218,19 @@ index 000000000000..28b77fdbbf83
 +       uintr_register_sender(2), which can be used by all tasks  of  the  same
 +       process to generate User IPIs.
 +
+	
+	如果一个 sender task 和 receiver 是相同的process, 然后 可以避免执行FD 
+	base connection setup  流程. `uintr_register_self` 用vector 作为输入，
+	并且返回和`uintr_register_sender`相似的 uipi_index, 他可以被 same process 
+	的所有的tasks 生成User IPIs。
+
 +       7) If a sender process wants to share it's IPI connections with another
 +       process it can request an IPI FD using uintr_ipi_fd(2). Also,  all  IPI
 +       connections are inherited upon fork().
+
+	如果一个sender process 想要去share 他的 IPI co 到另一个process, 它可以使用
+	`uintr_ipi_fd`请求一个IPI FD。另外，所有的IPI connections，都可以被fork()继承
+
 +
 +       8) The sender and receiver are expected to coordinate and then call the
 +       teardown syscalls to terminate the connection:
@@ -145,18 +238,40 @@ index 000000000000..28b77fdbbf83
 +         b. A receiver unregisters with uintr_unregister_handler(2)
 +         c. Calling close() on the file descrpiptors if they have been created
 +
+	coordinate : 协调
+	teardown : 拆卸，卸载
+
+	sender 和 receiver 应进行协调, 然后调用 teardown系统调用来终止连接: 
+	  a. sender 通过 uintr_unregister_sender 注销
+	  b. receiver 通过 uintr_unresiter_handler 注销
+	  c. 如果fd被创建，调用 close()  关闭fd
+
 +       If the sender and receiver  aren't  able  to  coordinate,  some  shared
 +       kernel  resources  between  them  would  get  freed later when the file
 +       descriptors get released automatically on process exit.
+
+	如果 sender 和 receiver 并没有协调好，某些在他们之中的shared kernel  resources 
+	将被freed later(在 process exit 是，被自动的释放)
+
 +
 +       9) User Interrupts can only be  delivered  if  a  task  is  running  in
 +       ring-3.   The  behavior differs when a receiver is not actively running
 +       based on each of the below states.
 +
+
+	9) Uintr 只能在 task 运行在 ring-3时，被delivery。当receiver不是
+	actively running, 行为会根据下面的状态有所不同。
+
 +       a) The receiver has been context switched out because it's  time  slice
 +       has  expired  or  a higher priority task is running. The a pending User
 +       Interrupt in that case would be delivered when the receiver is  context
 +       switched back.
+
+	a) receiver 
+	由于时间片过期，或者是更高优先级的task 正在运行, 已经被 context switched out.
+	在这种情况下 pending 的user interrupt  将会在 receiver context switched back 
+	时候被 delivery
+
 +
 +       b)  The  receiver is in context but not running in ring 3 (probably due
 +       to a syscall). The interrupt will be delivered the task  enters  ring-3
