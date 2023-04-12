@@ -1,0 +1,666 @@
+From 533d395f97a68c8dec5f3bda07919a014eff5f21 Mon Sep 17 00:00:00 2001
+From: Sohil Mehta <sohil.mehta@intel.com>
+Date: Thu, 8 Sep 2022 15:52:58 -0700
+Subject: [PATCH 12/18] x86/uintr: Add support for interrupting blocking system
+ calls
+
+User interrupts are delivered to applications immediately if they are
+running in userspace. Without this support, if a receiver task has
+blocked in the kernel due to blocking calls like read(), sleep(), etc;
+the interrupt will only get delivered when the application gets
+scheduled again.
+
+To avoid that, add support for interrupting tasks that are blocking when
+a user interrupt is triggered. This has similar semantics to how signals
+work today.
+
+There are 2 options implemented here:
+1) The cpu that was last running the task handles the kernel interrupt
+and wakes up the receiver task. There is no hardware assist here to
+identify the receiver. So, there is a need to scanning all tasks that were
+blocked.
+
+2) Set a reserved bit in the UPID which would cause a #GP on the
+sender task trying to generate the interrupt. In the #GP handler, decode
+and emulate the instruction to wake up the receiver.
+
+<Both of the above options are experimental and the implemented code
+susceptible to races.>
+
+Signed-off-by: Sohil Mehta <sohil.mehta@intel.com>
+---
+ arch/x86/Kconfig                  |  17 ++++
+ arch/x86/include/asm/uintr.h      |  19 ++++
+ arch/x86/include/uapi/asm/uintr.h |   7 ++
+ arch/x86/kernel/irq.c             |  22 +++++
+ arch/x86/kernel/process_64.c      |   3 +
+ arch/x86/kernel/signal.c          |  26 +++++
+ arch/x86/kernel/traps.c           | 146 +++++++++++++++++++++++++++++
+ arch/x86/kernel/uintr.c           | 151 +++++++++++++++++++++++++++++-
+ include/linux/sched.h             |   2 +
+ 9 files changed, 392 insertions(+), 1 deletion(-)
+
+diff --git a/arch/x86/Kconfig b/arch/x86/Kconfig
+index 931a61ede2f9..7cb9155ae9b5 100644
+--- a/arch/x86/Kconfig
++++ b/arch/x86/Kconfig
+@@ -1884,6 +1884,23 @@ config X86_USER_INTERRUPTS
+ 
+ 	  Refer Documentation/x86/user-interrupts.rst for details.
+ 
++config X86_UINTR_BLOCKING
++	bool "User Interrupts - blocking support"
++	depends on X86_USER_INTERRUPTS
++	help
++	  User interrupts are delivered to applications immediately if they are
++	  running in userspace. However, if a receiver task has blocked in the
++	  kernel and scheduled out then the interrupt will only get delivered
++	  when the application gets scheduled again.
++
++	  Enabling support for blocking would allow system calls like read(),
++	  sleep() etc; to be interrupted when a user interrupt is initiated.
++	  This behavior is similar to the mechanism provided by signals.
++
++	  Note: The current support for interrupting blocking system calls is
++	  experimental and flaky. Enable this only if you are specifically
++	  testing this. Failures can happen when stressed.
++
+ choice
+ 	prompt "TSX enable mode"
+ 	depends on CPU_SUP_INTEL
+diff --git a/arch/x86/include/asm/uintr.h b/arch/x86/include/asm/uintr.h
+index 9726e72ac479..17a6ddaa58bd 100644
+--- a/arch/x86/include/asm/uintr.h
++++ b/arch/x86/include/asm/uintr.h
+@@ -20,6 +20,8 @@ struct uintr_upid {
+ /* UPID Notification control status bits */
+ #define UINTR_UPID_STATUS_ON		0x0	/* Outstanding notification */
+ #define UINTR_UPID_STATUS_SN		0x1	/* Suppressed notification */
++#define UINTR_UPID_STATUS_BLKD		0x7	/* Blocked waiting for kernel */
++
+ 
+ struct uintr_upid_ctx {
+ 	struct list_head node;
+@@ -29,8 +31,15 @@ struct uintr_upid_ctx {
+ 	/* TODO: Change to kernel kref api */
+ 	refcount_t refs;
+ 	bool receiver_active;		/* Flag for UPID being mapped to a receiver */
++	bool waiting;			/* Flag for UPID blocked in the kernel */
++	unsigned int waiting_cost;	/* Flags for who pays the waiting cost */
+ };
+ 
++/* UPID waiting cost */
++#define UPID_WAITING_COST_NONE		0x0
++#define UPID_WAITING_COST_RECEIVER	0x1
++#define UPID_WAITING_COST_SENDER	0x2
++
+ /*
+  * Each UITT entry is 16 bytes in size.
+  * Current UITT table size is set as 4KB (256 * 16 bytes)
+@@ -67,9 +76,15 @@ bool is_uintr_sender(struct task_struct *t);
+ void uintr_set_sender_msrs(struct task_struct *t);
+ bool uintr_check_uitte_valid(struct uintr_uitt_ctx *uitt_ctx, unsigned int entry);
+ 
++/* Uintr blocking related function */
++void uintr_wake_up_process(void);
++bool is_uintr_receiver(struct task_struct *t);
++bool is_uintr_ongoing(struct task_struct *t);
++
+ /* TODO: Inline the context switch related functions */
+ void switch_uintr_prepare(struct task_struct *prev);
+ void switch_uintr_return(void);
++void switch_uintr_finish(struct task_struct *next);
+ 
+ void uintr_free(struct task_struct *task);
+ 
+@@ -77,8 +92,12 @@ void uintr_free(struct task_struct *task);
+ 
+ static inline void uintr_destroy_uitt_ctx(struct mm_struct *mm) {}
+ 
++static inline bool is_uintr_receiver(struct task_struct *t) { return false; }
++static inline bool is_uintr_ongoing(struct task_struct *t) { return false; }
++
+ static inline void switch_uintr_prepare(struct task_struct *prev) {}
+ static inline void switch_uintr_return(void) {}
++static inline void switch_uintr_finish(struct task_struct *next) {}
+ 
+ static inline void uintr_free(struct task_struct *task) {}
+ 
+diff --git a/arch/x86/include/uapi/asm/uintr.h b/arch/x86/include/uapi/asm/uintr.h
+index 6b306bf0e6eb..6e8623248290 100644
+--- a/arch/x86/include/uapi/asm/uintr.h
++++ b/arch/x86/include/uapi/asm/uintr.h
+@@ -16,4 +16,11 @@
+ /* Not supported for now. UITT clearing is an involved process */
+ #define UIPI_CLEAR_TARGET_TABLE		_IO(UINTR_UIPI_FD_BASE, 1)
+ 
++/* Syscall register handler flags */
++#define UINTR_HANDLER_FLAG_WAITING_NONE		0x0
++#define UINTR_HANDLER_FLAG_WAITING_RECEIVER	0x1000
++#define UINTR_HANDLER_FLAG_WAITING_SENDER	0x2000
++#define UINTR_HANDLER_FLAG_WAITING_ANY		(UINTR_HANDLER_FLAG_WAITING_SENDER | \
++						 UINTR_HANDLER_FLAG_WAITING_RECEIVER)
++
+ #endif
+diff --git a/arch/x86/kernel/irq.c b/arch/x86/kernel/irq.c
+index eb21340b2dfe..aed0f81d88e7 100644
+--- a/arch/x86/kernel/irq.c
++++ b/arch/x86/kernel/irq.c
+@@ -22,6 +22,7 @@
+ #include <asm/desc.h>
+ #include <asm/traps.h>
+ #include <asm/thermal.h>
++#include <asm/uintr.h>
+ 
+ #define CREATE_TRACE_POINTS
+ #include <asm/trace/irq_vectors.h>
+@@ -364,6 +365,21 @@ DEFINE_IDTENTRY_SYSVEC(sysvec_uintr_spurious_interrupt)
+ 	/* TODO: Add entry-exit tracepoints */
+ 	ack_APIC_irq();
+ 	inc_irq_stat(uintr_spurious_count);
++
++	/*
++	 * Typically, we only expect wake-ups to happen using the kernel
++	 * notification. However, there might be a possibility that a process
++	 * blocked while a notification with UINTR_NOTIFICATION_VECTOR was
++	 * in-progress. This could result in a spurious interrupt that needs to
++	 * wake up the process to avoid missing a notification.
++	 *
++	 * There might be an option to detect this wake notification earlier by
++	 * checking the ON bit right before letting the task block. That needs
++	 * further investigation. For now, leave it here for paranoid reasons.
++	 */
++	if (IS_ENABLED(CONFIG_X86_UINTR_BLOCKING))
++		uintr_wake_up_process();
++
+ }
+ 
+ /*
+@@ -374,6 +390,12 @@ DEFINE_IDTENTRY_SYSVEC(sysvec_uintr_kernel_notification)
+ 	/* TODO: Add entry-exit tracepoints */
+ 	ack_APIC_irq();
+ 	inc_irq_stat(uintr_kernel_notifications);
++
++	pr_debug_ratelimited("uintr: Kernel notification interrupt on %d\n",
++			     smp_processor_id());
++
++	if (IS_ENABLED(CONFIG_X86_UINTR_BLOCKING))
++		uintr_wake_up_process();
+ }
+ #endif
+ 
+diff --git a/arch/x86/kernel/process_64.c b/arch/x86/kernel/process_64.c
+index 75053dd8ffde..28d4c3ec3f82 100644
+--- a/arch/x86/kernel/process_64.c
++++ b/arch/x86/kernel/process_64.c
+@@ -628,6 +628,9 @@ __switch_to(struct task_struct *prev_p, struct task_struct *next_p)
+ 	/* Reload sp0. */
+ 	update_task_stack(next_p);
+ 
++	if (cpu_feature_enabled(X86_FEATURE_UINTR))
++		switch_uintr_finish(next_p);
++
+ 	switch_to_extra(prev_p, next_p);
+ 
+ 	if (static_cpu_has_bug(X86_BUG_SYSRET_SS_ATTRS)) {
+diff --git a/arch/x86/kernel/signal.c b/arch/x86/kernel/signal.c
+index 9c7265b524c7..e095c9017f81 100644
+--- a/arch/x86/kernel/signal.c
++++ b/arch/x86/kernel/signal.c
+@@ -36,6 +36,7 @@
+ #include <asm/mce.h>
+ #include <asm/sighandling.h>
+ #include <asm/vm86.h>
++#include <asm/uintr.h>
+ 
+ #ifdef CONFIG_X86_64
+ #include <linux/compat.h>
+@@ -872,6 +873,31 @@ void arch_do_signal_or_restart(struct pt_regs *regs)
+ 		return;
+ 	}
+ 
++	/* TODO: Improve common code */
++	/* Check if a User Interrupt needs to be delivered. Skip restarting in that case */
++	if (IS_ENABLED(CONFIG_X86_UINTR_BLOCKING) &&
++	    cpu_feature_enabled(X86_FEATURE_UINTR) &&
++	    is_uintr_receiver(current) &&
++	    is_uintr_ongoing(current)) {
++		if (syscall_get_nr(current, regs) != -1) {
++			switch (syscall_get_error(current, regs)) {
++			case -ERESTARTNOHAND:
++			case -ERESTARTSYS:
++			case -ERESTARTNOINTR:
++			case -ERESTART_RESTARTBLOCK:
++				regs->ax = -EINTR;
++				break;
++			}
++
++			/*
++			 * Since there's no signal to deliver, just put the
++			 * saved sigmask back.
++			 */
++			restore_saved_sigmask();
++			return;
++		}
++	}
++
+ 	/* Did we come from a system call? */
+ 	if (syscall_get_nr(current, regs) != -1) {
+ 		/* Restart the system call - no handlers present */
+diff --git a/arch/x86/kernel/traps.c b/arch/x86/kernel/traps.c
+index 8254275c45df..ede815ae1f89 100644
+--- a/arch/x86/kernel/traps.c
++++ b/arch/x86/kernel/traps.c
+@@ -416,9 +416,150 @@ static bool fixup_senduipi_ud_exception(struct pt_regs *regs)
+ 	return true;
+ }
+ 
++/* TODO: Check is the code flow is common and introduce a generic function */
++static long senduipi_decode_index(struct insn *insn, struct pt_regs *regs)
++{
++	unsigned long *reg_addr;
++	int reg_offset;
++
++#if 0
++	pr_debug("uintr: senduipi instruction detected insn.modrm.value:%x insn.modrm.got:%d ax:%lx &ax:%lx\n",
++		 insn->modrm.value,
++		 insn->modrm.got,
++		 regs->ax,
++		 (unsigned long)&regs->ax);
++
++	pr_debug("uintr: senduipi instruction detected - SENDUIPI 1-%lx 2-%x 3-%lx 4-%lx\n",
++		 (unsigned long)regs,
++		 insn_get_modrm_reg_off(insn, regs),
++		 (unsigned long)insn_get_modrm_reg_ptr(insn, regs),
++		 *insn_get_modrm_reg_ptr(insn, regs));
++#endif
++
++	reg_offset = insn_get_modrm_rm_off(insn, regs);
++
++	/*
++	 * Negative values are usually errors. In memory addressing,
++	 * the exception is -EDOM. Since we expect a register operand,
++	 * all negative values are errors.
++	 */
++	if (reg_offset < 0)
++		return -1;
++
++	reg_addr = (unsigned long *)((unsigned long)regs + reg_offset);
++
++	return *reg_addr;
++}
++
++static struct uintr_upid_ctx *get_upid_ctx_from_senduipi_index(struct task_struct *t,
++							       long uipi_index)
++{
++	struct uintr_uitt_ctx *uitt_ctx = t->mm->context.uitt_ctx;
++
++	return uitt_ctx->r_upid_ctx[uipi_index];
++}
++
++static int get_vector_from_senduipi_index(struct task_struct *t, long entry)
++{
++	struct uintr_uitt_ctx *uitt_ctx = t->mm->context.uitt_ctx;
++	struct uintr_uitt_entry *uitte = uitte = &uitt_ctx->uitt[entry];
++
++	return uitte->user_vec;
++}
++
++/* TODO: Check the entire function for concurrency and racing */
++/* Called from the GP exception handler with interrupts enabled */
++static bool fixup_uintr_gp_exception(struct pt_regs *regs)
++{
++	struct uintr_upid_ctx *r_upid_ctx;
++	struct task_struct *t = current;
++	unsigned char buf[MAX_INSN_SIZE];
++	struct insn insn;
++	long uipi_index;
++	int nr_copied;
++	int uvec;
++	int ret;
++
++	pr_debug("uintr: In gp exception fix function\n");
++
++	if (!is_uintr_sender(t))
++		return false;
++
++	if (!regs)
++		return false;
++
++	pr_debug("uintr: Starting to Decode fault instruction\n");
++
++	nr_copied = insn_fetch_from_user(regs, buf);
++	if (nr_copied <= 0)
++		return false;
++
++	if (!insn_decode_from_regs(&insn, regs, buf, nr_copied))
++		return false;
++
++	if (!is_senduipi_insn(&insn))
++		return false;
++
++	pr_debug("uintr: senduipi instruction detected");
++
++	uipi_index = senduipi_decode_index(&insn, regs);
++	if (uipi_index < 0)
++		return false;
++
++	pr_debug("uintr: SENDUIPI index %lx\n", uipi_index);
++
++	if (!uintr_check_uitte_valid(t->mm->context.uitt_ctx, uipi_index))
++		return false;
++
++	r_upid_ctx = get_upid_ctx_from_senduipi_index(t, uipi_index);
++	if (!r_upid_ctx)
++		return false;
++
++	pr_debug("uintr: Checking if UPID=%px is blocked\n",
++		 r_upid_ctx->upid);
++
++	uvec = get_vector_from_senduipi_index(t, uipi_index);
++
++	/* TODO: Confirm: Can we come here because of a GP not related to UPID Blocked? */
++
++	/* The next few steps are prone to racing and could have issues with concurrency */
++
++	/* Check if use of a mutex here would help avoid concurrency issues */
++
++	/*
++	 * Probably need a cmpxchg() here to also set the ON bit and uvec along
++	 * with clearing the Blocked bit
++	 */
++	if (!test_and_clear_bit(UINTR_UPID_STATUS_BLKD,
++				(unsigned long *)&r_upid_ctx->upid->nc.status)) {
++		/* Let the process execute this instruction again */
++		return true;
++	}
++
++	set_bit(uvec, (unsigned long *)&r_upid_ctx->upid->puir);
++
++	set_bit(UINTR_UPID_STATUS_ON, (unsigned long *)&r_upid_ctx->upid->nc.status);
++
++	r_upid_ctx->waiting = false;
++
++	set_tsk_thread_flag(r_upid_ctx->task, TIF_NOTIFY_SIGNAL);
++	ret = wake_up_process(r_upid_ctx->task);
++
++	pr_debug("uintr: task=%d UPID=%px was blocked. Set vector=%d Now the task is %s\n",
++		 r_upid_ctx->task->pid, r_upid_ctx->upid, uvec,
++		 ret ? "unblocked" : "already running");
++
++	/* Increase IP to avoid executing senduipi again. */
++	regs->ip += insn.length;
++
++	return true;
++}
++
+ #else
+ static inline bool is_senduipi_insn(struct insn *insn) { return false; }
+ static inline bool fixup_senduipi_ud_exception(struct pt_regs *regs) { return false; }
++static inline long senduipi_decode_index(struct insn *insn, struct pt_regs *regs) { return 0; }
++static inline bool fixup_uintr_gp_exception(struct pt_regs *regs) { return false; }
+ #endif
+ 
+ DEFINE_IDTENTRY_RAW(exc_invalid_op)
+@@ -836,6 +977,11 @@ DEFINE_IDTENTRY_ERRORCODE(exc_general_protection)
+ 			goto exit;
+ 	}
+ 
++	if (cpu_feature_enabled(X86_FEATURE_UINTR) && IS_ENABLED(CONFIG_X86_UINTR_BLOCKING)) {
++		if (user_mode(regs) && fixup_uintr_gp_exception(regs))
++			goto exit;
++	}
++
+ 	if (v8086_mode(regs)) {
+ 		local_irq_enable();
+ 		handle_vm86_fault((struct kernel_vm86_regs *) regs, error_code);
+diff --git a/arch/x86/kernel/uintr.c b/arch/x86/kernel/uintr.c
+index 218e30cdecdb..cb0f03baa851 100644
+--- a/arch/x86/kernel/uintr.c
++++ b/arch/x86/kernel/uintr.c
+@@ -39,11 +39,24 @@ struct uvecfd_ctx {
+ #endif
+ };
+ 
++/* Definitions to make the compiler happy */
++static void uintr_remove_task_wait(struct task_struct *task);
++
++/* TODO: To remove the global lock, move to a per-cpu wait list. */
++static DEFINE_SPINLOCK(uintr_wait_lock);
++static struct list_head uintr_wait_list = LIST_HEAD_INIT(uintr_wait_list);
++
+ inline bool is_uintr_receiver(struct task_struct *t)
+ {
+ 	return !!t->thread.upid_activated;
+ }
+ 
++inline bool is_uintr_ongoing(struct task_struct *t)
++{
++	return test_bit(UINTR_UPID_STATUS_ON,
++			(unsigned long *)&t->thread.upid_ctx->upid->nc.status);
++}
++
+ inline bool is_uintr_sender(struct task_struct *t)
+ {
+ 	return !!t->thread.uitt_activated;
+@@ -110,6 +123,7 @@ static struct uintr_upid_ctx *alloc_upid(void)
+ 	refcount_set(&upid_ctx->refs, 1);
+ 	upid_ctx->task = get_task_struct(current);
+ 	upid_ctx->receiver_active = true;
++	upid_ctx->waiting = false;
+ 
+ 	return upid_ctx;
+ }
+@@ -834,6 +848,11 @@ SYSCALL_DEFINE2(uintr_register_self, u64, vector, unsigned int, flags)
+ 	return ret;
+ }
+ 
++static inline void set_uintr_waiting(struct task_struct *t)
++{
++	t->thread.upid_ctx->waiting = true;
++}
++
+ static int do_uintr_unregister_handler(void)
+ {
+ 	struct task_struct *t = current;
+@@ -876,6 +895,8 @@ static int do_uintr_unregister_handler(void)
+ 	/* Release reference since the removed it from the MSR. */
+ 	put_upid_ref(upid_ctx);
+ 
++	uintr_remove_task_wait(t);
++
+ 	end_update_xsave_msrs();
+ 
+ 	/*
+@@ -970,6 +991,13 @@ static int do_uintr_register_handler(u64 handler, unsigned int flags)
+ 
+ 	end_update_xsave_msrs();
+ 
++	if (flags & UINTR_HANDLER_FLAG_WAITING_ANY) {
++		if (flags & UINTR_HANDLER_FLAG_WAITING_RECEIVER)
++			upid_ctx->waiting_cost = UPID_WAITING_COST_RECEIVER;
++		else
++			upid_ctx->waiting_cost = UPID_WAITING_COST_SENDER;
++	}
++
+ 	pr_debug("recv: task=%d register handler=%llx upid %px flags=%d\n",
+ 		 t->pid, handler, upid, flags);
+ 
+@@ -989,7 +1017,10 @@ SYSCALL_DEFINE2(uintr_register_handler, u64 __user *, handler, unsigned int, fla
+ 	pr_debug("recv: requesting register handler task=%d flags %d handler %lx\n",
+ 		 current->pid, flags, (unsigned long)handler);
+ 
+-	if (flags)
++	if (flags & ~UINTR_HANDLER_FLAG_WAITING_ANY)
++		return -EINVAL;
++
++	if (flags && !IS_ENABLED(CONFIG_X86_UINTR_BLOCKING))
+ 		return -EINVAL;
+ 
+ 	/* TODO: Validate the handler address */
+@@ -1079,6 +1110,33 @@ SYSCALL_DEFINE3(uintr_alt_stack, void __user *, sp, size_t, size, unsigned int,
+ 	return ret;
+ }
+ 
++static void uintr_switch_to_kernel_interrupt(struct uintr_upid_ctx *upid_ctx)
++{
++	unsigned long flags;
++
++	upid_ctx->upid->nc.nv = UINTR_KERNEL_VECTOR;
++	upid_ctx->waiting = true;
++	spin_lock_irqsave(&uintr_wait_lock, flags);
++	list_add(&upid_ctx->node, &uintr_wait_list);
++	spin_unlock_irqrestore(&uintr_wait_lock, flags);
++}
++
++static void uintr_set_blocked_upid_bit(struct uintr_upid_ctx *upid_ctx)
++{
++	set_bit(UINTR_UPID_STATUS_BLKD, (unsigned long *)&upid_ctx->upid->nc.status);
++	upid_ctx->waiting = true;
++}
++
++static inline bool is_uintr_waiting_cost_sender(struct task_struct *t)
++{
++	return (t->thread.upid_ctx->waiting_cost == UPID_WAITING_COST_SENDER);
++}
++
++static inline bool is_uintr_waiting_enabled(struct task_struct *t)
++{
++	return (t->thread.upid_ctx->waiting_cost != UPID_WAITING_COST_NONE);
++}
++
+ /* Suppress notifications since this task is being context switched out */
+ void switch_uintr_prepare(struct task_struct *prev)
+ {
+@@ -1090,6 +1148,22 @@ void switch_uintr_prepare(struct task_struct *prev)
+ 	/* Check if UIF should be considered here. Do we want to wait for interrupts if UIF is 0? */
+ 	upid_ctx = prev->thread.upid_ctx;
+ 
++	/*
++	 * A task being interruptible is a dynamic state. Need synchronization
++	 * in schedule() along with singal_pending_state() to avoid blocking if
++	 * a UINTR is pending
++	 */
++	if (IS_ENABLED(CONFIG_X86_UINTR_BLOCKING) &&
++	    is_uintr_waiting_enabled(prev) &&
++	    task_is_interruptible(prev)) {
++		if (!is_uintr_waiting_cost_sender(prev)) {
++			uintr_switch_to_kernel_interrupt(upid_ctx);
++			return;
++		}
++
++		uintr_set_blocked_upid_bit(upid_ctx);
++	}
++
+ 	set_bit(UINTR_UPID_STATUS_SN, (unsigned long *)&upid_ctx->upid->nc.status);
+ }
+ 
+@@ -1154,6 +1228,53 @@ void switch_uintr_return(void)
+ 		apic->send_IPI_self(UINTR_NOTIFICATION_VECTOR);
+ }
+ 
++/* Check does SN need to be set here */
++/* Called when task is unregistering/exiting or timer expired */
++static void uintr_remove_task_wait(struct task_struct *task)
++{
++	struct uintr_upid_ctx *upid_ctx, *tmp;
++	unsigned long flags;
++
++	if (!IS_ENABLED(CONFIG_X86_UINTR_BLOCKING))
++		return;
++
++	spin_lock_irqsave(&uintr_wait_lock, flags);
++	list_for_each_entry_safe(upid_ctx, tmp, &uintr_wait_list, node) {
++		if (upid_ctx->task == task) {
++			//pr_debug("wait: Removing task %d from wait\n",
++			//	 upid_ctx->task->pid);
++			upid_ctx->upid->nc.nv = UINTR_NOTIFICATION_VECTOR;
++			upid_ctx->waiting = false;
++			list_del(&upid_ctx->node);
++		}
++	}
++	spin_unlock_irqrestore(&uintr_wait_lock, flags);
++}
++
++static void uintr_clear_blocked_bit(struct uintr_upid_ctx *upid_ctx)
++{
++	upid_ctx->waiting = false;
++	clear_bit(UINTR_UPID_STATUS_BLKD, (unsigned long *)&upid_ctx->upid->nc.status);
++}
++
++/* Always make sure task is_uintr_receiver() before calling */
++static inline bool is_uintr_waiting(struct task_struct *t)
++{
++	return t->thread.upid_ctx->waiting;
++}
++
++void switch_uintr_finish(struct task_struct *next)
++{
++	if (IS_ENABLED(CONFIG_X86_UINTR_BLOCKING) &&
++	    is_uintr_receiver(next) &&
++	    is_uintr_waiting(next)) {
++		if (is_uintr_waiting_cost_sender(next))
++			uintr_clear_blocked_bit(next->thread.upid_ctx);
++		else
++			uintr_remove_task_wait(next);
++	}
++}
++
+ /*
+  * This should only be called from exit_thread().
+  * exit_thread() can happen in current context when the current thread is
+@@ -1186,6 +1307,7 @@ void uintr_free(struct task_struct *t)
+ 			 * generated based on this UPID.
+ 			 */
+ 			set_bit(UINTR_UPID_STATUS_SN, (unsigned long *)&upid_ctx->upid->nc.status);
++			uintr_remove_task_wait(t);
+ 			upid_ctx->receiver_active = false;
+ 			put_upid_ref(upid_ctx);
+ 		}
+@@ -1217,3 +1339,30 @@ void uintr_free(struct task_struct *t)
+ 	}
+ #endif
+ }
++
++/*
++ * Runs in interrupt context.
++ * Scan through all UPIDs to check if any interrupt is on going.
++ */
++void uintr_wake_up_process(void)
++{
++	struct uintr_upid_ctx *upid_ctx, *tmp;
++	unsigned long flags;
++
++	/* Fix: 'BUG: Invalid wait context' due to use of spin lock here */
++	spin_lock_irqsave(&uintr_wait_lock, flags);
++	list_for_each_entry_safe(upid_ctx, tmp, &uintr_wait_list, node) {
++		if (test_bit(UINTR_UPID_STATUS_ON, (unsigned long *)&upid_ctx->upid->nc.status)) {
++			pr_debug_ratelimited("uintr: Waking up task %d\n",
++					     upid_ctx->task->pid);
++			set_bit(UINTR_UPID_STATUS_SN, (unsigned long *)&upid_ctx->upid->nc.status);
++			/* Check if a locked access is needed for NV and NDST bits of the UPID */
++			upid_ctx->upid->nc.nv = UINTR_NOTIFICATION_VECTOR;
++			upid_ctx->waiting = false;
++			set_tsk_thread_flag(upid_ctx->task, TIF_NOTIFY_SIGNAL);
++			wake_up_process(upid_ctx->task);
++			list_del(&upid_ctx->node);
++		}
++	}
++	spin_unlock_irqrestore(&uintr_wait_lock, flags);
++}
+diff --git a/include/linux/sched.h b/include/linux/sched.h
+index e7b2f8a5c711..bc26593ab525 100644
+--- a/include/linux/sched.h
++++ b/include/linux/sched.h
+@@ -123,6 +123,8 @@ struct task_group;
+ #define task_is_stopped(task)		((READ_ONCE(task->jobctl) & JOBCTL_STOPPED) != 0)
+ #define task_is_stopped_or_traced(task)	((READ_ONCE(task->jobctl) & (JOBCTL_STOPPED | JOBCTL_TRACED)) != 0)
+ 
++#define task_is_interruptible(task)	((READ_ONCE(task->__state) & TASK_INTERRUPTIBLE) != 0)
++
+ /*
+  * Special states are those that do not use the normal wait-loop pattern. See
+  * the comment with set_special_state().
+-- 
+2.39.0
+

@@ -1,0 +1,205 @@
+From 5f1583c2b8805d223bbf0031bdb2e7f6b3e1ad5a Mon Sep 17 00:00:00 2001
+From: Sohil Mehta <sohil.mehta@intel.com>
+Date: Tue, 6 Sep 2022 13:26:25 -0700
+Subject: [PATCH 05/18] x86/irq: Reserve a user IPI notification and kernel
+ vectors
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+A user interrupt notification vector is used on the receiver's cpu to
+identify an interrupt as a user interrupt (and not a kernel interrupt).
+Hardware uses the same notification vector to generate an IPI from a
+sender's cpu core when the SENDUIPI instruction is executed.
+
+Typically, the kernel shouldn't receive an interrupt with this vector.
+However, it is possible that the kernel might receive this vector.
+
+Scenario that can cause the spurious interrupt:
+
+Step    cpu 0 (receiver task)           cpu 1 (sender task)
+----    ---------------------           -------------------
+1       task is running
+2                                       executes SENDUIPI
+3                                       IPI sent
+4       context switched out
+5       IPI delivered
+        (kernel interrupt detected)
+
+A kernel interrupt can be detected, if a receiver task gets scheduled
+out after the SENDUIPI-based IPI was sent but before the IPI was
+delivered.
+
+The kernel doesn't need to do anything in this case other than receiving
+the interrupt and clearing the local APIC. The user interrupt is always
+stored in the receiver's UPID before the IPI is generated. When the
+receiver gets scheduled back the interrupt would be delivered based on
+its UPID.
+
+Reserve another vector to be used for kernel notifications which need to
+wake up a user process that has blocked.
+
+In summary, reserve 2 notification vectors (NV) for the 2 states of a
+thread (running vs blocked).
+
+NV-1 – used only for tasks that are running. (results in a user
+interrupt or a spurious kernel interrupt)
+
+NV-2 – used only for a tasks that are blocked in the kernel. (always
+results in a kernel interrupt)
+
+The UPID.UINV bits are switched between NV-1 and NV-2 based on the state
+of the task.
+
+However, NV-1 is also programmed in the running task's MISC_MSR UINV
+bits. This is what tells the ucode that the notification vector received
+is for the user instead of the kernel.
+
+NV-2 is never programmed in the MISC_MSR of a task. When NV-2 arrives on
+any cpu there is never a possibility of it being detected as a User
+Interrupt. It will always be delivered to the kernel.
+
+Cc: Jacob Pan <jacob.jun.pan@linux.intel.com>
+Signed-off-by: Sohil Mehta <sohil.mehta@intel.com>
+---
+ arch/x86/include/asm/hardirq.h     |  4 +++
+ arch/x86/include/asm/idtentry.h    |  5 +++
+ arch/x86/include/asm/irq_vectors.h |  6 +++-
+ arch/x86/kernel/idt.c              |  4 +++
+ arch/x86/kernel/irq.c              | 50 ++++++++++++++++++++++++++++++
+ 5 files changed, 68 insertions(+), 1 deletion(-)
+
+diff --git a/arch/x86/include/asm/hardirq.h b/arch/x86/include/asm/hardirq.h
+index 275e7fd20310..a4623fdb65a1 100644
+--- a/arch/x86/include/asm/hardirq.h
++++ b/arch/x86/include/asm/hardirq.h
+@@ -19,6 +19,10 @@ typedef struct {
+ 	unsigned int kvm_posted_intr_ipis;
+ 	unsigned int kvm_posted_intr_wakeup_ipis;
+ 	unsigned int kvm_posted_intr_nested_ipis;
++#endif
++#ifdef CONFIG_X86_USER_INTERRUPTS
++	unsigned int uintr_spurious_count;
++	unsigned int uintr_kernel_notifications;
+ #endif
+ 	unsigned int x86_platform_ipis;	/* arch dependent */
+ 	unsigned int apic_perf_irqs;
+diff --git a/arch/x86/include/asm/idtentry.h b/arch/x86/include/asm/idtentry.h
+index 72184b0b2219..a01350b844e9 100644
+--- a/arch/x86/include/asm/idtentry.h
++++ b/arch/x86/include/asm/idtentry.h
+@@ -682,6 +682,11 @@ DECLARE_IDTENTRY_SYSVEC(POSTED_INTR_WAKEUP_VECTOR,	sysvec_kvm_posted_intr_wakeup
+ DECLARE_IDTENTRY_SYSVEC(POSTED_INTR_NESTED_VECTOR,	sysvec_kvm_posted_intr_nested_ipi);
+ #endif
+ 
++#ifdef CONFIG_X86_USER_INTERRUPTS
++DECLARE_IDTENTRY_SYSVEC(UINTR_NOTIFICATION_VECTOR,	sysvec_uintr_spurious_interrupt);
++DECLARE_IDTENTRY_SYSVEC(UINTR_KERNEL_VECTOR,		sysvec_uintr_kernel_notification);
++#endif
++
+ #if IS_ENABLED(CONFIG_HYPERV)
+ DECLARE_IDTENTRY_SYSVEC(HYPERVISOR_CALLBACK_VECTOR,	sysvec_hyperv_callback);
+ DECLARE_IDTENTRY_SYSVEC(HYPERV_REENLIGHTENMENT_VECTOR,	sysvec_hyperv_reenlightenment);
+diff --git a/arch/x86/include/asm/irq_vectors.h b/arch/x86/include/asm/irq_vectors.h
+index 43dcb9284208..1d289b3ee0da 100644
+--- a/arch/x86/include/asm/irq_vectors.h
++++ b/arch/x86/include/asm/irq_vectors.h
+@@ -104,7 +104,11 @@
+ #define HYPERV_STIMER0_VECTOR		0xed
+ #endif
+ 
+-#define LOCAL_TIMER_VECTOR		0xec
++/* Vector for User interrupt notifications */
++#define UINTR_NOTIFICATION_VECTOR       0xec
++#define UINTR_KERNEL_VECTOR		0xeb
++
++#define LOCAL_TIMER_VECTOR		0xea
+ 
+ #define NR_VECTORS			 256
+ 
+diff --git a/arch/x86/kernel/idt.c b/arch/x86/kernel/idt.c
+index a58c6bc1cd68..c78146472d40 100644
+--- a/arch/x86/kernel/idt.c
++++ b/arch/x86/kernel/idt.c
+@@ -155,6 +155,10 @@ static const __initconst struct idt_data apic_idts[] = {
+ 	INTG(POSTED_INTR_WAKEUP_VECTOR,		asm_sysvec_kvm_posted_intr_wakeup_ipi),
+ 	INTG(POSTED_INTR_NESTED_VECTOR,		asm_sysvec_kvm_posted_intr_nested_ipi),
+ # endif
++#ifdef CONFIG_X86_USER_INTERRUPTS
++	INTG(UINTR_NOTIFICATION_VECTOR,		asm_sysvec_uintr_spurious_interrupt),
++	INTG(UINTR_KERNEL_VECTOR,		asm_sysvec_uintr_kernel_notification),
++#endif
+ # ifdef CONFIG_IRQ_WORK
+ 	INTG(IRQ_WORK_VECTOR,			asm_sysvec_irq_work),
+ # endif
+diff --git a/arch/x86/kernel/irq.c b/arch/x86/kernel/irq.c
+index 766ffe3ba313..eb21340b2dfe 100644
+--- a/arch/x86/kernel/irq.c
++++ b/arch/x86/kernel/irq.c
+@@ -181,6 +181,19 @@ int arch_show_interrupts(struct seq_file *p, int prec)
+ 		seq_printf(p, "%10u ",
+ 			   irq_stats(j)->kvm_posted_intr_wakeup_ipis);
+ 	seq_puts(p, "  Posted-interrupt wakeup event\n");
++#endif
++#ifdef CONFIG_X86_USER_INTERRUPTS
++	if (cpu_feature_enabled(X86_FEATURE_UINTR)) {
++		seq_printf(p, "%*s: ", prec, "UIS");
++		for_each_online_cpu(j)
++			seq_printf(p, "%10u ", irq_stats(j)->uintr_spurious_count);
++		seq_puts(p, "  User-interrupt spurious event\n");
++
++		seq_printf(p, "%*s: ", prec, "UKN");
++		for_each_online_cpu(j)
++			seq_printf(p, "%10u ", irq_stats(j)->uintr_kernel_notifications);
++		seq_puts(p, "  User-interrupt kernel notification event\n");
++	}
+ #endif
+ 	return 0;
+ }
+@@ -327,6 +340,43 @@ DEFINE_IDTENTRY_SYSVEC_SIMPLE(sysvec_kvm_posted_intr_nested_ipi)
+ }
+ #endif
+ 
++#ifdef CONFIG_X86_USER_INTERRUPTS
++/*
++ * Handler for UINTR_NOTIFICATION_VECTOR.
++ *
++ * The notification vector is used by the cpu to detect a User Interrupt. In
++ * the typical usage, the cpu would handle this interrupt and clear the local
++ * apic.
++ *
++ * However, it is possible that the kernel might receive this vector. This can
++ * happen if the receiver thread was running when the interrupt was sent but it
++ * got scheduled out before the interrupt was delivered. The kernel doesn't
++ * need to do anything other than clearing the local APIC. A pending user
++ * interrupt is always saved in the receiver's UPID which can be referenced
++ * when the receiver gets scheduled back.
++ *
++ * If the kernel receives a storm of these, it could mean an issue with the
++ * kernel's saving and restoring of the User Interrupt MSR state; Specifically,
++ * the notification vector bits in the IA32_UINTR_MISC_MSR.
++ */
++DEFINE_IDTENTRY_SYSVEC(sysvec_uintr_spurious_interrupt)
++{
++	/* TODO: Add entry-exit tracepoints */
++	ack_APIC_irq();
++	inc_irq_stat(uintr_spurious_count);
++}
++
++/*
++ * Handler for UINTR_KERNEL_VECTOR.
++ */
++DEFINE_IDTENTRY_SYSVEC(sysvec_uintr_kernel_notification)
++{
++	/* TODO: Add entry-exit tracepoints */
++	ack_APIC_irq();
++	inc_irq_stat(uintr_kernel_notifications);
++}
++#endif
++
+ 
+ #ifdef CONFIG_HOTPLUG_CPU
+ /* A cpu has been removed from cpu_online_mask.  Reset irq affinities. */
+-- 
+2.39.0
+

@@ -1,0 +1,164 @@
+From 3c5726003d0e7cf579288f09e2e31dfb38fb0af5 Mon Sep 17 00:00:00 2001
+From: Sohil Mehta <sohil.mehta@intel.com>
+Date: Thu, 8 Sep 2022 16:01:25 -0700
+Subject: [PATCH 16/18] io_uring: add x86 uintr support to io_uring
+
+An update to libuintr causes uintr opcodes (IORING_REGISTER_UINTR and
+IORING_UNREGISTER_UINTR) to conflict. Update them to be a little further
+out to prevent future conflicts.
+
+Signed-off-by: Yunying Sun <yunying.sun@intel.com>
+Signed-off-by: Anirudh Venkataramanan <anirudh.venkataramanan@intel.com>
+Signed-off-by: Sohil Mehta <sohil.mehta@intel.com>
+---
+ include/linux/io_uring_types.h |  3 ++
+ include/uapi/linux/io_uring.h  |  5 +++
+ io_uring/io_uring.c            | 60 ++++++++++++++++++++++++++++++++++
+ io_uring/io_uring.h            |  2 +-
+ 4 files changed, 69 insertions(+), 1 deletion(-)
+
+diff --git a/include/linux/io_uring_types.h b/include/linux/io_uring_types.h
+index 677a25d44d7f..c082befb84c7 100644
+--- a/include/linux/io_uring_types.h
++++ b/include/linux/io_uring_types.h
+@@ -318,6 +318,9 @@ struct io_ring_ctx {
+ 	struct io_restriction		restrictions;
+ 	struct task_struct		*submitter_task;
+ 
++	/* User Interrupts file descriptor */
++	struct file			*cq_uintr_f;
++
+ 	/* slow path rsrc auxilary data, used by update/register */
+ 	struct io_rsrc_node		*rsrc_backup_node;
+ 	struct io_mapped_ubuf		*dummy_ubuf;
+diff --git a/include/uapi/linux/io_uring.h b/include/uapi/linux/io_uring.h
+index 6b83177fd41d..ba458da5342a 100644
+--- a/include/uapi/linux/io_uring.h
++++ b/include/uapi/linux/io_uring.h
+@@ -473,6 +473,11 @@ enum {
+ 	/* register a range of fixed file slots for automatic slot allocation */
+ 	IORING_REGISTER_FILE_ALLOC_RANGE	= 25,
+ 
++	/* User Interrupts based notification */
++	/* Skip a few numbers to avoid upstream clashes */
++	IORING_REGISTER_UINTR			= 31,
++	IORING_UNREGISTER_UINTR			= 32,
++
+ 	/* this goes last */
+ 	IORING_REGISTER_LAST
+ };
+diff --git a/io_uring/io_uring.c b/io_uring/io_uring.c
+index 242d896c00f3..b3c2487d63f9 100644
+--- a/io_uring/io_uring.c
++++ b/io_uring/io_uring.c
+@@ -73,6 +73,10 @@
+ #include <linux/audit.h>
+ #include <linux/security.h>
+ 
++#ifdef CONFIG_X86_USER_INTERRUPTS
++#include <asm/uintr.h>
++#endif
++
+ #define CREATE_TRACE_POINTS
+ #include <trace/events/io_uring.h>
+ 
+@@ -532,6 +536,11 @@ void __io_commit_cqring_flush(struct io_ring_ctx *ctx)
+ 	}
+ 	if (ctx->has_evfd)
+ 		io_eventfd_signal(ctx);
++
++#ifdef CONFIG_X86_USER_INTERRUPTS
++	if (ctx->cq_uintr_f)
++		uintr_notify(ctx->cq_uintr_f);
++#endif
+ }
+ 
+ static inline void io_cqring_ev_posted(struct io_ring_ctx *ctx)
+@@ -2393,6 +2402,44 @@ static int io_eventfd_unregister(struct io_ring_ctx *ctx)
+ 	return -ENXIO;
+ }
+ 
++#ifdef CONFIG_X86_USER_INTERRUPTS
++static int io_uintr_register(struct io_ring_ctx *ctx, void __user *arg)
++{
++	__s32 __user *fds = arg;
++	int fd;
++
++	if (ctx->cq_uintr_f)
++		return -EBUSY;
++
++	if (copy_from_user(&fd, fds, sizeof(*fds)))
++		return -EFAULT;
++
++	ctx->cq_uintr_f = uvecfd_fget(fd);
++	if (IS_ERR(ctx->cq_uintr_f)) {
++		int ret = PTR_ERR(ctx->cq_uintr_f);
++
++		ctx->cq_uintr_f = NULL;
++		return ret;
++	}
++
++	return 0;
++}
++
++static int io_uintr_unregister(struct io_ring_ctx *ctx)
++{
++	if (ctx->cq_uintr_f) {
++		fput(ctx->cq_uintr_f);
++		ctx->cq_uintr_f = NULL;
++		return 0;
++	}
++
++	return -ENXIO;
++}
++#else
++static int io_uintr_register(struct io_ring_ctx *ctx, void __user *arg) { return -EINVAL; }
++static int io_uintr_unregister(struct io_ring_ctx *ctx) { return -EINVAL; }
++#endif
++
+ static void io_req_caches_free(struct io_ring_ctx *ctx)
+ {
+ 	struct io_submit_state *state = &ctx->submit_state;
+@@ -2437,6 +2484,7 @@ static __cold void io_ring_ctx_free(struct io_ring_ctx *ctx)
+ 	if (ctx->rings)
+ 		__io_cqring_overflow_flush(ctx, true);
+ 	io_eventfd_unregister(ctx);
++	io_uintr_unregister(ctx);
+ 	io_alloc_cache_free(&ctx->apoll_cache, io_apoll_cache_free);
+ 	io_alloc_cache_free(&ctx->netmsg_cache, io_netmsg_cache_free);
+ 	mutex_unlock(&ctx->uring_lock);
+@@ -3760,6 +3808,18 @@ static int __io_uring_register(struct io_ring_ctx *ctx, unsigned opcode,
+ 			break;
+ 		ret = io_eventfd_unregister(ctx);
+ 		break;
++	case IORING_REGISTER_UINTR:
++		ret = -EINVAL;
++		if (nr_args != 1)
++			break;
++		ret = io_uintr_register(ctx, arg);
++		break;
++	case IORING_UNREGISTER_UINTR:
++		ret = -EINVAL;
++		if (arg || nr_args)
++			break;
++		ret = io_uintr_unregister(ctx);
++		break;
+ 	case IORING_REGISTER_PROBE:
+ 		ret = -EINVAL;
+ 		if (!arg || nr_args > 256)
+diff --git a/io_uring/io_uring.h b/io_uring/io_uring.h
+index 2f73f83af960..10dc98aff01c 100644
+--- a/io_uring/io_uring.h
++++ b/io_uring/io_uring.h
+@@ -259,7 +259,7 @@ static inline void io_req_complete_defer(struct io_kiocb *req)
+ 
+ static inline void io_commit_cqring_flush(struct io_ring_ctx *ctx)
+ {
+-	if (unlikely(ctx->off_timeout_used || ctx->drain_active || ctx->has_evfd))
++	if (unlikely(ctx->off_timeout_used || ctx->drain_active || ctx->has_evfd || ctx->cq_uintr_f))
+ 		__io_commit_cqring_flush(ctx);
+ }
+ 
+-- 
+2.39.0
+

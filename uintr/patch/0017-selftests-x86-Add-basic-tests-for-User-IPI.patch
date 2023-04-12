@@ -1,0 +1,233 @@
+From 6a7271b748e4bf7da818b5fbb5e49ea0d5be830c Mon Sep 17 00:00:00 2001
+From: Sohil Mehta <sohil.mehta@intel.com>
+Date: Wed, 7 Sep 2022 11:58:14 -0700
+Subject: [PATCH 17/18] selftests/x86: Add basic tests for User IPI
+
+Include 2 basic tests for receiving a User IPI:
+1. Receiver is spinning in userspace.
+2. Receiver is blocked in the kernel.
+
+The selftests need gcc with 'muintr' support to compile.
+
+GCC 11 (recently released) has support for this.
+
+Signed-off-by: Sohil Mehta <sohil.mehta@intel.com>
+---
+ tools/testing/selftests/x86/Makefile |  10 ++
+ tools/testing/selftests/x86/uintr.c  | 169 +++++++++++++++++++++++++++
+ 2 files changed, 179 insertions(+)
+ create mode 100644 tools/testing/selftests/x86/uintr.c
+
+diff --git a/tools/testing/selftests/x86/Makefile b/tools/testing/selftests/x86/Makefile
+index 0388c4d60af0..b0845df841e9 100644
+--- a/tools/testing/selftests/x86/Makefile
++++ b/tools/testing/selftests/x86/Makefile
+@@ -9,6 +9,7 @@ UNAME_M := $(shell uname -m)
+ CAN_BUILD_I386 := $(shell ./check_cc.sh "$(CC)" trivial_32bit_program.c -m32)
+ CAN_BUILD_X86_64 := $(shell ./check_cc.sh "$(CC)" trivial_64bit_program.c)
+ CAN_BUILD_WITH_NOPIE := $(shell ./check_cc.sh "$(CC)" trivial_program.c -no-pie)
++CAN_BUILD_UINTR := $(shell ./check_cc.sh "$(CC)" trivial_64bit_program.c -muintr)
+ 
+ TARGETS_C_BOTHBITS := single_step_syscall sysret_ss_attrs syscall_nt test_mremap_vdso \
+ 			check_initial_reg_state sigreturn iopl ioperm \
+@@ -19,6 +20,11 @@ TARGETS_C_32BIT_ONLY := entry_from_vm86 test_syscall_vdso unwind_vdso \
+ 			vdso_restorer
+ TARGETS_C_64BIT_ONLY := fsgsbase sysret_rip syscall_numbering \
+ 			corrupt_xstate_header amx
++
++ifeq ($(CAN_BUILD_UINTR),1)
++TARGETS_C_64BIT_ONLY := $(TARGETS_C_64BIT_ONLY) uintr
++endif
++
+ # Some selftests require 32bit support enabled also on 64bit systems
+ TARGETS_C_32BIT_NEEDED := ldt_gdt ptrace_syscall
+ 
+@@ -41,6 +47,10 @@ ifeq ($(CAN_BUILD_WITH_NOPIE),1)
+ CFLAGS += -no-pie
+ endif
+ 
++ifeq ($(CAN_BUILD_UINTR),1)
++CFLAGS += -muintr
++endif
++
+ define gen-target-rule-32
+ $(1) $(1)_32: $(OUTPUT)/$(1)_32
+ .PHONY: $(1) $(1)_32
+diff --git a/tools/testing/selftests/x86/uintr.c b/tools/testing/selftests/x86/uintr.c
+new file mode 100644
+index 000000000000..671a079a315b
+--- /dev/null
++++ b/tools/testing/selftests/x86/uintr.c
+@@ -0,0 +1,169 @@
++// SPDX-License-Identifier: GPL-2.0-only
++/*
++ * Copyright (c) 2020, Intel Corporation.
++ *
++ * Sohil Mehta <sohil.mehta@intel.com>
++ */
++#define _GNU_SOURCE
++#include <errno.h>
++#include <pthread.h>
++#include <stdio.h>
++#include <stdlib.h>
++#include <syscall.h>
++#include <unistd.h>
++#include <x86gprintrin.h>
++
++#include "../../../../arch/x86/include/uapi/asm/uintr.h"
++
++#ifndef __x86_64__
++# error This test is 64-bit only
++#endif
++
++#ifndef __NR_uintr_register_handler
++#define __NR_uintr_register_handler	471
++#define __NR_uintr_unregister_handler	472
++#define __NR_uintr_vector_fd		473
++#define __NR_uintr_register_sender	474
++#define __NR_uintr_unregister_sender	475
++#define __NR_uintr_wait			476
++#endif
++
++#define uintr_register_handler(handler, flags)	syscall(__NR_uintr_register_handler, handler, flags)
++#define uintr_unregister_handler(flags)		syscall(__NR_uintr_unregister_handler, flags)
++#define uintr_vector_fd(vector, flags)		syscall(__NR_uintr_vector_fd, vector, flags)
++#define uintr_register_sender(fd, flags)	syscall(__NR_uintr_register_sender, fd, flags)
++#define uintr_unregister_sender(ipi_idx, flags)	syscall(__NR_uintr_unregister_sender, ipi_idx, flags)
++#define uintr_wait(usec, flags)			syscall(__NR_uintr_wait, usec, flags)
++
++unsigned long uintr_received;
++unsigned int uvec_fd;
++
++void __attribute__((interrupt))__attribute__((target("general-regs-only", "inline-all-stringops")))
++uintr_handler(struct __uintr_frame *ui_frame,
++	      unsigned long long vector)
++{
++	uintr_received = 1;
++}
++
++void *sender_thread(void *arg)
++{
++	long sleep_usec = (long)arg;
++	int uipi_index;
++
++	uipi_index = uintr_register_sender(uvec_fd, 0);
++	if (uipi_index < 0) {
++		printf("[FAIL]\tSender register error\n");
++		return NULL;
++	}
++
++	/* Sleep before sending IPI to allow the receiver to block in the kernel */
++	if (sleep_usec)
++		usleep(sleep_usec);
++
++	printf("\tother thread: sending IPI\n");
++	_senduipi(uipi_index);
++
++	uintr_unregister_sender(uipi_index, 0);
++
++	return NULL;
++}
++
++static inline void cpu_relax(void)
++{
++	asm volatile("rep; nop" ::: "memory");
++}
++
++void test_base_ipi(void)
++{
++	int vector = 0;
++	pthread_t pt;
++	int ret;
++
++	/* Register interrupt handler */
++	if (uintr_register_handler(uintr_handler, 0)) {
++		printf("[FAIL]\tInterrupt handler register error\n");
++		exit(EXIT_FAILURE);
++	}
++
++	/* Create uvec_fd */
++	ret = uintr_vector_fd(vector, 0);
++	if (ret < 0) {
++		printf("[FAIL]\tInterrupt vector registration error\n");
++		exit(EXIT_FAILURE);
++	}
++
++	uvec_fd = ret;
++
++	/* Enable interrupts */
++	_stui();
++
++	uintr_received = 0;
++	if (pthread_create(&pt, NULL, &sender_thread, NULL)) {
++		printf("[FAIL]\tError creating sender thread\n");
++		return;
++	}
++
++	printf("[RUN]\tSpin in userspace (waiting for interrupts)\n");
++	// Keep spinning until interrupt received
++	while (!uintr_received)
++		cpu_relax();
++
++	printf("[OK]\tUser interrupt received\n");
++
++	close(uvec_fd);
++	uintr_unregister_handler(0);
++}
++
++void test_blocking_ipi(void)
++{
++	long sleep_usec;
++	int vector = 0;
++	pthread_t pt;
++	int ret;
++
++	/* Register interrupt handler */
++	if (uintr_register_handler(uintr_handler, UINTR_HANDLER_FLAG_WAITING_ANY)) {
++		/* Skip this test if blocking support is absent in the kernel */
++		printf("[SKIP]\tInterrupt handler register error\n");
++		exit(EXIT_SUCCESS);
++	}
++
++	/* Create uvec_fd */
++	ret = uintr_vector_fd(vector, 0);
++	if (ret < 0) {
++		printf("[FAIL]\tInterrupt vector registration error\n");
++		exit(EXIT_FAILURE);
++	}
++
++	uvec_fd = ret;
++
++	/* Enable interrupts */
++	_stui();
++
++	uintr_received = 0;
++	sleep_usec = 1000;
++	if (pthread_create(&pt, NULL, &sender_thread, (void *)sleep_usec)) {
++		printf("[FAIL]\tError creating sender thread\n");
++		return;
++	}
++
++	printf("[RUN]\tBlock in the kernel (waiting for interrupts)\n");
++	ret = uintr_wait(1000000, 0);
++
++	if (ret && (errno == EINTR) && uintr_received)
++		printf("[OK]\tUser interrupt received\n");
++	else
++		printf("[FAIL]\tUser interrupt not received during syscall\n");
++
++	close(uvec_fd);
++	uintr_unregister_handler(0);
++}
++
++int main(int argc, char *argv[])
++{
++	test_base_ipi();
++
++	test_blocking_ipi();
++
++	exit(EXIT_SUCCESS);
++}
+-- 
+2.39.0
+
