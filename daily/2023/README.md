@@ -20,3 +20,6 @@ Date:   Fri Jan 29 11:40:24 2021 +0900
 
 ## 04-11
 * [task state](https://zhuanlan.zhihu.com/p/42097408)
+
+## 04-13
+* [IN instruction can block cpu ?](https://stackoverflow.com/questions/18455371/can-the-in-as-well-as-ins-insb-etc-instruction-block-in-x86-assembly)

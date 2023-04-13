@@ -276,29 +276,55 @@ index 000000000000..28b77fdbbf83
 +       b)  The  receiver is in context but not running in ring 3 (probably due
 +       to a syscall). The interrupt will be delivered the task  enters  ring-3
 +       again.
+	
+	b)  receiver in context 但是，没有 运行在 ring 3（可能由于syscall)。interrupt
+	将再次进入ring-3 重新被delivery
+
 +
 +       c)  The  receiver is blocked in the kernel and context switched out due
 +       to a blocking system call like read() or  sleep().   The  receiver  can
 +       choose  to  be  context  switched  in  and  the  blocking syscall to be
 +       interrupted with the -EINTR error code similar to signal().  A specific
 +       interrupt handler flag needs to be passed to request such behavior.
+
+	c) receiver 在kernel 中 被 blocked, 并且 由于像 read()/sleep()
+	登 blocking systemcall 而context switched out。receiver 可以选择
+	context switched in 并且让 该blocking syscall 来被 带有-EINTR error
+	code 打断，像 signal()一样。
+
 +
 +       The  receiver  can  also  block  in  the kernel using the uintr_wait(2)
 +       system call if it is explicitly waiting for user interrupts.
+
+	receiver 也可以使用 uintr_wait(2) syscall block 在 kernel, 如果想显示的
+	等待 user interrupt
+
 +
 +       10)An process can use uintr_alt_stack(2) if  it  wants  to  handle  the
 +       interrupt  on  a  different  stack than the one it was running when the
 +       interrupt was received.
+
+	10) 如果想要在另一个不同的stack上处理interrupt, 程序可以使用
+	`uintr_alt_stack()`, 否则，将在interrupt收到时运行的堆栈上处理。
+
 +
 +
 +       Multi-threaded applications need to be careful when using  Uintr  since
 +       some  of  the features are thread specific. Actions by one thread might
 +       not reflect on other threads of the same application.
+
+	多线程的应用程序在使用uintr 时应该谨慎一些, 因为某些feature 是 thread 
+	specific。一个线程的一些动作将不会在 same application 的另一个线程中
+	reflect(生效)
+
 +
 +
 +   Toolchain support
 +       Support has added to GCC(11.1)  and  Binutils(2.36.1)  to  enable  user
 +       interrupt intrinsic instructions and compiler flag (-muintr).
+
+	在GCC(11.1) 和 
+
 +
 +       The "(interrupt)" attribute can be used to compile a function as a user
 +       interrupt handler. In conjunction with the 'muintr' flag, the  compiler
