@@ -164,7 +164,9 @@ index 000000000000..28b77fdbbf83
 	uvec_fd 只和一个Uintr vector相关联。必须为 64vectors中的每个vector创建一
 	个新的uvec_fd ??? uvec_fd将在 fork 时被自动继承，但是receiver可以通过 任意
 	现有的 existing FD sharing mechanism ( pidfd_getfd()/socketsendmeg)向潜在的
-	senders共享 uvec_fd
+	senders共享 uvec_fd. 访问uvec_fd允许sender 生成对应vector的 interrupt,
+	interrupt handler 被调用时，将vector number push 到stack上，以用于识别 
+	source of the interrupt
 
 +
 +       4) Each thread has a local flag called User Interrupt flag  (UIF).  The
@@ -323,7 +325,8 @@ index 000000000000..28b77fdbbf83
 +       Support has added to GCC(11.1)  and  Binutils(2.36.1)  to  enable  user
 +       interrupt intrinsic instructions and compiler flag (-muintr).
 
-	在GCC(11.1) 和 
+	在GCC(11.1) 和 Binutils(2.36.1) 使能了 userr interrupt intrinsic inst
+	和 compiler flag (-muintr)
 
 +
 +       The "(interrupt)" attribute can be used to compile a function as a user
@@ -333,9 +336,19 @@ index 000000000000..28b77fdbbf83
 +       handler
 +         - Handle the saving and restoring of registers
 +         - Call uiret to return from a user interrupt handler
+
+	"(intrrupt)" 属性可以用于将function作为user interrupt handler编译。使用了
+	'muintr' flag, 编译器应该:
+            - 对user interrupt handler 生成 entry/exit sequences
+	    - 处理 save/restore regs
+	    - 在 uintr handler 返回时调用iret
+	
 +
 +       User   Interrupts   related   compiler   intrinsic    instructions    -
 +       <x86gprintrin.h>:
+
+	User interrupts 相关的 compiler intrinsic inst -  <x86gprintrin.h>
+
 +
 +       _clui() - Disable user interrupts - clear UIF (User Interrupt Flag).
 +
@@ -349,11 +362,17 @@ index 000000000000..28b77fdbbf83
 +       uipi_index is obtained using uintr_register_sender(2).
 +
 +
-+   Interrupt handler restrictions
++   Interrupt handler restrictions<限制>
 +       There are restrictions on what can be done in a user interrupt handler.
+
+	在user interrupt handler 执行会有一些限制.
+
 +
 +       For example, the handler and the  functions  called  from  the  handler
 +       should only use general purpose registers.
+
+	例如, 在该 handler中调用的其他handler/func 应该只使用通用寄存器。
+
 +
 +       For    details    refer   the   Uintr   compiler   programming   guide.
 +       https://github.com/intel/uintr-compiler-guide/blob/uintr-
@@ -470,6 +489,11 @@ index 000000000000..28b77fdbbf83
 +NOTES
 +       Currently, there is no glibc wrapper for the Uintr related system call;
 +       call  the system calls using syscall(2).
+
+NOTES: 
+	现在，没有对于 Uintr 相关syscall glibc wrapper, 调用这些syscall
+	使用 syscall()
+
 +
 +
 +
@@ -496,10 +520,20 @@ index 000000000000..38a80e4d8799
 +       uintr_register_handler()  registers  a  user  interrupt handler for the
 +       calling process. In case of multi-threaded processes the user interrupt
 +       handler is only registered for the thread that makes this system call.
+
+	in case of: 如果;一旦;万一
+	uintr_register_handler() 对调用进程注册一个uintr handler.如果时
+	muti-thread 进程， user interrupt handler 注册用于调用该syscall
+	的thread。
+
 +
 +       The  handler_address  is  the  function  that would be invoked when the
 +       process receives a user interrupt. The function should  be  defined  as
 +       below:
+
+	handler_address 是 一个functions的地址，在 进程收到 uintr时，该function被
+	调用。该function应该如下定义:
+
 +
 +       void __attribute__ ((interrupt)) ui_handler(struct __uintr_frame *frame,
 +                                                   unsigned long long vector)
@@ -509,50 +543,100 @@ index 000000000000..38a80e4d8799
 +
 +       Providing an invalid handler_address could lead to  undefined  behavior
 +       for the process.
+
+	提供一个非法的 handler_address 对于进程将会导致 undefined
+	behavior
+
 +
 +       Each  user  thread can register only one interrupt handler. Each thread
 +       that would like to be a receiver must register once.  The  registration
 +       is not inherited across forks(2) or when additional threads are created
 +       within the same process.
+	
+	would like to be: 想成为
+	每个user thread 只能注册一个 interrupt handler. 想成为receiver的每个thread
+	必须要注册一次。该注册不会通过fork()继承，并且在同一个process中创建的其他线程
+	同样如此。
+
 +
 +       Each thread within a process gets its own interrupt vector space for 64
 +       vectors.  The  vector  number  is  pushed  onto  the  stack when a user
 +       interrupt is delivered. Since the  vector  space  is  per-thread,  each
 +       receiver can receive up to 64 unique interrupt events.
+
+	process 中的每个线程都有自己的 64 vector的interrupt vector space.当 user
+	interrupt 被 delivery, 该 vector number 被 push 到 stack。因为vector 
+	space 是per-thread, 每个receiver 可以最多接收64 个独立的interrupt events
+
 +
 +       For  information  on  creating uvec_fd to register and manage interrupt
 +       vectors, refer uintr_vector_fd(2) system call.
+
+	对于creating uvec_fd  注册/管理 interrupt vectors的相关信息，请参考 
+	uintr_vector_fd() syscall
+
 +
 +       Once an interrupt handler is registered it cannot be changed before the
 +       handler   is   unregistered  via  uintr_unregister_handler(2).  Calling
 +       uintr_unregister_handler(2)  would  however  invalidate   the   current
 +       interrupt resources registered with the kernel.
+
+	一旦 interrupt handler 被注册，在 通过 uintr_unresiter_handler()
+	注销之前，都不会被改变。然而，调用 uintr_unregister_handler会让当前注册在 
+	kernel 中的 interrupt resources 失效。
+
 +
 +       The  interrupt  handler gets invoked only while the process is running.
 +       If the process is scheduled out or blocked in  the  kernel,  interrupts
 +       will be delivered when the process is scheduled again.
+
+	interrupt handler 将只有在process running 的时候被调用。如果 process 被 
+	sched out 或者 在kernel 中 blocked , interrupt 将会在process下一次 sched的
+	时候delivery
+
 +
 +       An  experimental  mechanism  to  unblock  a  process  as soon as a user
 +       interrupt is detected is available for testing.
+
+	一个实验性质的机制可以在检测到一个uintr时，立即unblock process,
+	以供测试。
+
 +
 +       The following flags may be used to  change  the  blocking  behavior  of
 +       uintr_register_handler():
+
+	下面的一些flags可能用于改变 uintr_register_handler()的一些block行为
+
 +
 +       UINTR_HANDLER_FLAG_WAITING_ANY      Enable the support for interrupting
 +       blocking system calls. Use any of      the below mechanisms  to  enable
 +       support.
+
+	使能支持 interrupt blocking syscall.使用如下的机制来 enable support
+	(经查看代码，如果传入UINTR_HANDLER_FLAG_WAITING_ANY, 则为
+	UINTR_HANDLER_FLAG_WAITING_RECEIVER)
+	
 +
 +       UINTR_HANDLER_FLAG_WAITING_RECEIVER        Enable   the   support   for
 +       interrupting blocking system  calls.  The  cost  to       wake  up  the
 +       blocking task is paid on the receiver side.
+
+	在receiver 端 承担wake up blocking task的消耗.
+
 +
 +       UINTR_HANDLER_FLAG_WAITING_SENDER         Enable    the   support   for
 +       interrupting blocking system  calls.  The  cost  to       wake  up  the
 +       blocking task is paid on the sender side.
+
+	在sender 端承担 wake up blocking task 的消耗
+	
 +
 +       UINTR_HANDLER_FLAG_WAITING_NONE        Do   not   enable   interrupting
 +       blocking system calls. Set by default unless      any of the above have
 +       been specified.
+
+	不使能 interrupting blocking system call. 除非制定了上面的值，否则此为默认
+
 +
 +
 +   Interrupt handler restrictions
@@ -565,32 +649,58 @@ index 000000000000..38a80e4d8799
 +       https://github.com/intel/uintr-compiler-guide/blob/uintr-
 +       gcc-11.1/UINTR-compiler-guide.pdf
 +
+
+	(在上面讲到了)
+
 +
 +   Security implications
 +       A lot of security issues that are applicable to signal  handlers,  also
 +       apply to user interrupt handlers.
+	
+	适用于 signal handler的很多安全问题，同样适用于uintr handler
+
 +
 +       The  user  interrupt  handler  by-itself  need  not be re-entrant since
 +       interrupts are automatically disabled when the handler is invoked.  But
 +       this  isn't  valid if the handler is shared between multiple threads or
 +       nested interrupts have been enabled.
+
+	user interrupt handler本身不需要是 可重入的，因为interrupt在 handler被调用
+	的时候自动的被disable。但是如果handler在多个线程中被共享或者当nested interrupt
+	被使能的时候，那将不再 valid.
+
 +
 +       Similar to signal handlers, the functions that are called from  a  user
 +       interrupt  should  be  async-signal-safe.  Refer signal-safety(7) for a
 +       discussion of async-signal-safe functions.
+
+	和signal handler相似，user interrupt调用的function应该为 async-signal-safe
+	对于async-signal-safe function 的讨论请参照 signal-safety.
+
 +
 +       It is recommended  to  disable  interrupts  using  _clui()  instruction
 +       before  executing  any  privileged  code. Doing so would prevent a user
 +       interrupt handler from running at a higher privilege level.
+
+	在执行任何 privileged code 之前, 应该通过 _clui() disable interrupt.
+	这样做会阻止 user interrupt handler 以更高的特权级别执行.
+	(!!!!这方面的patch还需要再看下)
+
 +
 +
 +RETURN VALUE
 +       On success,  uintr_register_handler()  returns  0.   On  error,  -1  is
 +       returned and errno is set to indicate the cause of the error.
+
+RETURN VALUE
+	成功时, uintr_register_handler() 返回0. 在error时，返回-1,
+	errno被设置为该error的原因
+
 +
 +
 +ERRORS
 +       ENOSYS      Underlying hardware doesn't have support for Uintr.
+			(硬件不支持)
 +
 +       EINVAL      flags is not valid.
 +
@@ -603,6 +713,9 @@ index 000000000000..38a80e4d8799
 +
 +VERSIONS
 +       uintr_register_handler() first appeared in Linux <tbd>.
+
+	<tbd>: to be determined 待确定
+
 +
 +
 +CONFORMING TO
@@ -615,6 +728,9 @@ index 000000000000..38a80e4d8799
 +
 +       The user interrupt  related  system  calls  need  hardware  support  to
 +       generate and receive user interrupts. Refer uintr(7) for details.
+	
+	user interrupt 相关的syscall 需要硬件支持来生成/接收
+	uintr。请参照 uintr() 获取细节。
 +
 +
 +
@@ -641,19 +757,37 @@ index 000000000000..85d4d808e1d2
 +       uintr_unregister_handler()  unregisters  a  previously  registered user
 +       interrupt handler. If  no  interrupt  handler  was  registered  by  the
 +       process uintr_unregister_handler() would return an error.
+
+	uintr_unregister_handler()注销之前已经注册过的 uintr handler.如果之前进程
+	没有注册 interrupt handler, uintr_unregister_handler()将会返回错误
+
 +
 +       Since  interrupt handler is local to a thread, only the thread that has
 +       registered      via      uintr_register_handler(2)       can       call
 +       uintr_unregister_handler().
+
+	因为 interrupt handler 是local to thread的，只有通过 uintr_register_handler
+	注册的thread 可以调用 uintr_unregister_handler()
+
 +
 +       The  interrupt  resources  such  as interrupt vectors and uvec_fd, that
 +       have been allocated  for  this  thread,  would  be  deactivated.  Other
 +       senders posting interrupts to this thread will not be delivered.
+
+	例如 interrupt vectors 和 uvec_fd 这样的已经被 该进程分配的interrupt 
+	resources , 将会被 deactivated. 其他senders 递送到 该进程的的 interrupt 
+	也不会delivery
+
 +
 +       The  kernel  does  not automatically close the uvec_fds related to this
 +       process/thread   when   uintr_unregister_handler()   is   called.   The
 +       application  is  expected  to  close  the unused uvec_fds before or the
 +       after the handler has been unregistered.
+
+	kernel 将不会自动close 该process/thread 相关的uvec_fds, 当
+	uintr_unregister_handler()被调用的时候。期望apps在unregister
+	handler前后 关闭 不用的 uvec_fds
+
 +
 +
 +RETURN VALUE
@@ -710,12 +844,23 @@ index 000000000000..98987651ede6
 +       (uvec_fd) based on the vector registered by the  calling  process.  The
 +       uvec_fd can be shared with other processes and the kernel to allow them
 +       to generate interrupts with the associated vector.
+
+	uintr_vector_fd() 分配一个新的 uintr fd(uvec_fd)基于调用进程注册的vector.
+	uvec_fd 可以在kernel 中的其他进程中共享，用来允许他们产生相关 vector的
+	interrupt.
+
 +
 +       The caller must have registered a handler via uintr_register_handler(2)
 +       before  attempting to create uvec_fd. The interrupts generated based on
 +       this uvec_fd will be delivered only to the  thread  that  created  this
 +       file  descriptor.  A  unique  uvec_fd  is  generated  for  each  vector
 +       registered using uintr_vector_fd().
+
+	caller 在尝试创建 uvec_fd 之前， 必须通过uintr_register_handler()注册 
+	一个handler。基于改 uvec_fd生成的interrupt 只会delivery到创建该fd的
+	thread。对于每一个通过uintr_vector_fd()注册的vector，都会生成独立的
+	uvec_fd.
+
 +
 +       Each thread has a private vector space of 64 vectors ranging from 0-63.
 +       Vector number 63 has the highest priority while vector number 0 has the
@@ -724,25 +869,50 @@ index 000000000000..98987651ede6
 +       followed by the ones with lower vector numbers. Applications can choose
 +       appropriate  vector  numbers  to  prioritize  certain  interrupts  over
 +       others.
+
+	每个进程有 一个独立的64 vectors的 vector space, 范围时0~63.
+	64是最高的优先级,而0时最低的。如果两个或者多个中断同时等待被delivery.
+	将会首先delivery higher vector number 的intr。应用程序可以选择合适的
+	vector number,用来使某些中断有效级高于其他的中断
+
 +
 +       Upon interrupt delivery, the handler is invoked with the vector  number
 +       pushed  onto  the  stack  to help identify the source of the interrupt.
 +       Since the vector space is per-thread, each receiver can receive  up  to
 +       64 unique interrupt events.
+
+	随着 interrupt delivery，handler 被调用，并且 vector number 被 push到 
+	stack，来帮助识别中断源。因为 vector space 是per-thread，每个receiver
+	可以收到64 个独立的interrupt events
+
 +
 +       A  receiver can choose to share the same uvec_fd with multiple senders.
 +       Since an interrupt with the same vector number would be delivered,  the
 +       receiver  would  need  to  use  other  mechanisms to identify the exact
 +       source of the interrupt.
+
+	receiver可以选择来和多个sender分享同一个uvec_fd.因为带有相同vector
+	number 的interrupt可能会被delivery, 所以receiver应该需要用其他的机制来识别
+	确切的中断源。
+
 +
 +       The flags argument is reserved for future use.  Currently, it  must  be
 +       specified as 0.
+
+	flags 参数被保留用于未来用途。现在，它必须指定为0。
+
 +
 +       close(2)
 +             When the file descriptor is no longer required it should be
 +             closed.  When all file descriptors associated with the same
 +             uvec_fd object have been closed, the resources for object are
 +             freed by the kernel.
+
+	close(2)
+		当fd不再需要，他应该被closed。当所有相关同一个uvec_fd
+		object的 file descriptors被关闭时，该object的resources才会被
+		kernel释放
+
 +
 +       fork(2)
 +             A copy of the file descriptor created by uintr_vector_fd() is
@@ -750,6 +920,12 @@ index 000000000000..98987651ede6
 +             descriptor is associated with the same uvec_fd object. The
 +             close-on-exec flag (FD_CLOEXEC; see fcntl(2)) is set on the
 +             file descriptor returned by uintr_vector_fd().
+
+	fork(2)
+		用uintr_vector_fd创建的file descriptor 的副本(copy)可以通过
+		fork产生的子程序继承获得。duplicate fd 将会和同一个uvec_fd 
+		object 相关。 FD_CLOEXEC flag 将会设置在通过 uintr_vector_fd 
+		返回的fd上.
 +
 +       For  information  on  how  to  generate  interrupts  with uvec_fd refer
 +       uintr_register_sender(2).
@@ -822,40 +998,83 @@ index 000000000000..52e737b07eaa
 +       receiver based on the uvec_fd. It returns a user IPI index (uipi_index)
 +       that  the  sender  process  can  use  in  conjunction with the SENDUIPI
 +       instruction to generate a user IPI.
+
+	conjunction with: 结合
+
+	uintr_register_sender() 允许一个sender process 连接到一个 基于uvec_fd的
+	uintr receiver上。它将返回一个user IPI index(uipi_index)，
+	sender process 可以结合他和 SENDUIPI指令，来生成一个 user IPI.
+
 +
 +       When a sender executes 'SENDUIPI  <uipi_index>',  a  user  IPI  can  be
 +       delivered by the hardware to the receiver without any intervention from
 +       the kernel. Upon IPI delivery, the handler is invoked with  the  vector
 +       number, associated with uvec_fd, pushed onto the stack to help identify
 +       the source of the interrupt.
+
+	intervention : 介入
+
+	当sender 执行 'SENDUIPI <uipi_index>', user IPI将通过硬件delivery到 receiver
+	在没有kernel任何介入的情况下。在IPI delivery后，handler 被引入，带者一个vector 
+	number ,该值和 uvec_fd相关，将pushed 到 stack 上来帮助识别中断源
+
 +
 +       If the receiver for the thread is running the hardware  would  directly
 +       deliver the user IPI to the receiver. If the receiver is not running or
 +       has disabled receiving  interrupts  using  the  STUI  instruction,  the
 +       interrupt  will  be stored in memory and delivered when the receiver is
 +       able to receive it.
+
+	如果receiver对应的thread正在 hardware上运行，将会向receiver直接deliver
+	user IPI 。如果 receiver 没有运行或者使用了STUI inst disable 接收中断，
+	中断将会保存在 memory中，并且在receiver 可以接收他的时候delivery
+
 +
 +       If the sender tries to send multiple IPIs while  the  receiver  is  not
 +       able  to  receive  them then all the IPIs with the same vector would be
 +       coalesced.  Only a single IPI per vector would be delivered.
+
+	coalesce: 合并 
+
+	如果当sender在receiver 不能接收中断时，尝试发送多个IPI, 带有相同vector的所有ipi
+	将会被合并。每个vector只有一个IPI将会被deliver
+
 +
 +       uintr_register_sender() can be used to connect with multiple  uvec_fds.
 +       uintr_register_sender()  would  return  a  unique  uipi_index  for each
 +       uvec_fd the sender connects with.
+
+	uintr_register_sender() 可以被用来连接 multiple uvec_fds ???
+	uintr_register_sender()将会对每个 sender 连接的每个uvec_fd
+	返回独立的uipi_index.
+
 +
 +       In case of a multi-threaded process, the uipi_index is  valid  for  all
 +       threads  of  the  same  process.  Other threads do not need to register
 +       themselves if they intend to be a user IPI sender.  Executing  SENDUIPI
 +       with  a specific uipi_index on different threads would produce the same
 +       results based on the connections that have been setup.
+
+	如果是多线程，uipi_index将会对同一进程中的所有threads生效。如果其他线程
+	打算成为 user IPI sender 江湖需要再注册他们。在不通的thread上执行
+	带有特定的uipi_index 的SENDUIPI, 将会根据已设置的connections产生相同结果。
+
 +
 +       If   a   process    uses    SENDUIPI    without    registering    using
 +       uintr_register_sender()  it receives a SIGILL signal. If a process uses
 +       an illegal uipi_index, it receives a SIGSEGV signal.  See  sigaction(2)
 +       for details of the information available with that signal.
+
+	如果一个进程使用SENDUIPI指令, 但是在没有使用uintr_register_sender()
+	的情况下，他将会收到SIGILL信号。如果一个进程使用了非法的uipi_index, 他将
+	收到SIGSEGV信号。请查看 sigaction了解关于该信号的可获得的信息(???)。
+
 +
 +       The  flags  argument is reserved for future use.  Currently, it must be
 +       specified as 0.
+
+	flags参数被保留，以供未来使用。现在，他必须指定为0。
+
 +
 +       close(2)
 +             When the file descriptor is no longer required it should be
@@ -863,6 +1082,8 @@ index 000000000000..52e737b07eaa
 +             uvec_fd object have been closed, the resources for object are
 +             freed by the kernel. Freeing the uvec_fd object would also
 +             result in the associated uipi_index to be freed.
+
+		（上面有讲)
 +
 +       fork(2)
 +             A copy of uvec_fd is inherited by the child produced by
@@ -870,6 +1091,7 @@ index 000000000000..52e737b07eaa
 +             child. If the child wants to send a user IPI it would have to
 +             explicitly register itself using the uintr_register_sender()
 +             system call.
+		(上面有讲)
 +
 +       For   information   on   how   to    unregister    a    sender    refer
 +       uintr_unregister_sender(2).
@@ -955,6 +1177,8 @@ index 000000000000..2ba7bc227956
 +
 +       The flags argument is reserved for future use.  Currently, it  must  be
 +       specified as 0.
+
+	(内容和 uintr_unregister_handler差不多)
 +
 +
 +RETURN VALUE
@@ -1011,18 +1235,51 @@ index 000000000000..a70dc45bc75f
 +       microseconds until a user interrupt is  delivered.  The  sleep  may  be
 +       lengthened  slightly  by  any  system  activity  or  by  the time spent
 +       processing the call or by the granularity of system timers.
+
+	lengthen : 变长
+	activity : 活动; 活力
+	granularity: 粒度
+
+	uintr_wait() 导致 calling process (or thread) 暂停 <usec> microseconds
+	直到 user interrupt 被delivery。任何系统活动 或者 处理call
+	消耗的时间，或者system timer 的粒度都可以略微的延长睡眠时间。
+
 +
 +       uintr_wait() will block in the kernel only when a interrupt handler has
 +       been registered using uintr_register_handler(2)
+
+	只有当一个 使用 uintr_register_handler 注册了interrupt handler的情况下，
+	uintr_wait()将会blocked在 kernel ,
+
 +
 +       <uintr_wait()  is an experimental syscall to allow applications to wait
 +       specifically for uintr(7).>
+
+	experimental : 实验性质的，用于实验的
+	specifically : 确切的，明确的
+
+	<uintr_wait()是一个实验性质的 syscall , 允许applications 主动等待 uintr>
+
 +
 +
 +RETURN VALUE
 +       uintr_wait() returns 0 upon successfully suspending  execution  for  at
 +       least  usec microseconds. In case of error, -1 is returned and errno is
 +       set to indicate the error.
+
+	uintr_wail() 在成功暂停至少 usec ms 后返回0。
+
+	NOTE: 如果收到了在usec时间内收到interrupt, 则返回EINTR
+	```
+	================tools/testing/selftests/x86/uintr.c================
+	ret = uintr_wait(1000000, 0);
+
+	if (ret && (errno == EINTR) && uintr_received)
+	        printf("[OK]\tUser interrupt received\n");
+	else
+	        printf("[FAIL]\tUser interrupt not received during syscall\n");
+
+	```
 +
 +       If it is interrupted by a uintr(7), EINTR is set as the error code.
 +
@@ -1083,11 +1340,23 @@ index 000000000000..8208db0895de
 +       (uipi_index) that all threads that are part of the same the process can
 +       use  in  conjunction  with  the SENDUIPI instruction to generate a user
 +       IPI.
+
+	uintr_register_self()允许进程作为 基于 vector的uintr sender connect 自己。
+	它将返回一个 user IPI index(uipi_index) , 相同进程的其他线程可以通过结合
+	SENDUIPI指令生成user IPI
+
 +
 +       uintr_register_self() is useful if the  process  would  like  to  avoid
 +       using  an  FD  based connection setup for connection between threads of
 +       the same  process.  The  behavior  when  a  sender  executes  'SENDUIPI
 +       <uipi_index>' is exactly the same as uintr_register_sender(2).
+
+	be exactly the same as : 一模一样
+
+	假如进程想要避免使用在相同进程的线程中基于FD 初始化连接的方式, 
+	uintr_register_self()是有用的。 当sender执行 'SENDUIPI <uipi_index>'
+	将和uintr_register_sender一模一样
+
 +
 +       The  flags  argument is reserved for future use.  Currently, it must be
 +       specified as 0.
@@ -1150,7 +1419,8 @@ index 000000000000..eeeca3e8573c
 +
 +
 +NAME
-+       uintr_alt_stack - wait for user interrupts
++       uintr_alt_stack - wait for user interrupts    
+	(!!!这里有问题)
 +
 +
 +SYNOPSIS
@@ -1160,6 +1430,10 @@ index 000000000000..eeeca3e8573c
 +DESCRIPTION
 +       uintr_alt_stack()  allows  a  thread  to  define  an alternate stack to
 +       handle a User Interrupt.
+
+	uintr_alt_stack() 允许thread 定义一个 alternate stack来处理 User
+	Interrupt
+
 +
 +       sp      Base address of the stack
 +
