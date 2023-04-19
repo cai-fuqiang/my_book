@@ -12,10 +12,23 @@ identify an interrupt as a user interrupt (and not a kernel interrupt).
 Hardware uses the same notification vector to generate an IPI from a
 sender's cpu core when the SENDUIPI instruction is executed.
 
+> user interrupt notification vector用于 receiver cpu识别作为 user
+> interrupt 的 interrupt(而不是一个kernel interrupt). Hardware使用相同的
+> notification vector来生成 IPI，该IPI来自sender's cpu core当SENDUIPI
+> 指令执行时。
+
 Typically, the kernel shouldn't receive an interrupt with this vector.
 However, it is possible that the kernel might receive this vector.
 
+> 一般的，kernel不应该收到带有此vector的interrupt。但是kernel是 有可能
+> 收到该vector的中断
+
 Scenario that can cause the spurious interrupt:
+
+> scenario : （电影、戏剧等的）脚本、剧情概要等; 想像中的未来事情的顺序:
+> spurious :假的，伪造的
+>
+> 下面的事件顺序可能会导致这样的 spurious interrupt
 
 Step    cpu 0 (receiver task)           cpu 1 (sender task)
 ----    ---------------------           -------------------
@@ -29,6 +42,10 @@ Step    cpu 0 (receiver task)           cpu 1 (sender task)
 A kernel interrupt can be detected, if a receiver task gets scheduled
 out after the SENDUIPI-based IPI was sent but before the IPI was
 delivered.
+
+> kernel interrupt 
+>
+>
 
 The kernel doesn't need to do anything in this case other than receiving
 the interrupt and clearing the local APIC. The user interrupt is always

@@ -42,11 +42,21 @@ index 000000000000..a7795b193c34
 +User Interrupts provides a low latency event delivery and inter process
 +communication mechanism. These events can be delivered directly to userspace
 +without a transition through the kernel.
+
+User interrupt 提供了一个低延迟的 event delivery和进程间通信的机制。这些事件
+可以在没有传输经过kernel的情况下，直接delivery到 kernel
+
 +
 +In the User Interrupts architecture, a receiver is always expected to be a user
 +space task. However, a user interrupt can be sent by another user space task,
 +kernel or an external source (like a device). The feature that allows another
 +task to send an interrupt is referred to as User IPI.
+
+在User Interrupts architecture中，receiver总是被期望为是一个 user space tack。
+然而, user interrupt 可能被另一个 user space task, kernel 或者其他的external 
+source (like a device)发送。允许另一个task发送interrupt的feature 成为
+User IPI.
+
 +
 +Hardware Summary
 +================
@@ -54,17 +64,33 @@ index 000000000000..a7795b193c34
 +first posted to a memory location and then delivered to the receiver when they
 +are running with CPL=3.
 +
+
+User interrupt是一个 posted interrupt delivery 机制。中断首先被posted
+到一个内存区域，然后将在receiver运行在CPL=3时再delivery
+
 +Kernel managed architectural data structures
 +--------------------------------------------
 +UPID: User Posted Interrupt Descriptor - Holds receiver interrupt vector
 +information and notification state (like an ongoing notification, suppressed
 +notifications).
+
+UPID: User Posted interrupt Descriptor - 持有receiver interrupt vector
+information 和 notification stdate(像 ongoing notification，suppressed
+notifications)
 +
 +UITT: User Interrupt Target Table - Stores UPID pointer and vector information
 +for interrupt routing on the sender side. Referred by the senduipi instruction.
+
+UITT: User Interrupt Target Table - 保存着 UPID pointer和vector information
+，该信息用于将interrupt 路由到sender端。会被 senduipi 指令使用。
+
 +
 +The interrupt state of each task is referenced via MSRs which are saved and
 +restored by the kernel during context switch.
+
+通过MSRs参考每个task的interrupt state ,这些MSRs将会在kernel context
+switch时候save && restored
+
 +
 +Instructions
 +------------
@@ -83,14 +109,26 @@ index 000000000000..a7795b193c34
 +When a User IPI sender executes 'senduipi <index>' the hardware refers the UITT
 +table entry pointed by the index and posts the interrupt vector into the
 +receiver's UPID.
+
+当user IPI sender执行 'senduipi <index>'， hardware会参考 UITT 中的由index指向的 
+table entry, 并且将interrupt vector post到receiver的UPID
+
 +
 +If the receiver is running the sender cpu would send a physical IPI to the
 +receiver's cpu. On the receiver side this IPI is detected as a User Interrupt.
 +The User Interrupt handler for the receiver is invoked and the vector number is
 +pushed onto the stack.
+
+如果receiver 正在运行, sender cpu 应该发送一个 物理 IPI到 receiver的cpu。
+在 receiver 端，该 IPI被认为是一个 User Interrupt. receiver 的 User Interrupt
+handler将会被调用，并且 vector number 被push 到stack。
+
 +
 +Upon execution of 'uiret' in the interrupt handler, the control is transferred
 +back to instruction that was interrupted.
+
+在interrupt handler 中执行 'uiret'指令后，控制权将传回到发生中断时的指令。
+
 +
 +Refer the Intel Software Developer's Manual for more details.
 +
@@ -100,42 +138,97 @@ index 000000000000..a7795b193c34
 +wanting to use Uintr are expected to register themselves with the kernel using
 +the Uintr related system calls. A Uintr receiver is always a userspace task. A
 +Uintr sender can be another userspace task, kernel or a device.
+
+User Interrupt 是一个 可选择的 feature (不像signal)。应用程序想要使用Uintr 被期望
+使用 Uintr 相关的syscall 在kernel中去注册他们。Uintr receiver 总是 userspace task。
+Uintr sender 可以是另一个 userspace task, kernel 或者 device.
+
 +
 +1) A receiver can register/unregister an interrupt handler using the Uintr
 +receiver related syscalls.
 +		uintr_register_handler(handler, flags)
+
+1) receiver 可以 使用 uintr receiver 相关的 syscall register/unregister interrupt handler
+
 +
 +2) A syscall also allows a receiver to register a vector and create a user
 +interrupt file descriptor - uvec_fd.
 +		uvec_fd = uintr_vector_fd(vector, flags)
+
+2) 该syscall 同时允许receiver注册一个vector, 并且创建一个 uintr fd  - uvec_fd
+
 +
 +Uintr can be useful in some of the usages where eventfd or signals are used for
 +frequent userspace event notifications. The semantics of uvec_fd are somewhat
 +similar to an eventfd() or the write end of a pipe.
+
+frequent: 频繁的，时常发生的
+write end of: 写端
+
+Uintr 在 一些使用中很有用，其中包括 eventfd / signal用于频繁的用户空间事件通知。
+uvec_fd的语义在某种意义上类似于eventfd或者pipe的写端
+
 +
 +3) Any sender with access to uvec_fd can use it to deliver events (in this
 +case - interrupts) to a receiver. A sender task can manage its connection with
 +the receiver using the sender related syscalls based on uvec_fd.
 +		uipi_index = uintr_register_sender(uvec_fd, flags)
+
+3) 任意可以对uvec_fd访问的sender 可以使用其来deliver events(在此情况下 -
+interrupt)给 receiver。sender task 可以通过使用sender 相关的基于uvec_fd的
+syscall管理他和receiver 的链接。
+
 +
 +Using an FD abstraction provides a secure mechanism to connect with a receiver.
 +The FD sharing and isolation mechanisms put in place by the kernel would extend
 +to Uintr as well.
+in place: 意为：“合适的；恰当的；在通常的位置；在适当的位置；就位的；已确定的；
+put sth in place=put in place +（sth长内容）put... in place 实施; 实现; 做到; 把…放到合适的位置
+
+使用FD 抽象提供了与receiver 连接的一种安全的机制。kernel 实施的 FD sharing 和 isolation 机制
+也将很好的扩展Uintr
+
+(也就是说kernel 这边对FD的一些feature, 例如fd sharing/isolation 也可能扩展Uintr的功能,
+例如非亲进程之间的connect)
+
 +
 +4a) After the initial setup, a sender task can use the SENDUIPI instruction to
 +generate user IPIs without any kernel intervention.
 +		SENDUIPI <uipi_index>
+
+intervention: 进入;介入
+
+4a) 在初始设置后，sender task 可以使用 SENDUIPI 指令来生成user IPIs,
+在没有任何kernel的介入下
+
 +
 +If the receiver is running (CPL=3), then the user interrupt is delivered
 +directly without a kernel transition. If the receiver isn't running the
 +interrupt is delivered when the receiver gets context switched back. If the
 +receiver is blocked in the kernel, the user interrupt is delivered to the
 +kernel which then unblocks the intended receiver to deliver the interrupt.
+
+transition: 过渡;转变
+intend <v>: 打算;想要
+intended <adj>: 打算的;计划的;原来的意思，预期的意思，原有的目的
+
+如果receiver 正在运行(CPL=3), uintr将会直接被deliver, 在没有kernel transition。
+如果receiver 没有running, interrupt 将会在 receiver context switch
+back后，再deliver。如果receiver 被blocked到 kernel, user interrupt 将deliver到
+kernel，之后unblock目标receiver来deliver该中断.
+
 +
 +4b) If the sender is the kernel or a device, the uvec_fd can be passed onto
 +the related kernel entity to allow them to setup a connection and then generate
 +a user interrupt for event delivery. <The exact details of this API are still
 +being worked upon.>
+
+pass onto: 传递
+
+4b) 如果sender是kernel/device, uvec_fd可以传递到相关的kernel entity来允许他们
+建立一个connection并且为event delivery 生成user interrupt<此API的确切细节仍在指定
+中>
+
 +
 +Refer the Uintr man-pages for details on the syscall interface.
 -- 

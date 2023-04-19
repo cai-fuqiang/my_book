@@ -1443,12 +1443,23 @@ index 000000000000..eeeca3e8573c
 +
 +       The current expectation is for a thread to register an alternate  stack
 +       only after it has registered a User Interrupt handler.
+
+	现在期望线程只有在注册了Uintr handler之后在去注册 alt stack
+
 +
 +       Calling  uintr_alt_stack()  with  a  NULL  base address would clear the
 +       alternate stack request.
+
+	调用 uintr_alt_stack()传入 NULL base address 将会clear alt stack
+	request.
+
 +
 +       uintr_unregister_handler(2)  would  also  clear  any  alternate   stack
 +       request that have been made.
+
+	uintr_unregister_handler() 将会清空任何之前产生的 alt stack
+	request
+
 +
 +
 +RETURN VALUE
@@ -1504,6 +1515,10 @@ index 000000000000..6d9698f13d35
 +       uintr_ipi_fd()  allows  a  sender process to share its Uintr connection
 +       with another process. It returns a user IPI FD - uipi_fd that abstracts
 +       all the uipi_index based connections.
+
+	uintr_ipi_fd() 允许sender process 和其他进程分享他的 Uintr链接。他将返
+	回 一个 user IPI fd - 对所有基于uipi_index 链接的抽象
+
 +
 +
 +       The  flags  argument is reserved for future use.  Currently, it must be
@@ -1529,6 +1544,11 @@ index 000000000000..6d9698f13d35
 +       registers  to  allow SENDUIPI           execution based on the uipi_fd.
 +       <There isn't any option to           clear the hardware registers  once
 +       they have been set.>
+
+	     UIPI_SET_TARGET_TABLE	设置当前进程(指定了特定的uipi_fd) 的target
+	     table。设置hardware register 允许基于 uipi_fd 的 SENDUIPI指令执行。
+	     <这里没有任何选项可以清空 这些 hardware registers一旦他们被设置>
+
 +
 +
 +RETURN VALUE

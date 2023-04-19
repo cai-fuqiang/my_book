@@ -6,9 +6,15 @@ Subject: [PATCH 04/18] x86/fpu/xstate: Enumerate User Interrupts supervisor
 
 Enable xstate supervisor support for User Interrupts by default.
 
+默认情况下，启动对 xstate supervisor 对User Interrupt xstate supervisor 
+的支持
+
 The user interrupt state for a task consists of the MSR state and the
 User Interrupt Flag (UIF) value. XSAVES and XRSTORS handle saving and
 restoring both of these states.
+
+对于一个task的user interrupt state包含MSR state和 User Interrupt Flag
+(UIF) value。XSAVE和XRSTORS handle 保存并恢复两者
 
 Signed-off-by: Sohil Mehta <sohil.mehta@intel.com>
 ---

@@ -8,20 +8,40 @@ The 'uintr' flag in /proc/cpuinfo can be used to identify it. The
 recommended mechanism for user applications to detect support is calling
 the uintr related syscalls.
 
+对User interrupt 支持(包括 user IPIs)是通过 cpuid 枚举的。 /proc/cpuinfo 
+中的 uintr flag 也可以用于identify。对于用户程序去发现支不支持该功能推荐
+调用 uintr相关syscalls(看返回值)
+
 Use CONFIG_X86_USER_INTERRUPTS to compile with User Interrupts support.
 The feature can be disabled at boot time using the 'nouintr' kernel
 parameter.
+
+使用CONFIG_X86_USER_INTERRUPTS来编译带有Uintr support的kernel。该功能
+可以在boot time时通过使用 'nouintr' 内核参数disabled.
 
 SENDUIPI is a special ring-3 instruction that makes a supervisor mode
 memory access to the UPID and UITT memory. Currently, KPTI needs to be
 off for User IPIs to work.  Processors that support user interrupts are
 not affected by Meltdown so the auto mode of KPTI will default to off.
 
+supervisor mode : 特权模式
+SENDUIPI是一个特殊的可以运行在ring-3指令，该指令会对 UPID 和 UITT
+memory做一些特权模式的访问。当前 KPTI 需要被off来使得User IPIs可以正常
+工作。支持用户中断的处理器不受Meltdown的影响，因此KPTI的自动模式将默认为
+关闭。
+
 Users who want to force enable KPTI will need to wait for a later
 version of this patch series that is compatible with KPTI. We need to
 allocate the UPID and UITT structures from a special memory region that
 has supervisor access but it is mapped into userspace. The plan is to
 implement a mechanism similar to LDT.
+
+想要强制enable KPTI的用户可能要等该系列patch 晚一点的版本（兼容KPTI）。
+我们需要从 一个特殊的memory region 中分配 UPID和UITT structures, 这个
+memory region仍然是特权级访问，但是将会映射到userspace。该计划想实现
+一个类似于LDT的机制。
+
+(这块没看懂，还需要继续看下)
 
 Signed-off-by: Jacob Pan <jacob.jun.pan@linux.intel.com>
 Signed-off-by: Sohil Mehta <sohil.mehta@intel.com>
@@ -80,6 +100,9 @@ index ef4775c6db01..a970819bf77e 100644
  #define X86_FEATURE_AVX512_4VNNIW	(18*32+ 2) /* AVX-512 Neural Network Instructions */
  #define X86_FEATURE_AVX512_4FMAPS	(18*32+ 3) /* AVX-512 Multiply Accumulation Single precision */
  #define X86_FEATURE_FSRM		(18*32+ 4) /* Fast Short Rep Mov */
+
+> CPUID.(EAX=7,ECX=0):EDX[5]
+
 +#define X86_FEATURE_UINTR		(18*32+ 5) /* User Interrupts support */
  #define X86_FEATURE_AVX512_VP2INTERSECT (18*32+ 8) /* AVX-512 Intersect for D/Q */
  #define X86_FEATURE_SRBDS_CTRL		(18*32+ 9) /* "" SRBDS mitigation MSR available */
@@ -138,6 +161,12 @@ index c47cc7f2feeb..c1cb1e39f561 100644
  #define X86_CR4_PKE		_BITUL(X86_CR4_PKE_BIT)
  #define X86_CR4_CET_BIT		23 /* enable Control-flow Enforcement Technology */
  #define X86_CR4_CET		_BITUL(X86_CR4_CET_BIT)
+
+> User Interrupts Enable Bit (bit 25 of CR4) — Enables user 
+> interrupts when set, including user-interrupt delivery, 
+> user-interrupt notification identification, and the 
+> user-interrupt instructions.
+
 +#define X86_CR4_UINTR_BIT	25 /* enable User Interrupts support */
 +#define X86_CR4_UINTR		_BITUL(X86_CR4_UINTR_BIT)
  

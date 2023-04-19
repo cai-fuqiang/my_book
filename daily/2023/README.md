@@ -23,3 +23,6 @@ Date:   Fri Jan 29 11:40:24 2021 +0900
 
 ## 04-13
 * [IN instruction can block cpu ?](https://stackoverflow.com/questions/18455371/can-the-in-as-well-as-ins-insb-etc-instruction-block-in-x86-assembly)
+
+## 04-19
+* [Context Switch with Less Memory and Better Performance](http://events17.linuxfoundation.org/sites/events/files/slides/LinuxCon_NA_2014.pdf)
