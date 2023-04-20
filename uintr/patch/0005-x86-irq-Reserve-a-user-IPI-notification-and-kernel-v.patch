@@ -43,9 +43,8 @@ A kernel interrupt can be detected, if a receiver task gets scheduled
 out after the SENDUIPI-based IPI was sent but before the IPI was
 delivered.
 
-> kernel interrupt 
->
->
+> kernel interrupt 可以被发现，如果receiver task 在 SENDUIPI-based IPI
+> 发出后，IPI 被delivery之前，context_switch out
 
 The kernel doesn't need to do anything in this case other than receiving
 the interrupt and clearing the local APIC. The user interrupt is always
@@ -53,28 +52,52 @@ stored in the receiver's UPID before the IPI is generated. When the
 receiver gets scheduled back the interrupt would be delivered based on
 its UPID.
 
+> 在这种情况下kernel 不需要做任何事情, 除了接收该中断，并且clear local
+> APIC。 在IPI生成之前, uintr 总是已经store 在 receiver的UPID中。当receiver
+> sched back, 中断应该基于该UPID再被deliver
+
 Reserve another vector to be used for kernel notifications which need to
 wake up a user process that has blocked.
+
+> 保留另一个vector以用来 kernel notifcation 那些需要被wake up
+> 的已经阻塞的进程
 
 In summary, reserve 2 notification vectors (NV) for the 2 states of a
 thread (running vs blocked).
 
+> 总之，为 thread的两个状态保留两个 notification vector (NV)
+
 NV-1 – used only for tasks that are running. (results in a user
 interrupt or a spurious kernel interrupt)
+
+> NV-1 - 仅用于task是running 的时候。（会造成 uintr 或者 spurious kernel
+> interrupt)
 
 NV-2 – used only for a tasks that are blocked in the kernel. (always
 results in a kernel interrupt)
 
+> NV-2 - 仅用于 task 被blocked在 kernel时候 (总是会造成 一个kernel 
+> interrupt)
+
 The UPID.UINV bits are switched between NV-1 and NV-2 based on the state
 of the task.
+
+> UPID。UINV bits会基于 task的state 在 NV-1和 NV-2中切换
 
 However, NV-1 is also programmed in the running task's MISC_MSR UINV
 bits. This is what tells the ucode that the notification vector received
 is for the user instead of the kernel.
 
+> it is what : 这就是...， 类似于it is that, 但是更注重强调，是一个强调句
+> 但是, NV-1 总是会编程在 running task的 MISC_MSR UINV bits中。这就是告诉
+> ucode 收到的notification vector 是针对 user 而不是针对kernel
+
 NV-2 is never programmed in the MISC_MSR of a task. When NV-2 arrives on
 any cpu there is never a possibility of it being detected as a User
 Interrupt. It will always be delivered to the kernel.
+
+> NV-2从不编程进task的MISC_MSR中。当NV-2到达任意cpu，这将没有可能被识别为
+> Uintr. 他总是会被deliver 到kernel中。
 
 Cc: Jacob Pan <jacob.jun.pan@linux.intel.com>
 Signed-off-by: Sohil Mehta <sohil.mehta@intel.com>
@@ -101,6 +124,9 @@ index 275e7fd20310..a4623fdb65a1 100644
  #endif
  	unsigned int x86_platform_ipis;	/* arch dependent */
  	unsigned int apic_perf_irqs;
+
+> } struct irq_cpustat_t;
+
 diff --git a/arch/x86/include/asm/idtentry.h b/arch/x86/include/asm/idtentry.h
 index 72184b0b2219..a01350b844e9 100644
 --- a/arch/x86/include/asm/idtentry.h
@@ -131,6 +157,8 @@ index 43dcb9284208..1d289b3ee0da 100644
 +#define UINTR_KERNEL_VECTOR		0xeb
 +
 +#define LOCAL_TIMER_VECTOR		0xea
+
+> 这里为什么要把local timer放到最下面??
  
  #define NR_VECTORS			 256
  

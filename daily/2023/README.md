@@ -26,3 +26,7 @@ Date:   Fri Jan 29 11:40:24 2021 +0900
 
 ## 04-19
 * [Context Switch with Less Memory and Better Performance](http://events17.linuxfoundation.org/sites/events/files/slides/LinuxCon_NA_2014.pdf)
+
+## 04-20
+* [x86/xsaves: Optimize xstate context switch by xsaves/xrstors](https://lore.kernel.org/lkml/1401123682-5384-5-git-send-email-fenghua.yu@intel.com/t/)
+* 
