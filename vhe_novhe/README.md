@@ -1,5 +1,670 @@
-# NOTE 
+# NOVHE KVM(el2) memory map
+**本文主要分析, novh关于el2内存映射初始化, 顺便测试下，能不能在kernel module中
+访问el2的资源（陷入到el2执行代码)**
 
+# 代码分析
+## kernel boot el2 setup
+### stext
+kernel在引导后，会进入stext执行, 此时cpu状态为:
+* nommu(没有开启分页)
+* 当前cpu允许的最高异常等级
+```cpp
+ /*
+  * The following callee saved general purpose registers are used on the
+  * primary lowlevel boot path:
+  *
+  *  Register   Scope                      Purpose
+  *  x21        stext() .. start_kernel()  FDT pointer passed at boot in x0
+  *  x23        stext() .. start_kernel()  physical misalignment/KASLR offset
+  *  x28        __create_page_tables()     callee preserved temp register
+  *  x19/x20    __primary_switch()         callee preserved temp registers
+  */
+
+ENTRY(stext)
+        bl      preserve_boot_args
+        bl      el2_setup                       // Drop to EL1, w0=cpu_boot_mode
+        adrp    x23, __PHYS_OFFSET          //这个偏移加进去, 这是一个常量
+        and     x23, x23, MIN_KIMG_ALIGN - 1    // KASLR offset, defaults to 0, 先设置KASLR offset先设置成0
+        bl      set_cpu_boot_mode_flag
+        bl      __create_page_tables
+        /*
+         * The following calls CPU setup code, see arch/arm64/mm/proc.S for
+         * details.
+         * On return, the CPU will be ready for the MMU to be turned on and
+         * the TCR will have been set.
+         */
+        bl      __cpu_setup                     // initialise processor
+        b       __primary_switch
+ENDPROC(stext)
+```
+引导到`stext`时，有几个参数
+* x21: fdt pointer
+* x23:  physical misalignment(这个不太清楚!!)/KASLR offset
+
+`preserve_boot_args`会将 bootloader传过来的参数`fdt`指向的内存, 存放到`boot_args`内存
+处。
+
+> NOTE :
+>
+> `secondary_entry`也会调用到该函数。
+> ```
+> ENTRY(secondary_entry)
+>       bl      el2_setup                       // Drop to EL1
+>       bl      set_cpu_boot_mode_flag
+>       b       secondary_startup
+> ENDPROC(secondary_entry)
+
+> ```
+我们主要看下 `el2_setup`的流程。
+
+### el2_setup
+在grub引导至内核中，kernel会在最高的异常级别下执行，
+这里也很好理解，因为控制权是交给kernel了，低特权级无法
+访问高特权级的寄存器，所以必须要在最高的特权级跳转到kernel的
+代码。
+
+kernel会在`el2_setup`函数中进行简单的初始化, 而函数有返回值
+* BOOT_CPU_MODE_EL1
+* BOOT_CPU_MODE_EL2
+表示在引导到kernel时，是否是在el1/el2异常级别。
+
+```cpp
+ENTRY(el2_setup)                                
+	msr	SPsel, #1			// We want to use SP_EL{1,2}
+	mrs	x0, CurrentEL
+	//#define CurrentEL_EL1           (1 << 2)
+	//#define CurrentEL_EL2           (2 << 2)
+	cmp	x0, #CurrentEL_EL2                          //判断是否是el2
+	b.eq	1f					    //相同eq为真，如果是el2跳转到1f
+	mov_q	x0, (SCTLR_EL1_RES1 | ENDIAN_SET_EL1)
+	msr	sctlr_el1, x0
+	mov	w0, #BOOT_CPU_MODE_EL1		// This cpu booted in EL1
+	isb
+	ret
+
+	/* 
+	 * #ifdef CONFIG_CPU_BIG_ENDIAN
+	 * #define ENDIAN_SET_EL2          SCTLR_ELx_EE
+	 * #define ENDIAN_CLEAR_EL2        0
+	 * #else
+	 * #define ENDIAN_SET_EL2          0
+	 * #define ENDIAN_CLEAR_EL2        SCTLR_ELx_EE
+	 * #endif
+	 * 
+	 * 初始化el2 ctrl 寄存器, 这里只是置位了 该寄存器的res位，和 ENDIAN_SET_EL2
+	 * 和大小端有关, 该 大小端主要作用于stage 1 stage 2 translation table walks
+	 *
+	 * arm64 一般是小端存储，但是也可以设置为大端，kernel CONFIG_CPU_BIG_ENDIAN 
+	 * 默认配置为NOT SET
+	 */
+1:	mov_q	x0, (SCTLR_EL2_RES1 | ENDIAN_SET_EL2)
+	msr	sctlr_el2, x0	
+
+#ifdef CONFIG_ARM64_VHE
+	/*
+	 * Check for VHE being present. For the rest of the EL2 setup,
+	 * x2 being non-zero indicates that we do have VHE, and that the
+	 * kernel is intended to run at EL2.
+	 */
+	mrs	x2, id_aa64mmfr1_el1        //查看id_aa64mmfr1_el1寄存器存储到x2
+	/*
+	 * 从x2寄存器8位开始，提取4位到x2寄存器, 实际上是[11:8], 取的是VH字段
+	 * 该字段为1使能VHE功能
+	 */
+	ubfx	x2, x2, #8, #4          
+#else
+	mov	x2, xzr
+#endif
+
+	/* Hyp configuration. */
+	mov_q	x0, HCR_HOST_NVHE_FLAGS //以到x0 (HCR_RW | HCR_API | HCR_APK)
+        //为0跳转 表示如果是novhe，则跳转, 设置hcr_el2为HCR_HOST_NVHE_FLAGS 
+	//如果是vhe, 则设置hcr_el2为HCR_HOST_VHE_FLAGS
+	cbz	x2, set_hcr
+	mov_q	x0, HCR_HOST_VHE_FLAGS  //(HCR_RW | HCR_TGE | HCR_E2H)
+set_hcr:
+    //在这里设置hcr_el2,也就是这个寄存器在kernel中是software设置的
+	msr	hcr_el2, x0                 
+	isb
+
+	/*
+	 * Allow Non-secure EL1 and EL0 to access physical timer and counter.
+	 * This is not necessary for VHE, since the host kernel runs in EL2,
+	 * and EL0 accesses are configured in the later stage of boot process.
+	 * Note that when HCR_EL2.E2H == 1, CNTHCTL_EL2 has the same bit layout
+	 * as CNTKCTL_EL1, and CNTKCTL_EL1 accessing instructions are redefined
+	 * to access CNTHCTL_EL2. This allows the kernel designed to run at EL1
+	 * to transparently mess with the EL0 bits via CNTKCTL_EL1 access in
+	 * EL2.
+	 */
+	//非0跳转, 也就是vhe跳转, 这个和physical timer相关，先略过
+	cbnz	x2, 1f              
+	mrs	x0, cnthctl_el2
+	orr	x0, x0, #3			// Enable EL1 physical timers
+	msr	cnthctl_el2, x0
+1:
+	msr	cntvoff_el2, xzr		// Clear virtual offset
+
+	//下面 #ifdef中的内容和GIC_V3相关，先略过
+#ifdef CONFIG_ARM_GIC_V3
+	/* GICv3 system register access */
+	mrs	x0, id_aa64pfr0_el1
+	ubfx	x0, x0, #24, #4
+	cmp	x0, #1
+	b.ne	3f
+
+	mrs_s	x0, SYS_ICC_SRE_EL2
+	orr	x0, x0, #ICC_SRE_EL2_SRE	// Set ICC_SRE_EL2.SRE==1
+	orr	x0, x0, #ICC_SRE_EL2_ENABLE	// Set ICC_SRE_EL2.Enable==1
+	msr_s	SYS_ICC_SRE_EL2, x0
+	isb					// Make sure SRE is now set
+	mrs_s	x0, SYS_ICC_SRE_EL2		// Read SRE back,
+	tbz	x0, #0, 3f			// and check that it sticks
+	msr_s	SYS_ICH_HCR_EL2, xzr		// Reset ICC_HCR_EL2 to defaults
+
+3:
+#endif
+
+	/* Populate ID registers. */
+	//和midr, mpidr相关，略过
+	mrs	x0, midr_el1
+	mrs	x1, mpidr_el1
+	msr	vpidr_el2, x0
+	msr	vmpidr_el2, x1
+
+#ifdef CONFIG_COMPAT
+	msr	hstr_el2, xzr			// Disable CP15 traps to EL2
+#endif
+	//和PMU相关，先略过
+	/* EL2 debug */
+	mrs	x1, id_aa64dfr0_el1		// Check ID_AA64DFR0_EL1 PMUVer
+	sbfx	x0, x1, #8, #4
+	cmp	x0, #1
+	b.lt	4f				// Skip if no PMU present
+	mrs	x0, pmcr_el0			// Disable debug access traps
+	ubfx	x0, x0, #11, #5			// to EL2 and allow access to
+4:
+	csel	x3, xzr, x0, lt			// all PMU counters from EL1
+
+	/* Statistical profiling */
+	ubfx	x0, x1, #32, #4			// Check ID_AA64DFR0_EL1 PMSVer
+	cbz	x0, 7f				// Skip if SPE not present
+	cbnz	x2, 6f				// VHE?
+	mrs_s	x4, SYS_PMBIDR_EL1		// If SPE available at EL2,
+	and	x4, x4, #(1 << SYS_PMBIDR_EL1_P_SHIFT)
+	cbnz	x4, 5f				// then permit sampling of physical
+	mov	x4, #(1 << SYS_PMSCR_EL2_PCT_SHIFT | \
+		      1 << SYS_PMSCR_EL2_PA_SHIFT)
+	msr_s	SYS_PMSCR_EL2, x4		// addresses and physical counter
+5:
+	mov	x1, #(MDCR_EL2_E2PB_MASK << MDCR_EL2_E2PB_SHIFT)
+	orr	x3, x3, x1			// If we don't have VHE, then
+	b	7f				// use EL1&0 translation.
+6:						// For VHE, use EL2 translation
+	orr	x3, x3, #MDCR_EL2_TPMS		// and disable access from EL1
+7:
+	//设置mdcr_el2
+	msr	mdcr_el2, x3			// Configure debug traps
+
+	/* LORegions */
+	mrs	x1, id_aa64mmfr1_el1
+	ubfx	x0, x1, #ID_AA64MMFR1_LOR_SHIFT, 4
+	cbz	x0, 1f
+	msr_s	SYS_LORC_EL1, xzr
+1:
+	//stage-2 translation相关
+	/* Stage-2 translation */
+	msr	vttbr_el2, xzr
+
+	/* 
+	 * !!!!!!!!!!!!!!
+	 * 重点部分 :
+	 *
+	 * 如果是novhe, 则跳转到install_el2_stub, 
+	 * 如果是vhe,则不会跳转，而是直接返回
+	 *
+	 * 这里也就是novhe和vhe的不同走向
+	 *    novhe : 跳转到install_el2_stub, 最终会调用eret返回，跳回到el1异常级别
+	 *    vhe : 在这里调用ret返回，返回到上一级仍然是el2异常级别
+	 */
+	cbz	x2, install_el2_stub        //查看是否为0，为0跳转, 也就是跳转到EL1
+
+	mov	w0, #BOOT_CPU_MODE_EL2		// This CPU booted in EL2 //boot as EL1
+	isb
+	ret
+
+install_el2_stub:
+	/*
+	 * When VHE is not in use, early init of EL2 and EL1 needs to be
+	 * done here.
+	 * When VHE _is_ in use, EL1 will not be used in the host and
+	 * requires no configuration, and all non-hyp-specific EL2 setup
+	 * will be done via the _EL1 system register aliases in __cpu_setup.
+	 */
+	mov_q	x0, (SCTLR_EL1_RES1 | ENDIAN_SET_EL1)
+	//设置el1 ctrl寄存器，和上面的流程一样，仅设置res和大小端
+	msr	sctlr_el1, x0
+
+	/* Coprocessor traps. */
+	mov	x0, #0x33ff
+	msr	cptr_el2, x0			// Disable copro. traps to EL2
+
+	/* SVE register access */
+	mrs	x1, id_aa64pfr0_el1
+	ubfx	x1, x1, #ID_AA64PFR0_SVE_SHIFT, #4
+	cbz	x1, 7f
+
+	bic	x0, x0, #CPTR_EL2_TZ		// Also disable SVE traps
+	msr	cptr_el2, x0			// Disable copro. traps to EL2
+	isb
+	mov	x1, #ZCR_ELx_LEN_MASK		// SVE: Enable full vector
+	msr_s	SYS_ZCR_EL2, x1			// length for EL1.
+
+	/* Hypervisor stub */
+	/*
+	 * 设置vbar_el2异常向量表，设置为 __hyp_stub_vectors
+	 *
+	 * NOTE : 这里大家思考下，为什么novhe的情况下，在el2_setup
+	 * 返回之前需要设置异常向量表?
+	 *
+	 * 因为，novhe是通过eret返回，之后就返回到el1了，之后kvm运行在
+	 * el2, 所以肯定还是有可能返回到el2，而代码控制权传递，就是
+	 * 通过异常向量表，所以需要在这里设置下（要不就回不来了 :( )
+	 */
+7:	adr_l	x0, __hyp_stub_vectors
+	msr	vbar_el2, x0
+
+	/* spsr */
+	//设置spsr
+	mov	x0, #(PSR_F_BIT | PSR_I_BIT | PSR_A_BIT | PSR_D_BIT |\
+		      PSR_MODE_EL1h)            
+	msr	spsr_el2, x0 
+        /*
+	 * lr寄存器存储当前函数(el2_setup) 返回地址, 也就是:
+	 *    ENTRY(xtext)
+	 *      ...
+	 *      bl      el2_setup          
+	 *      adrp    x23, __PHYS_OFFSET <---here
+	 *      ...
+	 *
+	 * 然后，将lr寄存器保存在elr_el2寄存器中，调用eret返回，则会
+	 * 退回到el1异常级别，在elr_el2指向的代码地址运行。继续之前的
+	 * 初始化流程
+	 */
+	msr	elr_el2, lr
+	mov	w0, #BOOT_CPU_MODE_EL2		// This CPU booted in EL2   //boot as el2
+	eret                            //当作异常返回了，也就是在这里drop to el1
+ENDPROC(el2_setup)
+```
+<!--
+我们先来思考下, vhe和novhe在该流程中需要做哪些初始化，
+或者说需要初始化el2的哪些资源, 其实两者的目的不同: 
+-->
+可以看到, 无论是novhe,还是vhe 都没有去做idmap页表映射。也没有开启分页，
+也就是说，在novhe情况中，下次如果通过`hvc`进入到el2异常级别，那也是
+nommu的情况，一会我们重点看下。
+
+### set_cpu_boot_mode_flag
+
+之后便执行到 `set_cpu_boot_mode_flag`, 该函数会将`el2_setup`的返回值，
+保存到__boot_cpu_mode中
+```
+set_cpu_boot_mode_flag:
+        adr_l   x1, __boot_cpu_mode
+        cmp     w0, #BOOT_CPU_MODE_EL2
+        b.ne    1f              //不为0, 表示为el1, 跳转
+        add     x1, x1, #4	//如果是el2则进行地址add操作，x1 = &__boot_cpu_mode[1]
+1:      str     w0, [x1]                        // This CPU has booted in EL1
+        dmb     sy
+        dc      ivac, x1                        // Invalidate potentially stale cache line
+        ret
+ENDPROC(set_cpu_boot_mode_flag)
+
+ENTRY(__boot_cpu_mode)
+        .long   BOOT_CPU_MODE_EL2
+        .long   BOOT_CPU_MODE_EL1
+```
+这里为什么要这么操作呢 ? 上面提到了, `stext`(boot_cpu)和`secondary_entry`
+(secondary cpu) 都会调用到该函数, 为了避免每个cpu执行到记录的最高异常等级
+不一样，影响kvm的使用，所以当出现这种情况时，则不会使能kvm功能（vhe情况
+还得看下，因为vhe中kernel也会运行在el2）。
+
+而__boot_cpu_mode默认值为: `[0] = BOOT_CPU_MODE_EL2, [1] = BOOT_CPU_MODE_EL1`
+而上面函数设置的时候, 如果检测到 `w0 == BOOT_CPU_MODE_EL2`, 则会设置 
+`__boot_cpu_mode[1] =  BOOT_CPU_MODE_EL2`, 否则相反。
+
+假设一个机器有8个cpu，有7个是 BOOT_CPU_MODE_EL2, 另外1个是 BOOT_CPU_MODE_EL1
+则会出现 `__boot_cpu_mode[0] =  BOOT_CPU_MODE_EL1 &&
+__boot_cpu_mode[1] =  BOOT_CPU_MODE_EL2`。并且，无论启动顺序如何，
+`__boot_cpu_mode[0] = BOOT_CPU_MODE_EL1`都不会被后续的操作覆盖。
+
+而在 `is_hyp_mode_available`会判断两个值是否相等，如果不相等，
+并且是否是`BOOT_CPU_MODE_EL2`如果不是, 则认为kvm功能不能开启
+```cpp
+static inline bool is_hyp_mode_available(void)
+{
+        return (__boot_cpu_mode[0] == BOOT_CPU_MODE_EL2 &&
+                __boot_cpu_mode[1] == BOOT_CPU_MODE_EL2);
+}
+int kvm_arch_init(void *opaque)
+{
+	...
+	if (!is_hyp_mode_available()) {
+		kvm_info("HYP mode not available\n");
+        	return -ENODEV;
+	}
+	...
+}
+```
+### __create_page_tables
+```cpp
+__create_page_tables:
+	/*
+	 * 将lr 保存到 x28中
+	 * 在最后还会通过 ret x28 返回, 那么这里为什么要保存lr
+	 * 和`__inval_dcache_area`的调用相关, 我们接下来会分析到
+	 */
+	mov	x28, lr
+
+	/*
+	 * Invalidate the init page tables to avoid potential dirty cache lines
+	 * being evicted. Other page tables are allocated in rodata as part of
+	 * the kernel image, and thus are clean to the PoC per the boot
+	 * protocol.
+	 */
+	 /*
+	  * 这里提到需要invalidate init_pg_dir中的 dirty cache line, 以免对其产生影响,
+	  * 但是不需要invalidate 其他的 page tables,因为其他的page tables在 kernel
+	  * image的rodata, 根据PoC引导协议是干净的。
+	  *
+	  * 这里有点疑惑:
+	  * 假如是stext路径走下来的，此时还没有开启分页和cache，不应该会产生影响
+	  * （可能是其他的路径，先遗留，之后再看)
+	  *
+	  * ????????????????
+	  */
+	adrp	x0, init_pg_dir
+	adrp	x1, init_pg_end
+	sub	x1, x1, x0          //算出size
+	/*
+	 * 算出来init_pg_dir的大小，然后调用__inval_dcache_data
+	 *
+	 * __inval_dcache_area参数:
+	 * 
+	 * x0 start_address
+	 * x1 size
+	 *
+	 * 而且该函数并没有 STP x29, x30
+	 * 所以没有保存LR，所以在开始的时候，需要先将LR保存到其他寄存器中
+	 * 这里不清楚问什么不在	__inval_dcache_area堆栈中保存LR
+	 */
+	bl	__inval_dcache_area
+
+	/*
+	 * Clear the init page tables.
+	 */
+	adrp	x0, init_pg_dir
+	adrp	x1, init_pg_end
+	sub	x1, x1, x0              //x1 指的是size
+	/*
+	 * 该指令会这里先将[x0, x0 + 16]赋值为0
+	 * 然后再 x0 += 16
+	 */
+1:	stp	xzr, xzr, [x0], #16
+	stp	xzr, xzr, [x0], #16
+	stp	xzr, xzr, [x0], #16
+	stp	xzr, xzr, [x0], #16
+	subs	x1, x1, #64         //x1 = x1 -64
+	b.ne	1b
+```
+
+我们来看下`init_pg_dir`的size
+```
+#define EARLY_PAGES(vstart, vend) ( 1                   /* PGDIR page */                                \
+                        + EARLY_PGDS((vstart), (vend))  /* each PGDIR needs a next level page table */  \
+                        + EARLY_PUDS((vstart), (vend))  /* each PUD needs a next level page table */    \
+                        + EARLY_PMDS((vstart), (vend))) /* each PMD needs a next level page table */
+#define INIT_DIR_SIZE (PAGE_SIZE * EARLY_PAGES(KIMAGE_VADDR + TEXT_OFFSET, _end))
+```
+不过多展开，这里计算了 `_end - (KIMAGE_VADDR + TEXT_OFFSET)`需要多少个
+page来构建页表（各级页表)。
+
+我们再来看下, arm64的链接脚本:
+```cpp
+SECTIONS
+{
+	/DISCARD/ : {
+	        ARM_EXIT_DISCARD(EXIT_TEXT)
+	        ARM_EXIT_DISCARD(EXIT_DATA)
+	        EXIT_CALL
+	        *(.discard)
+	        *(.discard.*)
+	        *(.interp .dynamic)
+	        *(.dynsym .dynstr .hash)
+	}
+
+	. = KIMAGE_VADDR + TEXT_OFFSET;
+
+	.head.text : {
+	        _text = .;
+	        HEAD_TEXT
+	}
+	.text : {           
+		...
+	}
+	...
+	_end = .;
+
+	STABS_DEBUG
+
+	HEAD_SYMBOLS
+
+}
+```
+可以看到[KIMAGE_ADDR + TEXT_OFFSET, _end] 几乎包含了整个
+kernel的image。
+
+接着分析`__create_page_tables`
+
+```cpp
+__create_page_tables:
+	//...
+	//接上面分析
+	//...
+	mov	x7, SWAPPER_MM_MMUFLAGS
+
+	/*
+	 * Create the identity mapping.
+	 */
+	adrp	x0, idmap_pg_dir
+	adrp	x3, __idmap_text_start		// __pa(__idmap_text_start)
+
+#ifdef CONFIG_ARM64_USER_VA_BITS_52
+	/*
+	 * #define ID_AA64MMFR2_LVA_SHIFT          16
+	 *
+	 * VARange [19,16]: 
+	 *   0b0 : support 48-bits VAs
+	 *   0b1 : support 52-bits VAs
+	 */
+	mrs_s	x6, SYS_ID_AA64MMFR2_EL1    //读操作
+	and	x6, x6, #(0xf << ID_AA64MMFR2_LVA_SHIFT)
+	mov	x5, #52
+	//如果不是0, 则跳转
+	cbnz	x6, 1f
+#endif
+	/*
+	 * 如果没有配置，则配置为 VA_BITS (CONFIG_ARM64_VA_BITS)
+	 */
+	mov	x5, #VA_BITS
+1:
+	adr_l	x6, vabits_user		//获取vabits_user的地址
+	str	x5, [x6]		//将x5保存
+	dmb	sy
+	dc	ivac, x6		// Invalidate potentially stale cache line
+
+	/*
+	 * VA_BITS may be too small to allow for an ID mapping to be created
+	 * that covers system RAM if that is located sufficiently high in the
+	 * physical address space. So for the ID map, use an extended virtual
+	 * range in that case, and configure an additional translation level
+	 * if needed.
+	 *
+	 * Calculate the maximum allowed value for TCR_EL1.T0SZ so that the
+	 * entire ID map region can be mapped. As T0SZ == (64 - #bits used),
+	 * this number conveniently equals the number of leading zeroes in
+	 * the physical address of __idmap_text_end.
+	 */
+	adrp	x5, __idmap_text_end
+	clz	x5, x5
+	cmp	x5, TCR_T0SZ(VA_BITS)	// default T0SZ small enough?
+	b.ge	1f			// .. then skip VA range extension
+```
+
+这里将`__idmap_text_end`地址存放到x5中，注意，这个地址是相对地址，adrp指令
+编码时，只是记录了一个偏移(可见末尾章节对adrp相关解码分析)，算出来的值实际上
+是根据ip来的，也就是未开启分页时的线性地址，和开启分页后的虚拟地址算出来还不一样。
+
+TCR_EL1.T0SZ则表示，TTBR0_EL1能访问的memory region的范围，该字段又在整个寄存器
+的低位，所以正好可以不用做位移，拿过来直接用。
+
+而这里我们获取的应该是线性地址（物理地址），而计算`idmap`访问大小则是通过查看
+最大的地址访问(`__idmap_text_end`)得到，所以查看T0SZ能不能满足当前最大的地址访问
+(`__idmap_text_end`), 如果不能则用一定的方式扩展（扩展代码暂时不看），
+关于`TCR_EL1.T0SZ`和`TCR_EL1.T1SZ`见末尾章节。
+
+我们继续分析`__create_page_tables`代码:
+```cpp
+__create_page_tables:
+	//...
+	//接上面分析
+	//...
+	adr_l	x6, idmap_t0sz
+	str	x5, [x6]
+	dmb	sy
+	dc	ivac, x6		// Invalidate potentially stale cache line
+
+#if (VA_BITS < 48)
+#define EXTRA_SHIFT	(PGDIR_SHIFT + PAGE_SHIFT - 3)
+#define EXTRA_PTRS	(1 << (PHYS_MASK_SHIFT - EXTRA_SHIFT))
+
+	/*
+	 * If VA_BITS < 48, we have to configure an additional table level.
+	 * First, we have to verify our assumption that the current value of
+	 * VA_BITS was chosen such that all translation levels are fully
+	 * utilised, and that lowering T0SZ will always result in an additional
+	 * translation level to be configured.
+	 */
+#if VA_BITS != EXTRA_SHIFT
+#error "Mismatch between VA_BITS and page size/number of translation levels"
+#endif
+
+	mov	x4, EXTRA_PTRS
+	create_table_entry x0, x3, EXTRA_SHIFT, x4, x5, x6
+#else
+	/*
+	 * If VA_BITS == 48, we don't have to configure an additional
+	 * translation level, but the top-level table has more entries.
+	 */
+	mov	x4, #1 << (PHYS_MASK_SHIFT - PGDIR_SHIFT)
+	str_l	x4, idmap_ptrs_per_pgd, x5
+#endif
+	//!!!!!
+	//假如T0SZ满足当前idmap的访问，则跳转到这
+1:
+	ldr_l	x4, idmap_ptrs_per_pgd
+	mov	x5, x3				// __pa(__idmap_text_start)
+	adr_l	x6, __idmap_text_end		// __pa(__idmap_text_end)
+        map_memory x0, x1, x3, x6, x7, x3, x4, x10, x11, x12, x13, x14
+```
+
+我们来看下 `map_memory`代码:
+```cpp
+/*
+ * Map memory for specified virtual address range. Each level of page table needed supports
+ * multiple entries. If a level requires n entries the next page table level is assumed to be
+ * formed from n pages.
+ *
+ *	tbl:	location of page table
+ *	rtbl:	address to be used for first level page table entry (typically tbl + PAGE_SIZE)
+ *	vstart:	start address to map
+ *	vend:	end address to map - we map [vstart, vend]
+ *	flags:	flags to use to map last level entries
+ *	phys:	physical address corresponding to vstart - physical memory is contiguous
+ *	pgds:	the number of pgd entries
+ *
+ * Temporaries:	istart, iend, tmp, count, sv - these need to be different registers
+ * Preserves:	vstart, vend, flags
+ * Corrupts:	tbl, rtbl, istart, iend, tmp, count, sv
+ */
+	.macro map_memory, tbl, rtbl, vstart, vend, flags, phys, pgds, istart, iend, tmp, count, sv
+	add \rtbl, \tbl, #PAGE_SIZE
+	mov \sv, \rtbl
+	mov \count, #0
+	compute_indices \vstart, \vend, #PGDIR_SHIFT, \pgds, \istart, \iend, \count
+	populate_entries \tbl, \rtbl, \istart, \iend, #PMD_TYPE_TABLE, #PAGE_SIZE, \tmp
+	mov \tbl, \sv
+	mov \sv, \rtbl
+
+#if SWAPPER_PGTABLE_LEVELS > 3
+	compute_indices \vstart, \vend, #PUD_SHIFT, #PTRS_PER_PUD, \istart, \iend, \count
+	populate_entries \tbl, \rtbl, \istart, \iend, #PMD_TYPE_TABLE, #PAGE_SIZE, \tmp
+	mov \tbl, \sv
+	mov \sv, \rtbl
+#endif
+
+#if SWAPPER_PGTABLE_LEVELS > 2
+	compute_indices \vstart, \vend, #SWAPPER_TABLE_SHIFT, #PTRS_PER_PMD, \istart, \iend, \count
+	populate_entries \tbl, \rtbl, \istart, \iend, #PMD_TYPE_TABLE, #PAGE_SIZE, \tmp
+	mov \tbl, \sv
+#endif
+
+	compute_indices \vstart, \vend, #SWAPPER_BLOCK_SHIFT, #PTRS_PER_PTE, \istart, \iend, \count
+	bic \count, \phys, #SWAPPER_BLOCK_SIZE - 1
+	populate_entries \tbl, \count, \istart, \iend, \flags, #SWAPPER_BLOCK_SIZE, \tmp
+	.endm
+
+```
+
+
+
+我们接下来再看`__create_table_entry`代码
+
+```cpp
+__create_table_entry:
+	//...
+	//...接上面
+	//...
+        /*
+         * Map the kernel image (starting with PHYS_OFFSET).
+         */
+        adrp    x0, init_pg_dir
+        mov_q   x5, KIMAGE_VADDR + TEXT_OFFSET  // compile time __va(_text)
+        add     x5, x5, x23                     // add KASLR displacement
+        mov     x4, PTRS_PER_PGD
+        adrp    x6, _end                        // runtime __pa(_end)
+        adrp    x3, _text                       // runtime __pa(_text)
+        sub     x6, x6, x3                      // _end - _text
+        add     x6, x6, x5                      // runtime __va(_end)
+
+        map_memory x0, x1, x5, x6, x7, x3, x4, x10, x11, x12, x13, x14
+
+        /*
+         * Since the page tables have been populated with non-cacheable
+         * accesses (MMU disabled), invalidate the idmap and swapper page
+         * tables again to remove any speculatively loaded cache lines.
+         */
+        adrp    x0, idmap_pg_dir
+        adrp    x1, init_pg_end
+        sub     x1, x1, x0
+        dmb     sy
+        bl      __inval_dcache_area
+
+        ret     x28
+ENDPROC(__create_page_tables)
+```
+
+# NOTE 
 ## create_hyp_mappings
 ```
 create_hyp_mappings
@@ -65,9 +730,88 @@ D17.2.150 VBAR_EL2, Vector Base Address Register (EL2)
 ## SCTLR_EL2
 D17.2.119 SCTLR_EL2, System Control Register (EL2)
 
-
+### 25 bit
+> Endianness of data accesses at EL2, stage 1 translation table walks in the EL2 or EL2&0 translation
+> regime, and stage 2 translation table walks in the EL1&0 translation regime.
+>
+> `0b0`: Explicit data accesses at EL2, stage 1 translation table walks in the EL2 or EL2&0
+> translation regime, and stage 2 translation table walks in the EL1&0 translation regime
+> are little-endian.
+>
+> `0b1`: Explicit data accesses at EL2, stage 1 translation table walks in the EL2 or EL2&0
+> translation regime, and stage 2 translation table walks in the EL1&0 translation regime
+> are big-endian.
+>
+> If an implementation does not provide Big-endian support at Exception levels higher than EL0, this
+> bit is RES0.
+>
+> If an implementation does not provide Little-endian support at Exception levels higher than EL0,
+> this bit is RES1.
+>
+> The EE bit is permitted to be cached in a TLB.
+>
+> The reset behavior of this field is:
+>
+> * On a Warm reset,this field resets to an IMPLEMENTATION DEFINED value.
 ## TTBR0_EL2
 D17.2.145 TTBR0_EL2, Translation Table Base Register 0 (EL2)
 
 ## TTBR0_EL2
 D17.2.148 TTBR1_EL2, Translation Table Base Register 1 (EL2)
+
+## ID_AA64MMFR1_EL1
+D17.2.65 ID_AA64MMFR1_EL1, AArch64 Memory Model Feature Register 1
+
+### VH, bits [11:8]
+> Virtualization Host Extensions. Defined values are:
+> * `0b0000`: Virtualization Host Extensions not supported.
+> * `0b0001`: Virtualization Host Extensions supported.
+> All other values are reserved.
+> FEAT_VHE implements the functionality identified by the value 0b0001.
+> From Armv8.1, the only permitted value is 0b0001.
+
+
+## TCR_EL1
+D17.2.131  TCR_EL1, Translation Control Register (EL1)
+
+和MMU相关
+### T1SZ, bits [21:16]
+The size offset of the memory region addressed by TTBR1_EL1. 
+The region size is 2(64-T1SZ) bytes.
+
+The maximum and minimum possible values for T1SZ depend on 
+the level of translation table and the memory translation
+granule size, as described in the AArch64 Virtual Memory 
+System Architecture chapter.
+
+（为TTBR1_EL1, 所能访问到的memory region size offset)
+
+### T0SZ, bits [5:0]
+The size offset of the memory region addressed by TTBR0_EL1. 
+The region size is 2(64-T0SZ) bytes. 
+
+The maximum and minimum possible values for T0SZ depend on
+the level of translation table and the memory translation 
+granule size, as described in the AArch64 Virtual Memory System
+Architecture chapter.
+
+(为TTBR0_EL1, 所能访问到的 memory region size offset)
+# 指令解码
+## adrp
+
+![adrp](pic/adrp.png)
+```
+0xffff8000115800c4 <+132>:   adrp    x5, 0xffff800011b97000 <dbg_reg_def+856>
+(gdb) x/4xb 0xffff8000115800c4
+0xffff8000115800c4 <__create_page_tables+132>:  0xa5    0x30    0x00    0xf0
+```
+![a53000f0](pic/0xa53000f0_to_b.png)
+
+![0xf00030a5(pic/0xf00030a5.png)
+
+[30,29],[23,5] = [0b0000 0000 0011 0000 101  11] * 4096 =  0x617000
+0xffff800011580000 + 0x617000 = 0xffff800011b97000
+
+> NOTE: 
+>
+> 这里最高位是符号位，所以计算出来是33位
