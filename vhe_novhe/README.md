@@ -1,3 +1,5 @@
+[TOC](文章目录)
+
 # NOVHE KVM(el2) memory map
 **本文主要分析, novh关于el2内存映射初始化, 顺便测试下，能不能在kernel module中
 访问el2的资源（陷入到el2执行代码)**
@@ -461,7 +463,7 @@ SECTIONS
 
 }
 ```
-可以看到[KIMAGE_ADDR + TEXT_OFFSET, _end] 几乎包含了整个
+可以看到[KIMAGE_ADDR + TEXT_OFFSET, \_end] 几乎包含了整个
 kernel的image。
 
 接着分析`__create_page_tables`
@@ -577,6 +579,82 @@ __create_page_tables:
 	adr_l	x6, __idmap_text_end		// __pa(__idmap_text_end)
         map_memory x0, x1, x3, x6, x7, x3, x4, x10, x11, x12, x13, x14
 ```
+上面实际上在构造 `map_memory`宏的参数，然后调用map_memory进行idmap映射。
+
+这里，我们先来看下`idmap_ptrs_per_pgd`的相关定义:
+```
+u64 idmap_ptrs_per_pgd = PTRS_PER_PGD;
+
+#define PTRS_PER_PGD            (1 << (VA_BITS - PGDIR_SHIFT))
+//CONFIG_PGTABLE_LEVELS = 3
+/*
+ * PGDIR_SHIFT determines the size a top-level page table entry can map
+ * (depending on the configuration, this level can be 0, 1 or 2).
+ */
+#define PGDIR_SHIFT             ARM64_HW_PGTABLE_LEVEL_SHIFT(4 - CONFIG_PGTABLE_LEVELS)
+/*
+ * Size mapped by an entry at level n ( 0 <= n <= 3)
+ * We map (PAGE_SHIFT - 3) at all translation levels and PAGE_SHIFT bits
+ * in the final page. The maximum number of translation levels supported by
+ * the architecture is 4. Hence, starting at at level n, we have further
+ * ((4 - n) - 1) levels of translation excluding the offset within the page.
+ * So, the total number of bits mapped by an entry at level n is :
+ *
+ *  ((4 - n) - 1) * (PAGE_SHIFT - 3) + PAGE_SHIFT
+ *
+ * Rearranging it a bit we get :
+ *   (4 - n) * (PAGE_SHIFT - 3) + 3
+ */
+#define ARM64_HW_PGTABLE_LEVEL_SHIFT(n) ((PAGE_SHIFT - 3) * (4 - (n)) + 3)
+```
+我们先来看`ARM64_HW_PGTABLE_LEVEL_SHIFT`，注释中提到了，该宏用于计算level n
+的entry能映射的size(但是这个size是用shift表示的), 最后一级页表的shift，为`PAGE_SHIFT`,
+而其他页表的shift为`PAGE_SHIFT - 3`, 最多有4级页表，n为，所需计算的页表等级，
+范围是`（0 <= n <= 3)`, 最后一级页表为3(pte), 所以除去最后一级，还有(4 - n - 1) 级页表,
+所以最终计算的shift为:
+```
+(4 - n - 1) * (PAGE_SHIFT - 3) + PAGE_SHIFT
+```
+
+展开计算:
+```
+(4 - n) * (PAGE_SHIFT - 3) - (PAGE_SHIFT - 3) + PAGE_SHIFT
+(4 - n) * (PAGE_SHIFT - 3) + 3
+```
+在回到 PTRS_PER_PGD ，为`1 << (VA_BITS - PGDIR_SHIFT)`
+计算的为PGD的 bits所能表示的范围大小，我们举个例子来看下:
+
+对于
+```
+CONFIG_ARM64_PAGE_SHIFT=16
+CONFIG_ARM64_VA_BITS=48
+CONFIG_PGTABLE_LEVELS=3
+```
+`PGDIR_SHIFT`计算为:
+```
+ARM64_HW_PGTABLE_LEVEL_SHIFT(4 - 3 = 1)
+(4  - 1) * (16 - 3) + 3 = 3 * 13 + 3 = 42
+```
+PTRS_PER_PGD 计算为:
+```
+(1 << (48 - 42)) = 64
+```
+简单画个图:
+```
+page_shift alias pgf
+
++-------------------------------------------------------------------+
+|          PGD        |    PMD    |    PTE    |        PAGE         |
+VA_bits         pgdir_shift    pmd_shift     pgf                    0
+|48                   42         29          16                     0
++-------------------------------------------------------------------+
+|va_bits - pgdir_shift|  pgf - 3  | pgf - 3   |     pgf             |
+|          6          |   13      |    13     |      16             |
++-------------------------------------------------------------------+
+```
+
+PS: 手册中给出的图表:
+![arm64_sdm_64kb_3_level](pic/arm64_sdm_64kb_3_level.png)
 
 我们来看下 `map_memory`代码:
 ```cpp
@@ -590,19 +668,216 @@ __create_page_tables:
  *	vstart:	start address to map
  *	vend:	end address to map - we map [vstart, vend]
  *	flags:	flags to use to map last level entries
- *	phys:	physical address corresponding to vstart - physical memory is contiguous
+ *	phys:	physical address corresponding to vstart - physical memory is contiguous(相邻的，邻近的)
  *	pgds:	the number of pgd entries
  *
  * Temporaries:	istart, iend, tmp, count, sv - these need to be different registers
  * Preserves:	vstart, vend, flags
  * Corrupts:	tbl, rtbl, istart, iend, tmp, count, sv
  */
+	/*
+	 * tbl: idmap_pgd_dir(x0)
+	 * rtbl: 临时变量，表示first level pgtable entry的地址( tbl + PAGE+SIZE )(x1)
+	 * vstart: __idmap_text_start(x3)
+	 * vend: __idmap_text_end(x6)
+	 * flags:  SWAPPER_MM_MMUFLAGS (x7)
+	 * phys: __idmap_text_start(x3)
+	 * pgds: idmap_ptrs_per_pgd(x4)
+	 */
 	.macro map_memory, tbl, rtbl, vstart, vend, flags, phys, pgds, istart, iend, tmp, count, sv
 	add \rtbl, \tbl, #PAGE_SIZE
 	mov \sv, \rtbl
 	mov \count, #0
 	compute_indices \vstart, \vend, #PGDIR_SHIFT, \pgds, \istart, \iend, \count
 	populate_entries \tbl, \rtbl, \istart, \iend, #PMD_TYPE_TABLE, #PAGE_SIZE, \tmp
+```
+我们来看下`compute_indices`的代码:
+
+```cpp
+/*
+ * Compute indices(index的复数形式之一) of table entries from virtual address range. If multiple entries
+ * were needed in the previous page table level then the next page table level is assumed
+ * to be composed of multiple pages. (This effectively scales the end index).
+ *
+ * 个人理解这里提到的做法:
+ * 假设上一级需要多个pgtable entry, 每个pgtable entry实际上都指向一个页面，这样iend, 可能就有多个，
+ * 但是这里假定，下一级页表是 composed of multiple pages(由多个连续的页面组成),这样把
+ * 多个页面看成一个整体，得到一个iend,供下面函数使用
+ *
+ * 而下面count参数提到的入参含义，里面提到`scale`， 没有太理解作用
+ *
+ *	vstart:	virtual address of start of range
+ *	vend:	virtual address of end of range
+ *	shift:	shift used to transform virtual address into index
+ *	ptrs:	number of entries in page table
+ *	istart:	index in table corresponding to vstart
+ *	iend:	index in table corresponding to vend
+ *	count:	On entry: how many extra entries were required in previous level, scales
+ *			  our end index.
+ *		On exit: returns how many extra entries required for next page table level
+ *
+ * Preserves:	vstart, vend, shift, ptrs
+ * Returns:	istart, iend, count
+ */
+	.macro compute_indices, vstart, vend, shift, ptrs, istart, iend, count
+	lsr	\iend, \vend, \shift	//右移shift 计算 iend index
+	mov	\istart, \ptrs		//不要被这里istart迷惑，只是一个临时变量使用
+	sub	\istart, \istart, #1
+	and	\iend, \iend, \istart	// iend = (vend >> shift) & (ptrs - 1)
+	mov	\istart, \ptrs
+	mul	\istart, \istart, \count
+	add	\iend, \iend, \istart	// iend += (count - 1) * ptrs 
+					//个人理解: 
+					//这里入参 count ，是 count - 1
+					//假设，上一级需要5个page, 那么这里传入的count为4
+					//原因在 (2)
+					// our entries span multiple tables
+
+	lsr	\istart, \vstart, \shift	//计算istart
+	mov	\count, \ptrs			//count这时作为临时变量
+	sub	\count, \count, #1		//ptrs - 1
+	and	\istart, \istart, \count	//istart = (istart >> shift) & (ptrs - 1)
+
+	sub	\count, \iend, \istart		//(2) 在这里计算icount,如果有4个entry，这里得到的count = 3
+	.endm
+```
+该宏定义，为了计算 [vstart, vend]虚拟内存区间，在该shift的页表中的index start,和
+index end。而count会作为出参，用来计算低级页表的入参(PMD, PTE)
+
+我们再来看下`populate_entry`
+```cpp
+/*
+ * Macro to populate page table entries, these entries can be pointers to the next level
+ * or last level entries pointing to physical memory.
+ *
+ *      tbl:    page table address
+ *      rtbl:   pointer to page table or physical memory
+ *      index:  start index to write
+ *      eindex: end index to write - [index, eindex] written to
+ *      flags:  flags for pagetable entry to or in
+ *      inc:    increment to rtbl between each entry
+ *      tmp1:   temporary variable
+ *
+ * Preserves:   tbl, eindex, flags, inc
+ * Corrupts:    index, tmp1
+ * Returns:     rtbl
+ */
+        .macro populate_entries, tbl, rtbl, index, eindex, flags, inc, tmp1
+.Lpe\@: phys_to_pte \tmp1, \rtbl
+        orr     \tmp1, \tmp1, \flags    // tmp1 = table entry
+	/*
+	 * 该指令为: 将tmp1存储到 [tbl + index << 3]的内存中
+	 */
+        str     \tmp1, [\tbl, \index, lsl #3]
+        add     \rtbl, \rtbl, \inc      // rtbl = pa next level
+        add     \index, \index, #1
+        cmp     \index, \eindex
+        b.ls    .Lpe\@
+        .endm
+```
+该宏 用于填充page table entries.
+
+先看下`page_to_pte`宏:
+```
+        .macro  phys_to_pte, pte, phys
+#ifdef CONFIG_ARM64_PA_BITS_52
+        /*
+         * We assume \phys is 64K aligned and this is guaranteed by only
+         * supporting this configuration with 64K pages.
+         */
+        orr     \pte, \phys, \phys, lsr #36
+        and     \pte, \pte, #PTE_ADDR_MASK
+#else
+        mov     \pte, \phys
+#endif
+        .endm
+```
+在没有`CONFIG_ARM64_PA_BITS_52`情况下，为`phys`, 在代码中，就是rtbl
+
+回到 populate 的流程, 大致为:
+* tmp1 = rtbl	//获取entry指向的内存的物理地址
+* tmp1 = tmp1 | flags(PMD_TYPE_TABLE/SWAPPER_MM_MMUFLAGS)//或上一些flags
+* `[tbl + index << 3] = tmp1`, 这里`<< 3` 相当于 `* 8`, 
+    相当于每个entry为8-byte
+* rtbl = rtbl + PAGE_SIZE //获取下一个entry指向内存的物理地址
+* index = index + 1	  //自增index
+* `if (index < eindex) b.ls .Lpe\@`	//如果没有达到end_index,则继续循环
+* 这里需要注意: 因为各级页表是连续的，上级页表的末尾，为下级页表的开始，
+ 所以rtbl 会依次增加到，下一级页表的开始位置。
+
+那这里我们需要看下flags的内容, 这里有两个值
+> NOTE 
+>
+> 关于具体的位，我们在[Table descriptor format](#Table_descriptor_format)中详细说明
+* PMD_TYPE_TABLE
+* SWAPPER_MM_MMUFLAGS
+
+kernel中的定义:
+
+我们先来看, `PMD_TYPE_TABLE`
+```cpp
+#define PMD_TYPE_TABLE          (_AT(pmdval_t, 3) << 0)
+```
+* 关于`_AT(a, b)`宏定义，这里不再展开，和汇编，C的编译相关，如果是汇编展开，
+ 则为3
+* 这里 3 指的是:
+	+ bits 1 : valid
+	+ bits 2 : 指向page table address, 而不是page
+
+我们再来看`SWAPPER_MM_MMUFLAGS`:
+```cpp
+//--------------------------------------------------------------------------
+#if ARM64_SWAPPER_USES_SECTION_MAPS
+#define SWAPPER_MM_MMUFLAGS     (PMD_ATTRINDX(MT_NORMAL) | SWAPPER_PMD_FLAGS)
+#else
+#define SWAPPER_MM_MMUFLAGS     (PTE_ATTRINDX(MT_NORMAL) | SWAPPER_PTE_FLAGS)
+#endif
+#define MT_NORMAL               4
+//---------------------------------------------------------------------
+/*
+ * The linear mapping and the start of memory are both 2M aligned (per
+ * the arm64 booting.txt requirements). Hence we can use section mapping
+ * with 4K (section size = 2M) but not with 16K (section size = 32M) or
+ * 64K (section size = 512M).
+ */
+#ifdef CONFIG_ARM64_4K_PAGES
+#define ARM64_SWAPPER_USES_SECTION_MAPS 1
+#else
+#define ARM64_SWAPPER_USES_SECTION_MAPS 0
+#endif
+//---------------------------------------------------------------------
+#define SWAPPER_PTE_FLAGS       (PTE_TYPE_PAGE | PTE_AF | PTE_SHARED)
+#define SWAPPER_PMD_FLAGS       (PMD_TYPE_SECT | PMD_SECT_AF | PMD_SECT_S)
+#define PMD_ATTRINDX(t)         (_AT(pmdval_t, (t)) << 2)
+#define PTE_ATTRINDX(t)         (_AT(pteval_t, (t)) << 2)
+```
+* 这里`ARM64_SWAPPER_USES_SECTION_MAPS`表示可以使用 section mapping,而不是
+page mapping。
+* 从`PMD_ATTRINDX(MT_NORMAL)`,`PTE_ATTRINDX(MT_NORMAL)` 和memory type(cache)
+ 相关。对于stage-1 translation, 
+
+![stage_1_mt](pic/stage_1_mt.png)
+
+可以看到, 实际该字段存放的用于在`MAIR_ELx.Attr<n>`中的n, 只是一个index, 
+关于MAIR_ELx，我们在[MAIR_El1](#MAIR_EL1_label)章节中去看。
+* 我们再看看其他位: (这里只是简单说下，字段详细内容还是请看[Table descriptor format](#Table_descriptor_format))
+	+ SWAPPER_PTE_FLAGS:
+		* PTE_TYPE_PAGE : 表明是PTE 映射的 page 
+		* PTE_AF : access flag
+		* PTE_SHARED : shared flag
+	+ SWAPPER_PMD_FLAGS:
+		* PMD_TYPE_SECT: 表明是PMD映射的 block (个人理解: huge page)
+		* PMD_SECT_AF: access flag
+		* PMD_SECT_S: shared flag
+* 可以看到两者的不同就在于，是使用pte page映射，还是pmd block映射
+***
+
+我们继续分析 map_memory代码。
+```cpp
+	.macro map_memory
+	// ...
+	// 接上面分析
+	// ...
 	mov \tbl, \sv
 	mov \sv, \rtbl
 
@@ -625,7 +900,10 @@ __create_page_tables:
 	.endm
 
 ```
-
+* 之后流程比较简单sv，相当于是上一级page table的entry指向的地址，那么就是下一级page table的地址
+* 而rtbl作为上次 populate_entries的出参，记录着下下级page table的地址.
+* 通过多次调用`compute_indices`, `populate_entries`, 依次建立了 PGD->PUD, PUD->PMD, PMD->PTE, 
+* 这里需要注意的是，
 
 
 我们接下来再看`__create_table_entry`代码
@@ -796,6 +1074,12 @@ granule size, as described in the AArch64 Virtual Memory System
 Architecture chapter.
 
 (为TTBR0_EL1, 所能访问到的 memory region size offset)
+
+<div id="MAIR_EL1_label"></div>
+
+## MAIR_EL1
+asdfasdf
+
 # 指令解码
 ## adrp
 
@@ -815,3 +1099,19 @@ Architecture chapter.
 > NOTE: 
 >
 > 这里最高位是符号位，所以计算出来是33位
+
+<div id="Table_descriptor_format"></div>
+
+## Table descriptor format
+来自 arm6e sdm `D8.3 Translation table descriptor formats`
+
+![mid_table_descriptor_format](pic/mid_table_descriptor_format.png)
+attribute字段:
+![mid_table_desc_attribute_field](pic/mid_table_desc_attribute_field.png)
+
+* bits 0: Table descriptor bit[0] is required to be 1 to indicate the 
+ descriptor is valid.(valid位)
+* bits 1: For lookup levels other than lookup level 3, to specify a Table 
+ descriptor, the value of descriptor bit[1] is required to be 1.
+ (对于lv 3以外的entry，指定Table descriptor的话，需要指定bit[1]为1)
+* [48,16]: (这里指的是64KB granule 48-bit OA): next level table address
