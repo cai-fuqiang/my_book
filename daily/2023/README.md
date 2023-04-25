@@ -32,3 +32,5 @@ Date:   Fri Jan 29 11:40:24 2021 +0900
 
 ## 04-24
 * [Markdown锚点](https://blog.csdn.net/weixin_50464560/article/details/114784012)
+* [gnu as doc](https://sourceware.org/binutils/docs/as/)
+

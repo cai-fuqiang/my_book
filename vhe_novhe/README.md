@@ -805,71 +805,23 @@ index end。而count会作为出参，用来计算低级页表的入参(PMD, PTE
 * 这里需要注意: 因为各级页表是连续的，上级页表的末尾，为下级页表的开始，
  所以rtbl 会依次增加到，下一级页表的开始位置。
 
-那这里我们需要看下flags的内容, 这里有两个值
+那这里我们需要看下flags的内容, 这里有两个值, 我们简单说明下:
 > NOTE 
 >
 > 关于具体的位，我们在[Table descriptor format](#Table_descriptor_format)中详细说明
-* PMD_TYPE_TABLE
-* SWAPPER_MM_MMUFLAGS
 
-kernel中的定义:
+* PMD_TYPE_TABLE: 
+	+ kernel 中定义: `#define PMD_TYPE_TABLE          (_AT(pmdval_t, 3) << 0)`
+	+ 关于`_AT(a, b)`宏定义，这里不再展开，和汇编，
+	  C的编译相关，如果是汇编展开，则为3, 这里 3 指的是:
+		* bits 1 : valid
+		* bits 2 : 指向page table address, 而不是page
 
-我们先来看, `PMD_TYPE_TABLE`
-```cpp
-#define PMD_TYPE_TABLE          (_AT(pmdval_t, 3) << 0)
-```
-* 关于`_AT(a, b)`宏定义，这里不再展开，和汇编，C的编译相关，如果是汇编展开，
- 则为3
-* 这里 3 指的是:
-	+ bits 1 : valid
-	+ bits 2 : 指向page table address, 而不是page
+* SWAPPER_MM_MMUFLAGS: 
+	+ 最后一级页表的flag（页表指向page, block page)
+	+ 这里情况比较多，会涉及到 `ARM64_SWAPPER_USES_SECTION_MAPS`内容, 我们
+	 在[ARM64_SWAPPER_USES_SECTION_MAPS](#ARM64_SWAPPER_USES_SECTION_MAPS_label)结合讲述
 
-我们再来看`SWAPPER_MM_MMUFLAGS`:
-```cpp
-//--------------------------------------------------------------------------
-#if ARM64_SWAPPER_USES_SECTION_MAPS
-#define SWAPPER_MM_MMUFLAGS     (PMD_ATTRINDX(MT_NORMAL) | SWAPPER_PMD_FLAGS)
-#else
-#define SWAPPER_MM_MMUFLAGS     (PTE_ATTRINDX(MT_NORMAL) | SWAPPER_PTE_FLAGS)
-#endif
-#define MT_NORMAL               4
-//---------------------------------------------------------------------
-/*
- * The linear mapping and the start of memory are both 2M aligned (per
- * the arm64 booting.txt requirements). Hence we can use section mapping
- * with 4K (section size = 2M) but not with 16K (section size = 32M) or
- * 64K (section size = 512M).
- */
-#ifdef CONFIG_ARM64_4K_PAGES
-#define ARM64_SWAPPER_USES_SECTION_MAPS 1
-#else
-#define ARM64_SWAPPER_USES_SECTION_MAPS 0
-#endif
-//---------------------------------------------------------------------
-#define SWAPPER_PTE_FLAGS       (PTE_TYPE_PAGE | PTE_AF | PTE_SHARED)
-#define SWAPPER_PMD_FLAGS       (PMD_TYPE_SECT | PMD_SECT_AF | PMD_SECT_S)
-#define PMD_ATTRINDX(t)         (_AT(pmdval_t, (t)) << 2)
-#define PTE_ATTRINDX(t)         (_AT(pteval_t, (t)) << 2)
-```
-* 这里`ARM64_SWAPPER_USES_SECTION_MAPS`表示可以使用 section mapping,而不是
-page mapping。
-* 从`PMD_ATTRINDX(MT_NORMAL)`,`PTE_ATTRINDX(MT_NORMAL)` 和memory type(cache)
- 相关。对于stage-1 translation, 
-
-![stage_1_mt](pic/stage_1_mt.png)
-
-可以看到, 实际该字段存放的用于在`MAIR_ELx.Attr<n>`中的n, 只是一个index, 
-关于MAIR_ELx，我们在[MAIR_El1](#MAIR_EL1_label)章节中去看。
-* 我们再看看其他位: (这里只是简单说下，字段详细内容还是请看[Table descriptor format](#Table_descriptor_format))
-	+ SWAPPER_PTE_FLAGS:
-		* PTE_TYPE_PAGE : 表明是PTE 映射的 page 
-		* PTE_AF : access flag
-		* PTE_SHARED : shared flag
-	+ SWAPPER_PMD_FLAGS:
-		* PMD_TYPE_SECT: 表明是PMD映射的 block (个人理解: huge page)
-		* PMD_SECT_AF: access flag
-		* PMD_SECT_S: shared flag
-* 可以看到两者的不同就在于，是使用pte page映射，还是pmd block映射
 ***
 
 我们继续分析 map_memory代码。
@@ -903,7 +855,8 @@ page mapping。
 * 之后流程比较简单sv，相当于是上一级page table的entry指向的地址，那么就是下一级page table的地址
 * 而rtbl作为上次 populate_entries的出参，记录着下下级page table的地址.
 * 通过多次调用`compute_indices`, `populate_entries`, 依次建立了 PGD->PUD, PUD->PMD, PMD->PTE, 
-* 这里需要注意的是，
+* 这里需要注意的是，这里涉及`ARM64_SWAPPER_USES_SECTION_MAPS`, 我们在
+ [ARM64_SWAPPER_USES_SECTION_MAPS](#ARM64_SWAPPER_USES_SECTION_MAPS_label)结合讲述 
 
 
 我们接下来再看`__create_table_entry`代码
@@ -924,7 +877,15 @@ __create_table_entry:
         adrp    x3, _text                       // runtime __pa(_text)
         sub     x6, x6, x3                      // _end - _text
         add     x6, x6, x5                      // runtime __va(_end)
-
+	/*
+	 * tbl: init_pg_dir(x0)
+	 * vstart: KIMAGE_ADDR + TEXT_OFFSET + KASLR_displacement (x5)
+	 * vend: __pa(_end) - __pa(_text) + vstart (x6)
+	 * flags: 仍为 SWAPPER_MM_MMUFLAGS (x7)
+	 * phys : (x3) 这里是 adrp _text, 因为这时候没有开启映射，所以ip还是指向物理地址，
+	 *    那么该指令的结果是：获取 _text物理地址
+	 * pgds: idmap_ptrs_per_pgd(x4)
+	 */
         map_memory x0, x1, x5, x6, x7, x3, x4, x10, x11, x12, x13, x14
 
         /*
@@ -937,10 +898,28 @@ __create_table_entry:
         sub     x1, x1, x0
         dmb     sy
         bl      __inval_dcache_area
-
+	//返回之前保存的值
         ret     x28
 ENDPROC(__create_page_tables)
 ```
+可以发现在创建了identity map映射后, 又创建了kernel在运行时使用的映射
+将虚拟内存区间，`[KIMAGE_ADDR + TEXT_OFFSET, KIMAGE_ADDR + TEXT_OFFSET + _text - _end]`
+建立和相应物理地址映射
+
+> NOTE : 
+>
+> 不考虑KASLR的话， 就是编译的地址，可以使用`readelf`工具查看符号地址，和
+> `/proc/kallsyms`中的地址进行比较（比较编译地址和运行地址)
+> ```
+> [root@node-1 4.18.0-372.19.1.es8_2.aarch64]# readelf -s vmlinux |grep " _text$"
+> 102200: ffff800010080000     0 NOTYPE  GLOBAL DEFAULT    1 _text
+> [root@node-1 4.18.0-372.19.1.es8_2.aarch64]# cat /proc/kallsyms |grep " _text$"
+> ffff800010080000 T _text
+> ```
+
+该函数执行后, identity map和runtime map都已经初始化完成。
+
+## 
 
 # NOTE 
 ## create_hyp_mappings
@@ -1115,3 +1094,56 @@ attribute字段:
  descriptor, the value of descriptor bit[1] is required to be 1.
  (对于lv 3以外的entry，指定Table descriptor的话，需要指定bit[1]为1)
 * [48,16]: (这里指的是64KB granule 48-bit OA): next level table address
+
+# kernel NOTE
+
+<div id="ARM64_SWAPPER_USES_SECTION_MAPS_label"></div>
+ARM64_SWAPPER_USER_SECTION_MAPS_label
+
+##  ARM64_SWAPPER_USES_SECTION_MAPS
+`SWAPPER_MM_MMUFLAGS` kernel中的定义:
+```cpp
+//--------------------------------------------------------------------------
+#if ARM64_SWAPPER_USES_SECTION_MAPS
+#define SWAPPER_MM_MMUFLAGS     (PMD_ATTRINDX(MT_NORMAL) | SWAPPER_PMD_FLAGS)
+#else
+#define SWAPPER_MM_MMUFLAGS     (PTE_ATTRINDX(MT_NORMAL) | SWAPPER_PTE_FLAGS)
+#endif
+#define MT_NORMAL               4
+//---------------------------------------------------------------------
+/*
+ * The linear mapping and the start of memory are both 2M aligned (per
+ * the arm64 booting.txt requirements). Hence we can use section mapping
+ * with 4K (section size = 2M) but not with 16K (section size = 32M) or
+ * 64K (section size = 512M).
+ */
+#ifdef CONFIG_ARM64_4K_PAGES
+#define ARM64_SWAPPER_USES_SECTION_MAPS 1
+#else
+#define ARM64_SWAPPER_USES_SECTION_MAPS 0
+#endif
+//---------------------------------------------------------------------
+#define SWAPPER_PTE_FLAGS       (PTE_TYPE_PAGE | PTE_AF | PTE_SHARED)
+#define SWAPPER_PMD_FLAGS       (PMD_TYPE_SECT | PMD_SECT_AF | PMD_SECT_S)
+#define PMD_ATTRINDX(t)         (_AT(pmdval_t, (t)) << 2)
+#define PTE_ATTRINDX(t)         (_AT(pteval_t, (t)) << 2)
+```
+* 这里`ARM64_SWAPPER_USES_SECTION_MAPS`表示可以使用 section mapping,而不是
+page mapping。
+* 从`PMD_ATTRINDX(MT_NORMAL)`,`PTE_ATTRINDX(MT_NORMAL)` 和memory type(cache)
+ 相关。对于stage-1 translation, 
+
+![stage_1_mt](pic/stage_1_mt.png)
+
+可以看到, 实际该字段存放的用于在`MAIR_ELx.Attr<n>`中的n, 只是一个index, 
+关于MAIR_ELx，我们在[MAIR_El1](#MAIR_EL1_label)章节中去看。
+* 我们再看看其他位: (这里只是简单说下，字段详细内容还是请看[Table descriptor format](#Table_descriptor_format))
+	+ SWAPPER_PTE_FLAGS:
+		* PTE_TYPE_PAGE : 表明是PTE 映射的 page 
+		* PTE_AF : access flag
+		* PTE_SHARED : shared flag
+	+ SWAPPER_PMD_FLAGS:
+		* PMD_TYPE_SECT: 表明是PMD映射的 block (个人理解: huge page)
+		* PMD_SECT_AF: access flag
+		* PMD_SECT_S: shared flag
+* 可以看到两者的不同就在于，是使用pte page映射，还是pmd block映射
