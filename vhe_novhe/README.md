@@ -5,7 +5,7 @@
 访问el2的资源（陷入到el2执行代码)**
 
 # 代码分析
-## kernel boot el2 setup
+## 初始化流程分析
 ### stext
 kernel在引导后，会进入stext执行, 此时cpu状态为:
 * nommu(没有开启分页)
@@ -68,7 +68,11 @@ ENDPROC(stext)
 kernel会在`el2_setup`函数中进行简单的初始化, 而函数有返回值
 * BOOT_CPU_MODE_EL1
 * BOOT_CPU_MODE_EL2
+
 表示在引导到kernel时，是否是在el1/el2异常级别。
+
+<details>
+<summary> el2_setup</summary>
 
 ```cpp
 ENTRY(el2_setup)                                
@@ -298,6 +302,7 @@ install_el2_stub:
 	eret                            //当作异常返回了，也就是在这里drop to el1
 ENDPROC(el2_setup)
 ```
+</details> <!-- el2_setup-->
 <!--
 我们先来思考下, vhe和novhe在该流程中需要做哪些初始化，
 或者说需要初始化el2的哪些资源, 其实两者的目的不同: 
@@ -359,6 +364,10 @@ int kvm_arch_init(void *opaque)
 }
 ```
 ### __create_page_tables
+
+<details> <!--__create_page_tables part 1-->
+<summary>__create_page_tables part1</summary>
+
 ```cpp
 __create_page_tables:
 	/*
@@ -419,6 +428,7 @@ __create_page_tables:
 	subs	x1, x1, #64         //x1 = x1 -64
 	b.ne	1b
 ```
+</details>
 
 我们来看下`init_pg_dir`的size
 ```
@@ -467,6 +477,9 @@ SECTIONS
 kernel的image。
 
 接着分析`__create_page_tables`
+
+<details>
+<summary>__create_page_tables part2</summary>
 
 ```cpp
 __create_page_tables:
@@ -522,6 +535,7 @@ __create_page_tables:
 	cmp	x5, TCR_T0SZ(VA_BITS)	// default T0SZ small enough?
 	b.ge	1f			// .. then skip VA range extension
 ```
+</details> <!-- __create_page_tables part2 -->
 
 这里将`__idmap_text_end`地址存放到x5中，注意，这个地址是相对地址，adrp指令
 编码时，只是记录了一个偏移(可见末尾章节对adrp相关解码分析)，算出来的值实际上
@@ -536,6 +550,10 @@ TCR_EL1.T0SZ则表示，TTBR0_EL1能访问的memory region的范围，该字段�
 关于`TCR_EL1.T0SZ`和`TCR_EL1.T1SZ`见末尾章节。
 
 我们继续分析`__create_page_tables`代码:
+
+<details>
+<summary>__create_page_tables part3</summary>
+
 ```cpp
 __create_page_tables:
 	//...
@@ -579,6 +597,9 @@ __create_page_tables:
 	adr_l	x6, __idmap_text_end		// __pa(__idmap_text_end)
         map_memory x0, x1, x3, x6, x7, x3, x4, x10, x11, x12, x13, x14
 ```
+
+</details> <!-- __create_page_tables part3 -->
+
 上面实际上在构造 `map_memory`宏的参数，然后调用map_memory进行idmap映射。
 
 这里，我们先来看下`idmap_ptrs_per_pgd`的相关定义:
@@ -657,6 +678,10 @@ PS: 手册中给出的图表:
 ![arm64_sdm_64kb_3_level](pic/arm64_sdm_64kb_3_level.png)
 
 我们来看下 `map_memory`代码:
+
+<details>
+<summary>map_memory part1</summary>
+
 ```cpp
 /*
  * Map memory for specified virtual address range. Each level of page table needed supports
@@ -691,7 +716,12 @@ PS: 手册中给出的图表:
 	compute_indices \vstart, \vend, #PGDIR_SHIFT, \pgds, \istart, \iend, \count
 	populate_entries \tbl, \rtbl, \istart, \iend, #PMD_TYPE_TABLE, #PAGE_SIZE, \tmp
 ```
+</details> <!-- map_memory part1 -->
+
 我们来看下`compute_indices`的代码:
+
+<details>
+<summary>compute_indices</summary>
 
 ```cpp
 /*
@@ -741,10 +771,17 @@ PS: 手册中给出的图表:
 	sub	\count, \iend, \istart		//(2) 在这里计算icount,如果有4个entry，这里得到的count = 3
 	.endm
 ```
+
+</details> <!-- compute_indices -->
+
 该宏定义，为了计算 [vstart, vend]虚拟内存区间，在该shift的页表中的index start,和
 index end。而count会作为出参，用来计算低级页表的入参(PMD, PTE)
 
 我们再来看下`populate_entry`
+
+<details>
+<summary>populate_entry</summary>
+
 ```cpp
 /*
  * Macro to populate page table entries, these entries can be pointers to the next level
@@ -775,6 +812,9 @@ index end。而count会作为出参，用来计算低级页表的入参(PMD, PTE
         b.ls    .Lpe\@
         .endm
 ```
+
+</details> <!--populate_entry -->
+
 该宏 用于填充page table entries.
 
 先看下`page_to_pte`宏:
@@ -825,6 +865,10 @@ index end。而count会作为出参，用来计算低级页表的入参(PMD, PTE
 ***
 
 我们继续分析 map_memory代码。
+
+<details>
+<summary>map_memory part2</summary>
+
 ```cpp
 	.macro map_memory
 	// ...
@@ -852,6 +896,9 @@ index end。而count会作为出参，用来计算低级页表的入参(PMD, PTE
 	.endm
 
 ```
+
+</details> <!-- map_memory part2-->
+
 * 之后流程比较简单sv，相当于是上一级page table的entry指向的地址，那么就是下一级page table的地址
 * 而rtbl作为上次 populate_entries的出参，记录着下下级page table的地址.
 * 通过多次调用`compute_indices`, `populate_entries`, 依次建立了 PGD->PUD, PUD->PMD, PMD->PTE, 
@@ -859,10 +906,13 @@ index end。而count会作为出参，用来计算低级页表的入参(PMD, PTE
  [ARM64_SWAPPER_USES_SECTION_MAPS](#ARM64_SWAPPER_USES_SECTION_MAPS_label)结合讲述 
 
 
-我们接下来再看`__create_table_entry`代码
+我们接下来再看`__create_page_tables`代码
+
+<details>
+<summary>__create_page_tables part4</summary>
 
 ```cpp
-__create_table_entry:
+__create_page_tables:
 	//...
 	//...接上面
 	//...
@@ -902,6 +952,9 @@ __create_table_entry:
         ret     x28
 ENDPROC(__create_page_tables)
 ```
+
+</details> <!-- __create_page_tables part4 -->
+
 可以发现在创建了identity map映射后, 又创建了kernel在运行时使用的映射
 将虚拟内存区间，`[KIMAGE_ADDR + TEXT_OFFSET, KIMAGE_ADDR + TEXT_OFFSET + _text - _end]`
 建立和相应物理地址映射
@@ -917,9 +970,123 @@ ENDPROC(__create_page_tables)
 > ffff800010080000 T _text
 > ```
 
-该函数执行后, identity map和runtime map都已经初始化完成。
+该函数执行后, `identity map table`和`runtime map table`都已经初始化完成。
+接下来就要开启分页。
 
-## 
+这个流程主要在`__enable_mmu`函数中。
+
+### __enable_mmu
+代码流程
+```
+stext
+  ...
+  __cpu_setup                     //init SCTLR_EL1 value
+  __primary_switch
+    adrp    x1, init_pg_dir
+    __enable_mmu
+```
+
+> NOTE
+>
+> 在该流程执行之前，会先调用`__cpu_up`对`SCTLR_EL1`的值有一系列的
+> 判定计算，但是这里涉及较多的arm64 memory 相关内容，不是很了解，
+> 暂时先不看。
+>
+> 该函数返回值保存在x0中，并且x0中有相应的开启分页的位.
+>
+> ```cpp
+> ENTRY(__cpu_setup)
+>	...
+> 	/*
+> 	 * Prepare SCTLR  基础功能，会在该功能上增加一些功能
+> 	 */
+> 	mov_q   x0, SCTLR_EL1_SET
+>	...
+> 
+> ENDPROC(__cpu_setup)
+> /*
+>  * SCTLR_ELx_M : mmu enable bit
+>  */
+> #define SCTLR_EL1_SET   (SCTLR_ELx_M    | SCTLR_ELx_C    | SCTLR_ELx_SA   |\
+>                         SCTLR_EL1_SA0  | SCTLR_EL1_SED  | SCTLR_ELx_I    |\
+>                         SCTLR_EL1_DZE  | SCTLR_EL1_UCT  | SCTLR_EL1_NTWI |\
+>                         SCTLR_EL1_NTWE | SCTLR_ELx_IESB | SCTLR_EL1_SPAN |\
+>                         ENDIAN_SET_EL1 | SCTLR_EL1_UCI  | SCTLR_EL1_RES1)
+> ```
+
+我们来看下`__enable_mmu`的代码:
+```cpp
+/*
+ * Enable the MMU.
+ *
+ *  x0  = SCTLR_EL1 value for turning on the MMU.
+ *  x1  = TTBR1_EL1 value
+ *
+ * Returns to the caller via x30/lr. This requires the caller to be covered
+ * by the .idmap.text section.
+ *
+ * Checks if the selected granule size is supported by the CPU.
+ * If it isn't, park the CPU
+ */
+ /*
+  * x0 : SCTLR_EL1 value, 该值在 __cpu_setup返回
+  * x1 : ttbr1_el1 value, 为 init_pg_dir
+  */
+ENTRY(__enable_mmu)
+        mrs     x2, ID_AA64MMFR0_EL1
+	/*
+	 * #elif defined(CONFIG_ARM64_64K_PAGES)
+	 * #define ID_AA64MMFR0_TGRAN_SHIFT        ID_AA64MMFR0_TGRAN64_SHIFT
+	 */
+        ubfx    x2, x2, #ID_AA64MMFR0_TGRAN_SHIFT, 4
+        cmp     x2, #ID_AA64MMFR0_TGRAN_SUPPORTED
+        b.ne    __no_granule_support
+        update_early_cpu_boot_status 0, x2, x3
+        adrp    x2, idmap_pg_dir
+        phys_to_ttbr x1, x1
+        phys_to_ttbr x2, x2
+        msr     ttbr0_el1, x2                   // load TTBR0
+        offset_ttbr1 x1
+        msr     ttbr1_el1, x1                   // load TTBR1
+        isb
+        msr     sctlr_el1, x0
+        isb
+        /*
+         * Invalidate the local I-cache so that any instructions fetched
+         * speculatively from the PoC are discarded, since they may have
+         * been dynamically patched at the PoU.
+         */
+        ic      iallu
+        dsb     nsh
+        isb
+        ret
+ENDPROC(__enable_mmu)
+```
+* 首先从`id sysreg aa64mmfr0` 寄存器中获取 TGran 相关比特，然后查看kernel配置的 
+ granule size是不是在硬件层面支持(下面是id 寄存器中的TGran字段，以64kb为例)
+ ```
+ TGran64 bit [27:24]
+   Indicates support for 64KB memory translation granule size. Defined values are:
+       0b000064KB granule supported.
+       0b111164KB granule not supported.
+       All other values are reserved.
+ ```
+ 如果不支持的话，跳转到`__no_granule_support`
+ ```cpp
+ __no_granule_support:
+         /* Indicate that this CPU can't boot and is stuck in the kernel */
+         update_early_cpu_boot_status CPU_STUCK_IN_KERNEL, x1, x2
+ 1:
+         wfe
+         wfi
+         b       1b
+ ENDPROC(__no_granule_support)
+ ```
+ 会在这里一直死循环, `update_early_cpu_boot_status`, 会将cpu 相关
+
+### vhe 
+
+### 该阶段总结 
 
 # NOTE 
 ## create_hyp_mappings
