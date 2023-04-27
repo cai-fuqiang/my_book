@@ -1082,8 +1082,32 @@ ENDPROC(__enable_mmu)
          b       1b
  ENDPROC(__no_granule_support)
  ```
- 会在这里一直死循环, `update_early_cpu_boot_status`, 会将cpu 相关
-
+ 会在这里一直死循环, `update_early_cpu_boot_status`, 会将cpu 相关state变量
+`__early_cpu_boot_status` 置为 `CPU_STUCK_IN_KERNEL`状态。
+ ```cpp
+update_early_cpu_boot_status
+/*
+ * The booting CPU updates the failed status @__early_cpu_boot_status,
+ * with MMU turned off.
+ *
+ * update_early_cpu_boot_status tmp, status
+ *  - Corrupts tmp1, tmp2
+ *  - Writes 'status' to __early_cpu_boot_status and makes sure                                    
+ *    it is committed to memory.
+ */                                                                                                
+        .macro  update_early_cpu_boot_status status, tmp1, tmp2                                    
+        mov     \tmp2, #\status
+        adr_l   \tmp1, __early_cpu_boot_status
+        str     \tmp2, [\tmp1]
+        dmb     sy                                                                                 
+        dc      ivac, \tmp1                     // Invalidate potentially stale cache line
+        .endm                                                                                      
+ ```
+* 将 `__early_cpu_boot_status`置为0, 表示正常启动
+* 将idmap_pg_dir --> ttbr0_el1
+* 将init_pg_dir  --> ttbr1_el1
+* 做一些cache刷新
+* 返回
 ### vhe 
 
 ### 该阶段总结 
