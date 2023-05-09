@@ -1108,6 +1108,72 @@ update_early_cpu_boot_status
 * 将init_pg_dir  --> ttbr1_el1
 * 做一些cache刷新
 * 返回
+
+这里要注意的是，`__enable_mmu`后，并不会使用到`ttbr1_el1`进行寻址，
+因为此时的`ip`仍然指向的是 `low memory`，而当该函数返回执行到
+`__primary_switch`, 也是这样的情况, 在 `__primary_switch`最后，会做一个
+跳转，代码如下:
+```cpp
+__primary_switch:
+        ...
+        ldr     x8, =__primary_switched
+        adrp    x0, __PHYS_OFFSET
+        br      x8
+ENDPROC(__primary_switch)
+```
+这里可以理解为，将`__primary_switched`的编译地址放到`x8`中，
+然后跳转到x8, 注意，这里是编译地址，而arm64 在编译的时候，
+会把符号编译成高低值，可以利用`readelf`命令进行查看。这里需要
+注意一下几点:
+
+> PS : ldr     x8, =__primary_switched
+> 
+> ldr指令 是利用当前pc值，做一个立即数的偏移，然后将该偏移内存中
+> 的值load到目标寄存器中，而这实际上是gcc的伪指令，gcc在编译的时候，会
+> 把 `__primary_switched`的值，放到代码段的一个偏移处（该function的末尾，
+> 然后在里面存着相关偏移）, 我们来测试下：
+>
+> ```
+> __primary_switch:
+>         ldr     x8, =__primary_switched
+>         br      x8
+> __primary_switched:
+>         b       __primary_switched
+> [root@node-1 ldr_test]# cat main.c
+> int main()
+> {
+>         return 0;
+> }
+> [root@node-1 ldr_test]# gcc -o main  head.S  main.c
+> [root@node-1 ldr_test]# gdb ./main
+> (gdb) disassemble __primary_switch
+> Dump of assembler code for function __primary_switch:
+>    0x00000000004005e8 <+0>:     ldr     x8, 0x4005f8 <__primary_switched+8>
+>    0x00000000004005ec <+4>:     br      x8
+> End of assembler dump.
+> (gdb) x/1xg 0x4005f8
+> 0x4005f8 <__primary_switched+8>:        0x00000000004005f0
+> (gdb) disassemble __primary_switched
+> Dump of assembler code for function __primary_switched:
+>    0x00000000004005f0 <+0>:     b       0x4005f0 <__primary_switched>
+> ```
+> * 0x4005f8为偏移地址，ldr会load这个内存的值，到x8中, 而该内存被gcc编译成
+> `0x00000000004005f0`地址，正好为`__primary_switched`的值。
+>
+>> NOTE: 这里gdb会帮忙解码，得到解码后 label+pc的值:(0x4005f8), 当然，大家
+>> 感兴趣可以自己去解码, 但需要注意的是，label=imm * 4, 这里不展示解码过程
+
+> PS:  identity map function
+>
+> 关于哪些初始化的代码运行于`identity map`映射(当然这里只是开启mmu之后，在开启mmu之前，
+> 访存不需要页面映射)，可以看下，该function是否在".idmap.text"段中，以上面的代码为例:
+>
+> 我们知道`__enable_mmu`在返回时还是处于identity map, 其符号，和其
+> 返回的符号(eg: `__primary_switch`, `secondary_startup`，都在 
+> `.idmap.text`段中。而`__primary_switch`返回`__primary_switched`, 
+> 后，就不再是identity map, 所以`__primary_switched`在`.head.text`段
+
+
 ### vhe 
 
 ### 该阶段总结 
