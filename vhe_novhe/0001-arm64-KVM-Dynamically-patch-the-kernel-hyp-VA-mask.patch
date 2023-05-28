@@ -7,6 +7,8 @@ So far, we're using a complicated sequence of alternatives to
 patch the kernel/hyp VA mask on non-VHE, and NOP out the
 masking altogether when on VHE.
 
+截至目前，
+
 The newly introduced dynamic patching gives us the opportunity
 to simplify that code by patching a single instruction with
 the correct mask (instead of the mind bending cumulative masking

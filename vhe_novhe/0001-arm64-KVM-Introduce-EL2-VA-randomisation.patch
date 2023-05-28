@@ -7,20 +7,41 @@ The main idea behind randomising the EL2 VA is that we usually have
 a few spare bits between the most significant bit of the VA mask
 and the most significant bit of the linear mapping.
 
+随即el2 va 背后的主要观点是: 我们通常会在 VA 掩码中的 最高有效位和
+线性映射的最高有效位之间的选择一些闲置bits去做。
+
 Those bits could be a bunch of zeroes, and could be useful
 to move things around a bit. Of course, the more memory you have,
 the less randomisation you get...
+
+这些bits可以是连续的0,然而也可以移动一些东西?.(这里指移动el2 memory va么, 
+翻译不太通顺) 当然, 你有越多内存，就会得到越少的随机性。
 
 Alternatively, these bits could be the result of KASLR, in which
 case they are already random. But it would be nice to have a
 *different* randomization, just to make the job of a potential
 attacker a bit more difficult.
 
+
+potential [pəˈtenʃl]: 潜在的
+
+或者，这些bits可以是 KASLR 的结果，在这种情况下，他们已经是随即的。
+但是有一个"不同的"随机性将会更好，浙江使得潜在的攻击者的工作变得更加
+困难。
+
 Inserting these random bits is a bit involved. We don't have a spare
 register (short of rewriting all the kern_hyp_va call sites), and
 the immediate we want to insert is too random to be used with the
 ORR instruction. The best option I could come up with is the following
 sequence:
+
+involved [ɪnˈvɒlvd]: 复杂的
+short of : 缺少，达不到，除了，只要不是
+come up with: 想到
+
+插入这些随机值会有一点麻烦。我们没有一个多余的寄存器（除了重写所有的kern_hyp_va
+的调用点),并且我们插入的立即数由于太随机，无法使用ORR指令，我能想到的最好的选择是
+如下的顺序:
 
 	and x0, x0, #va_mask
 	ror x0, x0, #first_random_bit
