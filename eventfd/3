@@ -1,0 +1,47 @@
+# eventfd
+
+## 简介
+eventfd = 用fd 实现的事件通知。
+
+有两个特点：
+* 使用vfs实现
+* 主要用于事件通知，不用于传输其他信息
+
+## fops : eventfd_fops
+```cpp
+static const struct file_operations eventfd_fops = {
+#ifdef CONFIG_PROC_FS
+        .show_fdinfo    = eventfd_show_fdinfo,
+#endif
+        .release        = eventfd_release,
+        .poll           = eventfd_poll,
+        .read           = eventfd_read,
+        .write          = eventfd_write,
+        .llseek         = noop_llseek,
+};
+```
+
+我们这里先看下 `read`, `write`, `poll`操作，看看其读取写入的行为。
+
+这里先简单说下, 稍后，我们会详细看下其实现:
+> NOTE
+>
+> eventfd 存储的信息 实际上是一个计数器。
+> * 大于0: 表示 有事件到达，但是还未接收
+> * 等于0: 
+* write: 表示有事件要通知到读侧, 写入的是一个64位的无符号整型。
+   该值会累加该eventfd的计数中
+* read : 读取事件，会将eventfd中的计数读取，并清零。(
+  EFD_SEMAPHORE除外, 下面我们会看到)
+* poll : 用于监听该事件，epoll 监听的时可读可写的事件。
+ 那么eventfd该监听什么信息呢 ? 
+
+所以，一般的用法是, 
+## 主要的数据结构 -- eventfd_ctx
+```
+
+```
+
+
+#  参考资料
+[Linux fd 系列 — eventfd 是什么？](https://blog.csdn.net/EDDYCJY/article/details/118980819)
