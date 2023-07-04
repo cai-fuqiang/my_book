@@ -262,11 +262,87 @@ copy的大小是 sizeof(u64), 并不是count
 计数资源, 这里会将该进程的`wait_queue_entry`加入等待队列，并退出调度，等待环境。
 4. 如果3中的条件不满足，则会将ctx->count加上`count_from_user`, 并查看等待队列中是否
 进程等待，如果有，则去唤醒。
-
+5. 检测上面的流程是否有问题(res > 0), 如果没有问题，说明write操作完成(更新了ctx->count)
+这时需要通知等待队列中的进程，以`EPOLLIN` 为key
 > NOTE:
 >
 > 这里只想唤醒，EPOLL 等待的
 
+# read -- event_read
+```cpp
+static ssize_t eventfd_read(struct file *file, char __user *buf, size_t count,
+                        ¦   loff_t *ppos)
+{
+        struct eventfd_ctx *ctx = file->private_data;
+        ssize_t res;
+        __u64 ucnt = 0;
+        DECLARE_WAITQUEUE(wait, current);
+
+        if (count < sizeof(ucnt))
+                return -EINVAL;
+
+        spin_lock_irq(&ctx->wqh.lock);
+        res = -EAGAIN;
+        //===============(1)=======================
+        if (ctx->count > 0)
+                res = sizeof(ucnt);
+        //===============(1.1)=======================
+        else if (!(file->f_flags & O_NONBLOCK)) {
+                __add_wait_queue(&ctx->wqh, &wait);
+                for (;;) {
+                        set_current_state(TASK_INTERRUPTIBLE);
+                        if (ctx->count > 0) {
+                                res = sizeof(ucnt);
+                                break;
+                        }
+                        if (signal_pending(current)) {
+                                res = -ERESTARTSYS;
+                                break;
+                        }
+                        spin_unlock_irq(&ctx->wqh.lock);
+                        schedule();
+                        spin_lock_irq(&ctx->wqh.lock);
+                }
+                __remove_wait_queue(&ctx->wqh, &wait);
+                __set_current_state(TASK_RUNNING);
+        }
+        //===============(2)=======================
+        if (likely(res > 0)) {
+                eventfd_ctx_do_read(ctx, &ucnt);
+                if (waitqueue_active(&ctx->wqh))
+                        wake_up_locked_poll(&ctx->wqh, EPOLLOUT);
+        }
+        spin_unlock_irq(&ctx->wqh.lock);
+
+        if (res > 0 && put_user(ucnt, (__u64 __user *)buf))
+                return -EFAULT;
+
+        return res;
+}
+```
+流程和`eventfd_write`很像.
+1. 如果`ctx->count > 0`, 说明有事件，不然，在`file->f_flags`, 没有
+设置`O_NONBLOCK`时, 会加入等待队列(`ctx->wqh`), 等待唤醒。
+2. `eventfd_ctx_do_read`, 这个函数会去修改`ctx->count`, -1 或者清零。
+具体流程我们下面在看，然后如果队列里面有等待的进程，以 `EPOLLOUT`,
+为key唤醒。
+
+`eventfd_ctx_do_read`: 
+```cpp
+void eventfd_ctx_do_read(struct eventfd_ctx *ctx, __u64 *cnt)
+{
+        lockdep_assert_held(&ctx->wqh.lock);
+        /*
+         * cnt会返回到用户态，作为本次读取的结果
+         * 如果 ctx->flags 有 EFD_SEMAPHORE标志位，
+         * 本次减1, 否则清零
+         */
+        *cnt = (ctx->flags & EFD_SEMAPHORE) ? 1 : ctx->count;
+        ctx->count -= *cnt;
+}
+```
+
+# poll -- eventfd_poll
 
 #  参考资料
 [Linux fd 系列 — eventfd 是什么？](https://blog.csdn.net/EDDYCJY/article/details/118980819)
