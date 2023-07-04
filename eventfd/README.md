@@ -268,7 +268,7 @@ copy的大小是 sizeof(u64), 并不是count
 >
 > 这里只想唤醒，EPOLL 等待的
 
-# read -- event_read
+### read -- event_read
 ```cpp
 static ssize_t eventfd_read(struct file *file, char __user *buf, size_t count,
                         ¦   loff_t *ppos)
@@ -342,7 +342,92 @@ void eventfd_ctx_do_read(struct eventfd_ctx *ctx, __u64 *cnt)
 }
 ```
 
-# poll -- eventfd_poll
+### poll -- eventfd_poll
+了解`eventfd_poll`需要了解些poll框架的知识，我们将在其他的文档中解释，
+这里我们只需要知道`fops->poll`有两个作用
+1. 是为了 加入监听文件的`wait_queue_head`, 加入后，就可以触发事件回调了
+2. 去检测下当前 file 是否有事件到达，如果有事件，则将事件类型作为返回值返回。
+
+我们先来看下代码:
+```cpp
+static __poll_t eventfd_poll(struct file *file, poll_table *wait)
+{
+        struct eventfd_ctx *ctx = file->private_data;
+        __poll_t events = 0;
+        u64 count;
+
+        poll_wait(file, &ctx->wqh, wait);
+        /*
+         * All writes to ctx->count occur within ctx->wqh.lock.  This read
+         * can be done outside ctx->wqh.lock because we know that poll_wait
+         * takes that lock (through add_wait_queue) if our caller will sleep.
+         *
+         * The read _can_ therefore seep into add_wait_queue's critical
+         * section, but cannot move above it!  add_wait_queue's spin_lock acts
+         * as an acquire barrier and ensures that the read be ordered properly
+         * against the writes.  The following CAN happen and is safe:
+         *
+         *     poll                               write
+         *     -----------------                  ------------
+         *     lock ctx->wqh.lock (in poll_wait)
+         *     count = ctx->count
+         *     __add_wait_queue
+         *     unlock ctx->wqh.lock
+         *                                        lock ctx->qwh.lock
+         *                                        ctx->count += n
+         *                                        if (waitqueue_active)
+         *                                          wake_up_locked_poll
+         *                                        unlock ctx->qwh.lock
+         *     eventfd_poll returns 0
+         *
+         * but the following, which would miss a wakeup, cannot happen:
+         *
+         *     poll                               write
+         *     -----------------                  ------------
+         *     count = ctx->count (INVALID!)
+         *                                        lock ctx->qwh.lock
+         *                                        ctx->count += n
+         *                                        **waitqueue_active is false**
+         *                                        **no wake_up_locked_poll!**
+         *                                        unlock ctx->qwh.lock
+         *     lock ctx->wqh.lock (in poll_wait)
+         *     __add_wait_queue
+         *     unlock ctx->wqh.lock
+         *     eventfd_poll returns 0
+         */
+        count = READ_ONCE(ctx->count);
+        
+        if (count > 0)
+                events |= EPOLLIN;
+        if (count == ULLONG_MAX)
+                events |= EPOLLERR;
+        if (ULLONG_MAX - 1 > count)
+                events |= EPOLLOUT;
+        
+        return events;
+}
+static inline void poll_wait(struct file * filp, wait_queue_head_t * wait_address, poll_table *p)
+{
+        if (p && p->_qproc && wait_address)
+                p->_qproc(filp, wait_address, p);
+}
+```
+这里 `poll_table`, 是调用者传过来的，里面有两个成员
+```cpp
+typedef struct poll_table_struct {
+        poll_queue_proc _qproc;
+        __poll_t _key;
+} poll_table;
+```
+
+`_qproc`函数负责，将调用者的 `wait_queue_entry_t`加入 `wait_address`(wait_queue_head_t).
+调用完成后，file 就可以进行事件通知了。`_key`则表示，该poll_table 是否需要事件过滤的类型。
+(需不需要过滤由wakeup函数决定, 也就是调用方决定)
+
+而在`poll_wait`调用完成后 (`eventfd_poll`, 可能会多次调用，去检测是否有事件到达，
+而`p->_qproc`, 又是一个初始化函数, 所以一般在调用一次后，会将该指针置为NULL).
+会检测是否有事件到达, 判断逻辑在上面read,write接口解释
+
 
 #  参考资料
 [Linux fd 系列 — eventfd 是什么？](https://blog.csdn.net/EDDYCJY/article/details/118980819)
