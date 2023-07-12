@@ -55,3 +55,129 @@ device 一次可能会写入多个buffer,也就是used_idx在本次增长中 > 1
 
 怎么去避免这种问题呢? qemu这边的逻辑是记录old, 如果old > event_idx + 1, 说明
 上次已经发送过了，那么这次就不需要在发送了。
+
+# virtio pop 
+```
+virtio_blk_data_plane_start {
+    ...
+    for (i = 0; i < nvqs; i++) {
+    VirtQueue *vq = virtio_get_queue(s->vdev, i);
+   
+    //set host notifier
+    virtio_queue_aio_set_host_notifier_handler(vq, s->ctx,
+          virtio_blk_data_plane_handle_output);
+    ...
+}
+virtio_blk_data_plane_handle_output {
+    virtio_blk_handle_vq {
+        ...
+		do {
+		    virtio_queue_set_notification(vq, 0);
+		
+		    while ((req = virtio_blk_get_request(s, vq))) { 
+		        progress = true;
+		        if (virtio_blk_handle_request(req, &mrb)) {
+		            virtqueue_detach_element(req->vq, &req->elem, 0);
+		            virtio_blk_free_request(req);
+		            break;
+		        }
+		    }
+		
+		    virtio_queue_set_notification(vq, 1);
+		} while (!virtio_queue_empty(vq));
+		...
+    }
+}
+```
+
+`virtio_queue_empty`:
+```cpp
+int virtio_queue_empty(VirtQueue *vq)
+{
+    if (virtio_vdev_has_feature(vq->vdev, VIRTIO_F_RING_PACKED)) {
+    ¦   return virtio_queue_packed_empty(vq);
+    } else {
+    ¦   return virtio_queue_split_empty(vq);
+    }
+}
+
+static int virtio_queue_split_empty(VirtQueue *vq)
+{
+    bool empty;
+
+    if (unlikely(vq->vdev->broken)) {
+        return 1;
+    }
+
+    if (unlikely(!vq->vring.avail)) {
+        return 1;
+    }
+
+    if (vq->shadow_avail_idx != vq->last_avail_idx) {
+        return 0;
+    }
+
+    RCU_READ_LOCK_GUARD();
+	//当last_avail_idx == avail_idx 时，认为avail ring request全部处理完
+    empty = vring_avail_idx(vq) == vq->last_avail_idx;
+    return empty;
+}
+```
+
+`virtio_blk_get_request`
+```
+{
+    virtqueue_pop
+        virtqueue_split_pop {
+            ...
+            if (!virtqueue_get_head(vq, vq->last_avail_idx++, &head)) {
+                goto done;
+            }
+
+            vq->inuse++;
+            ...
+        }
+}
+```
+
+# push
+```
+void virtqueue_push(VirtQueue *vq, const VirtQueueElement *elem,
+    ¦   ¦   ¦   ¦   unsigned int len)
+{
+    RCU_READ_LOCK_GUARD();
+    virtqueue_fill(vq, elem, len, 0);   //这个是更新used vring
+    virtqueue_flush(vq, 1);
+}
+
+virtqueue_flush {
+    virtqueue_split_flush
+}
+
+static void virtqueue_split_flush(VirtQueue *vq, unsigned int count)
+{
+    uint16_t old, new;
+
+    if (unlikely(!vq->vring.used)) {
+       return;
+    }
+
+    /* Make sure buffer is written before we update index. */
+    smp_wmb();
+    trace_virtqueue_flush(vq, count);
+    old = vq->used_idx;
+    new = old + count;
+    vring_used_idx_set(vq, new);
+    vq->inuse -= count;
+    if (unlikely((int16_t)(new - vq->signalled_used) < (uint16_t)(new - old)))
+        vq->signalled_used_valid = false;
+}
+static inline void vring_used_idx_set(VirtQueue *vq, uint16_t val)
+{
+    VRingMemoryRegionCaches *caches = vring_get_region_caches(vq);
+    hwaddr pa = offsetof(VRingUsed, idx);
+    virtio_stw_phys_cached(vq->vdev, &caches->used, pa, val);
+    address_space_cache_invalidate(&caches->used, pa, sizeof(val));
+    vq->used_idx = val;
+}
+```
