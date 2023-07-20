@@ -675,10 +675,556 @@ g_wakeup_get_pollfd (GWakeup *wakeup,
   poll_fd->events = G_IO_IN;
 }
 ```
+## new main loop -- g_main_loop_new
+```cpp
+/**
+ * g_main_loop_new:
+ * @context: (nullable): a #GMainContext  (if %NULL, the global-default
+ *   main context will be used).
+ *   该参数可以为空，如果是空，则使用 global-default main context
+ * @is_running: set to %TRUE to indicate that the loop is running. This
+ * is not very important since calling g_main_loop_run() will set this to
+ * %TRUE anyway.
+ *    如果为%TRUE指示在loop 中是 running的。这不是很重要，因为在g_main_loop_run()
+ *    中会将其设置为%TRUE
+ *
+ * Creates a new #GMainLoop structure.
+ *
+ * Returns: a new #GMainLoop.
+ **/
+GMainLoop *
+g_main_loop_new (GMainContext *context,
+                 gboolean      is_running)
+{
+  GMainLoop *loop;
 
+  if (!context)
+    //使用默认的
+    context = g_main_context_default();
+
+  g_main_context_ref (context);
+
+  loop = g_new0 (GMainLoop, 1);
+  loop->context = context;
+  loop->is_running = is_running != FALSE;
+  loop->ref_count = 1;
+
+  TRACE (GLIB_MAIN_LOOP_NEW (loop, context));
+
+  return loop;
+}
+```
+
+## g_main_loop_run
+```cpp
+/**
+ * g_main_loop_run:
+ * @loop: a #GMainLoop
+ *
+ * Runs a main loop until g_main_loop_quit() is called on the loop.
+ * If this is called for the thread of the loop's #GMainContext,
+ * it will process events from the loop, otherwise it will
+ * simply wait.
+ **/
+void
+g_main_loop_run (GMainLoop *loop)
+{
+  GThread *self = G_THREAD_SELF;
+
+  g_return_if_fail (loop != NULL);
+  g_return_if_fail (g_atomic_int_get (&loop->ref_count) > 0);
+
+  /* Hold a reference in case the loop is unreffed from a callback function */
+  //增长引用计数
+  g_atomic_int_inc (&loop->ref_count);
+
+  LOCK_CONTEXT (loop->context);
+  //这个先不看
+  if (!g_main_context_acquire_unlocked (loop->context))
+    {
+      gboolean got_ownership = FALSE;
+
+      /* Another thread owns this context */
+      g_atomic_int_set (&loop->is_running, TRUE);
+
+      while (g_atomic_int_get (&loop->is_running) && !got_ownership)
+        got_ownership = g_main_context_wait_internal (loop->context,
+                                                      &loop->context->cond,
+                                                      &loop->context->mutex);
+
+      if (!g_atomic_int_get (&loop->is_running))
+        {
+          if (got_ownership)
+            g_main_context_release_unlocked (loop->context);
+
+          UNLOCK_CONTEXT (loop->context);
+          g_main_loop_unref (loop);
+          return;
+        }
+
+      g_assert (got_ownership);
+    }
+  //这个先不看
+  if G_UNLIKELY (loop->context->in_check_or_prepare)
+    {
+      g_warning ("g_main_loop_run(): called recursively from within a source's "
+                 "check() or prepare() member, iteration not possible.");
+      g_main_context_release_unlocked (loop->context);
+      UNLOCK_CONTEXT (loop->context);
+      g_main_loop_unref (loop);
+      return;
+    }
+  //将loop->is_running 设置为 %TRUE
+  g_atomic_int_set (&loop->is_running, TRUE);
+  while (g_atomic_int_get (&loop->is_running))
+    //在该流程中，去检测事件
+    g_main_context_iterate_unlocked (loop->context, TRUE, TRUE, self);
+
+  g_main_context_release_unlocked (loop->context);
+
+  UNLOCK_CONTEXT (loop->context);
+
+  g_main_loop_unref (loop);
+}
+```
+### g_main_context_iterate_unlocked 
+```cpp
+/* HOLDS context lock */
+static gboolean
+g_main_context_iterate_unlocked (GMainContext *context,
+                                 gboolean      block,
+                                 gboolean      dispatch,
+                                 GThread      *self)
+{
+  gint max_priority = 0;
+  gint timeout;
+  gboolean some_ready;
+  gint nfds, allocated_nfds;
+  GPollFD *fds = NULL;
+  gint64 begin_time_nsec G_GNUC_UNUSED;
+
+  begin_time_nsec = G_TRACE_CURRENT_TIME;
+  //先不看
+  if (!g_main_context_acquire_unlocked (context))
+    {
+      gboolean got_ownership;
+
+      if (!block)
+        return FALSE;
+
+      got_ownership = g_main_context_wait_internal (context,
+                                                    &context->cond,
+                                                    &context->mutex);
+
+      if (!got_ownership)
+        return FALSE;
+    }
+  /*
+   * 如果没有 cache poll array, new一个
+   * 之前提到过GPollFD的结构类似于pollfd, 
+   * 该结构体会给glibc poll() 当作参数
+   */
+  if (!context->cached_poll_array)
+    {
+      context->cached_poll_array_size = context->n_poll_records;
+      context->cached_poll_array = g_new (GPollFD, context->n_poll_records);
+    }
+
+  allocated_nfds = context->cached_poll_array_size;
+  fds = context->cached_poll_array;
+  //调用prepare, 传出一个max_priority
+  g_main_context_prepare_unlocked (context, &max_priority);
+  /*
+   * 这里是入队的意思
+   * 这里选择比 max_priority更高优先级的事件入队。
+   * 执行后面的poll操作
+   */
+  while ((nfds = g_main_context_query_unlocked (
+            context, max_priority, &timeout, fds,
+            allocated_nfds)) > allocated_nfds)
+    {
+      g_free (fds);
+      //这里空间不够了需要重新分配
+      context->cached_poll_array_size = allocated_nfds = nfds;
+      context->cached_poll_array = fds = g_new (GPollFD, nfds);
+    }
+
+  if (!block)
+    timeout = 0;
+
+  g_main_context_poll_unlocked (context, timeout, max_priority, fds, nfds);
+
+  some_ready = g_main_context_check_unlocked (context, max_priority, fds, nfds);
+
+  if (dispatch)
+    g_main_context_dispatch_unlocked (context);
+
+  g_main_context_release_unlocked (context);
+
+  g_trace_mark (begin_time_nsec, G_TRACE_CURRENT_TIME - begin_time_nsec,
+                "GLib", "g_main_context_iterate",
+                "Context %p, %s ⇒ %s", context, block ? "blocking" : "non-blocking", some_ready ? "dispatched" : "nothing");
+
+  return some_ready;
+}
+```
+
+### g_main_context_prepare_unlocked 
+```cpp
+static gboolean
+g_main_context_prepare_unlocked (GMainContext *context,
+                                 gint         *priority)
+{
+  guint i;
+  gint n_ready = 0;
+  gint current_priority = G_MAXINT;
+  GSource *source;
+  GSourceIter iter;
+
+  context->time_is_fresh = FALSE;
+
+  if (context->in_check_or_prepare)
+    {
+      g_warning ("g_main_context_prepare() called recursively from within a source's check() or "
+		 "prepare() member.");
+      return FALSE;
+    }
+
+  TRACE (GLIB_MAIN_CONTEXT_BEFORE_PREPARE (context));
+
+#if 0
+  /* If recursing, finish up current dispatch, before starting over */
+  if (context->pending_dispatches)
+    {
+      if (dispatch)
+	g_main_dispatch (context, &current_time);
+      
+      return TRUE;
+    }
+#endif
+
+  /* If recursing, clear list of pending dispatches */
+
+  for (i = 0; i < context->pending_dispatches->len; i++)
+    {
+      if (context->pending_dispatches->pdata[i])
+        g_source_unref_internal ((GSource *)context->pending_dispatches->pdata[i], context, TRUE);
+    }
+  g_ptr_array_set_size (context->pending_dispatches, 0);
+  
+  /* Prepare all sources */
+
+  context->timeout = -1;
+  
+  g_source_iter_init (&iter, context, TRUE);
+  while (g_source_iter_next (&iter, &source))
+    {
+      gint source_timeout = -1;
+
+      if (SOURCE_DESTROYED (source) || SOURCE_BLOCKED (source))
+	continue;
+      //如果已经有ready的，并且该source->priority, 已经大于当前
+      //的priority, 然后就跳出循环, 这个地方没看懂!!!
+      //
+      //个人感觉应该是去找所有ready source的最高的 priority, 但是
+      //这里并没有这么做
+      if ((n_ready > 0) && (source->priority > current_priority))
+	break;
+      //如果不是 G_SOURCE_READY, 执行下面的分支检测本轮是否ready了
+      if (!(source->flags & G_SOURCE_READY))
+	{
+	  gboolean result;
+	  gboolean (* prepare) (GSource  *source,
+                                gint     *timeout);
+
+          prepare = source->source_funcs->prepare;
+
+          if (prepare)
+            {
+              gint64 begin_time_nsec G_GNUC_UNUSED;
+
+              context->in_check_or_prepare++;
+              UNLOCK_CONTEXT (context);
+
+              begin_time_nsec = G_TRACE_CURRENT_TIME;
+
+              result = (* prepare) (source, &source_timeout);
+              TRACE (GLIB_MAIN_AFTER_PREPARE (source, prepare, source_timeout));
+
+              g_trace_mark (begin_time_nsec, G_TRACE_CURRENT_TIME - begin_time_nsec,
+                            "GLib", "GSource.prepare",
+                            "%s ⇒ %s",
+                            (g_source_get_name (source) != NULL) ? g_source_get_name (source) : "(unnamed)",
+                            result ? "ready" : "unready");
+
+              LOCK_CONTEXT (context);
+              context->in_check_or_prepare--;
+            }
+          else
+            result = FALSE;
+          /* 
+           * 如果result == FALSE, 也就是说没有在prepare中检测到事件，需要
+           * 通过poll去检测事件, 但是这里有个事件到期的机制。
+           *
+           * source->priv->ready_time 记录的到期的时刻
+           * 而 prepare(source, &source_timeout), 作为出参返回的 source_timeout
+           * 的值，则表示poll()可以执行多长时间超时，也就是说ready_time是一个时间点。
+           * 而 source_timeout则是时长。
+           */
+           /*
+            * 如果ready_time != -1, 则说明指定了到期的时刻
+            */
+          if (result == FALSE && source->priv->ready_time != -1)
+            {
+              //time_is_fresh == False, 说明时间不新鲜了，需要重新获取时间
+              if (!context->time_is_fresh)
+                {
+                  context->time = g_get_monotonic_time ();
+                  context->time_is_fresh = TRUE;
+                }
+              /*
+               * 如果到期时间 <= 现在的时间, 说明已经到期了
+               * 这时候把source_timeout设置为0,并且result = TRUE, 
+               * 表示到期事件已经触发，不再需要poll进行监听。
+               */
+              if (source->priv->ready_time <= context->time)
+                {
+                  source_timeout = 0;
+                  result = TRUE;
+                }
+              else
+                {
+                  gint64 timeout;
+
+                  /* rounding down will lead to spinning, so always round up */
+                  /* 通过ready_time 计算timeout的时间点 */
+                  timeout = (source->priv->ready_time - context->time + 999) / 1000;
+                  //这里实际上是取 source_timeout 和 ready_time 哪个更早到期
+                  if (source_timeout < 0 || timeout < source_timeout)
+                    source_timeout = MIN (timeout, G_MAXINT);
+                }
+            }
+          //如果result == TRUE, 说明事件发生，不需要poll
+	  if (result)
+	    {
+	      GSource *ready_source = source;
+
+	      while (ready_source)
+		{
+                  //将 本 source和 parent 等等source都置上 G_SOURCE_READY
+		  ready_source->flags |= G_SOURCE_READY;
+		  ready_source = ready_source->priv->parent_source;
+		}
+	    }
+	}
+      //如果是ready
+      if (source->flags & G_SOURCE_READY)
+	{
+	  n_ready++;
+	  current_priority = source->priority;
+	  context->timeout = 0;
+	}
+      //设置context->timeout 
+      if (source_timeout >= 0)
+	{
+	  if (context->timeout < 0)
+	    context->timeout = source_timeout;
+	  else
+	    context->timeout = MIN (context->timeout, source_timeout);
+	}
+    }
+  g_source_iter_clear (&iter);
+
+  TRACE (GLIB_MAIN_CONTEXT_AFTER_PREPARE (context, current_priority, n_ready));
+  
+  if (priority)
+    *priority = current_priority;
+  
+  return (n_ready > 0);
+}
+```
+### g_main_context_query_unlocked
+```cpp
+static gint
+g_main_context_query_unlocked (GMainContext *context,
+                               gint          max_priority,
+                               gint         *timeout,
+                               GPollFD      *fds,
+                               gint          n_fds)
+{
+  gint n_poll;
+  GPollRec *pollrec, *lastpollrec;
+  gushort events;
+
+  TRACE (GLIB_MAIN_CONTEXT_BEFORE_QUERY (context, max_priority));
+
+  /* fds is filled sequentially from poll_records. Since poll_records
+   * are incrementally sorted by file descriptor identifier, fds will
+   * also be incrementally sorted.
+   */
+  n_poll = 0;
+  lastpollrec = NULL;
+  //遍历 context->poll_records
+  for (pollrec = context->poll_records; pollrec; pollrec = pollrec->next)
+    {
+      //过滤优先级，只有优先级比max_priority 大的时候，才监听
+      if (pollrec->priority > max_priority)
+        continue;
+
+      /* In direct contradiction to the Unix98 spec, IRIX runs into
+       * difficulty if you pass in POLLERR, POLLHUP or POLLNVAL
+       * flags in the events field of the pollfd while it should
+       * just ignoring them. So we mask them out here.
+       */
+       /* 获取 events */
+      events = pollrec->fd->events & ~(G_IO_ERR|G_IO_HUP|G_IO_NVAL);
+
+      /* This optimization --using the same GPollFD to poll for more
+       * than one poll record-- relies on the poll records being
+       * incrementally sorted.
+       */
+       /* 
+        * 这种情况实际上是，同一个fd , 用了两个 pollrec,
+        * 那这里会将事件合并。
+        */
+      if (lastpollrec && pollrec->fd->fd == lastpollrec->fd->fd)
+        {
+          if (n_poll - 1 < n_fds)
+            fds[n_poll - 1].events |= events;
+        }
+      else
+        {
+          if (n_poll < n_fds)
+            {
+              fds[n_poll].fd = pollrec->fd->fd;
+              fds[n_poll].events = events;
+              fds[n_poll].revents = 0;
+            }
+
+          n_poll++;
+        }
+
+      lastpollrec = pollrec;
+    }
+  //接下来要走监听, 将poll_changed 置为FALSE
+  context->poll_changed = FALSE;
+  /*
+   * 赋值timeout，并且将 time_is_fresh置 FALSE,
+   * 下次再用时间，需要重新获取.
+   *
+   * 为什么要在这个地方重置 time_is_fresh, 因为
+   * 接下来要走poll了，可能需要等待一段时间.
+   */
+  if (timeout)
+    {
+      *timeout = context->timeout;
+      if (*timeout != 0)
+        context->time_is_fresh = FALSE;
+    }
+
+  TRACE (GLIB_MAIN_CONTEXT_AFTER_QUERY (context, context->timeout,
+                                        fds, n_poll));
+
+  return n_poll;
+}
+```
+### g_main_context_poll_unlocked
+```cpp
+static void
+g_main_context_poll_unlocked (GMainContext *context,
+                              int           timeout,
+                              int           priority,
+                              GPollFD      *fds,
+                              int           n_fds)
+{
+#ifdef  G_MAIN_POLL_DEBUG
+  GTimer *poll_timer;
+  GPollRec *pollrec;
+  gint i;
+#endif
+
+  GPollFunc poll_func;
+
+  if (n_fds || timeout != 0)
+    {
+      int ret, errsv;
+
+#ifdef  G_MAIN_POLL_DEBUG
+      poll_timer = NULL;
+      if (_g_main_poll_debug)
+        {
+          g_print ("polling context=%p n=%d timeout=%d\n",
+                   context, n_fds, timeout);
+          poll_timer = g_timer_new ();
+        }
+#endif
+      poll_func = context->poll_func;
+
+      UNLOCK_CONTEXT (context);
+      ret = (*poll_func) (fds, n_fds, timeout);
+      LOCK_CONTEXT (context);
+
+      errsv = errno;
+      if (ret < 0 && errsv != EINTR)
+        {
+#ifndef G_OS_WIN32
+          g_warning ("poll(2) failed due to: %s.",
+                     g_strerror (errsv));
+#else
+          /* If g_poll () returns -1, it has already called g_warning() */
+#endif
+        }
+        //和debug相关，先不看
+#ifdef  G_MAIN_POLL_DEBUG
+      if (_g_main_poll_debug)
+        {
+          g_print ("g_main_poll(%d) timeout: %d - elapsed %12.10f seconds",
+                   n_fds,
+                   timeout,
+                   g_timer_elapsed (poll_timer, NULL));
+          g_timer_destroy (poll_timer);
+          pollrec = context->poll_records;
+
+          while (pollrec != NULL)
+            {
+              i = 0;
+              while (i < n_fds)
+                {
+                  if (fds[i].fd == pollrec->fd->fd &&
+                      pollrec->fd->events &&
+                      fds[i].revents)
+                    {
+                      g_print (" [" G_POLLFD_FORMAT " :", fds[i].fd);
+                      if (fds[i].revents & G_IO_IN)
+                        g_print ("i");
+                      if (fds[i].revents & G_IO_OUT)
+                        g_print ("o");
+                      if (fds[i].revents & G_IO_PRI)
+                        g_print ("p");
+                      if (fds[i].revents & G_IO_ERR)
+                        g_print ("e");
+                      if (fds[i].revents & G_IO_HUP)
+                        g_print ("h");
+                      if (fds[i].revents & G_IO_NVAL)
+                        g_print ("n");
+                      g_print ("]");
+                    }
+                  i++;
+                }
+              pollrec = pollrec->next;
+            }
+          g_print ("\n");
+        }
+#endif
+    } /* if (n_fds || timeout != 0) */
+}
+```
+### 
 # 参考链接
 [三个案例轻松搞定 glib 事件循环](https://github.com/liyansong2018/glib_demo)
 
 [Glib 主事件循环轻度分析与编程应用](https://blog.csdn.net/song_lee/article/details/116809089?spm=1001.2014.3001.5501)
 
 [Poll 函数应用](https://zhuanlan.zhihu.com/p/195450596)
+
+[glib主事件循环](https://blog.csdn.net/woai110120130/article/details/99701442)
