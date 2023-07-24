@@ -58,6 +58,18 @@ struct _GSourceFuncs
 * dispatch: 如果检测到该事件发生，则调用 `dispatch()`, 如果dispatch返回值为True,则表示销毁GSource
 * finalize: 这个还需要再看下代码!!!!
 
+###  _GSourceCallbackFuncs
+```cpp
+struct _GSourceCallbackFuncs
+{
+  void (*ref)   (gpointer     cb_data);
+  void (*unref) (gpointer     cb_data);
+  void (*get)   (gpointer     cb_data,
+                 GSource     *source,
+                 GSourceFunc *func,
+                 gpointer    *data);
+};
+```
 ### GSourcePrivate
 ```cpp
 struct _GSourcePrivate
@@ -1043,8 +1055,52 @@ g_main_context_prepare_unlocked (GMainContext *context,
   return (n_ready > 0);
 }
 ```
-### g_main_context_query_unlocked
+### g_main_context_query
 ```cpp
+/**
+ * g_main_context_query:
+ * @context: (nullable): a #GMainContext (if %NULL, the global-default
+ *   main context will be used)
+ * @max_priority: maximum priority source to check
+ * @timeout_: (out): location to store timeout to be used in polling
+ * @fds: (out caller-allocates) (array length=n_fds): location to
+ *       store #GPollFD records that need to be polled.
+ * @n_fds: (in): length of @fds.
+ *
+ * Determines information necessary to poll this main loop. You should
+ * be careful to pass the resulting @fds array and its length @n_fds
+ * as is when calling g_main_context_check(), as this function relies
+ * on assumptions made when the array is filled.
+ *
+ * You must have successfully acquired the context with
+ * g_main_context_acquire() before you may call this function.
+ *
+ * Returns: the number of records actually stored in @fds,
+ *   or, if more than @n_fds records need to be stored, the number
+ *   of records that need to be stored.
+ *          这里需要注意返回值:返回的是，实际放 fds 放入的量。
+ *          但是如果fds 空间不够了。返回实际需要的数组大小
+ **/
+gint
+g_main_context_query (GMainContext *context,
+                      gint          max_priority,
+                      gint         *timeout,
+                      GPollFD      *fds,
+                      gint          n_fds)
+{
+  gint n_poll;
+
+  if (context == NULL)
+    context = g_main_context_default ();
+
+  LOCK_CONTEXT (context);
+
+  n_poll = g_main_context_query_unlocked (context, max_priority, timeout, fds, n_fds);
+
+  UNLOCK_CONTEXT (context);
+
+  return n_poll;
+}
 static gint
 g_main_context_query_unlocked (GMainContext *context,
                                gint          max_priority,
@@ -1094,13 +1150,14 @@ g_main_context_query_unlocked (GMainContext *context,
         }
       else
         {
+          //如果fds空间够，就往里面放
           if (n_poll < n_fds)
             {
               fds[n_poll].fd = pollrec->fd->fd;
               fds[n_poll].events = events;
               fds[n_poll].revents = 0;
             }
-
+          //如果空间不够，也去增长n_poll, 但是合并不算
           n_poll++;
         }
 
@@ -1219,7 +1276,456 @@ g_main_context_poll_unlocked (GMainContext *context,
     } /* if (n_fds || timeout != 0) */
 }
 ```
-### 
+###  g_main_context_check_unlocked
+```cpp
+static gboolean
+g_main_context_check_unlocked (GMainContext *context,
+                               gint          max_priority,
+                               GPollFD      *fds,
+                               gint          n_fds)
+{
+  GSource *source;
+  GSourceIter iter;
+  GPollRec *pollrec;
+  gint n_ready = 0;
+  gint i;
+
+  if (context == NULL)
+    context = g_main_context_default ();
+   
+  if (context->in_check_or_prepare)
+    {
+      g_warning ("g_main_context_check() called recursively from within a source's check() or "
+		 "prepare() member.");
+      return FALSE;
+    }
+
+  TRACE (GLIB_MAIN_CONTEXT_BEFORE_CHECK (context, max_priority, fds, n_fds));
+  //这里会检测 wake_up_rec.fd, 如果有事件，则ack下
+  for (i = 0; i < n_fds; i++)
+    {
+      if (fds[i].fd == context->wake_up_rec.fd)
+        {
+          if (fds[i].revents)
+            {
+              TRACE (GLIB_MAIN_CONTEXT_WAKEUP_ACKNOWLEDGE (context));
+              g_wakeup_acknowledge (context->wakeup);
+            }
+          break;
+        }
+    }
+
+  /* If the set of poll file descriptors changed, bail out
+   * and let the main loop rerun
+   */
+   /*
+    * 如果有 poll_cahnged 则返回false
+    */
+  if (context->poll_changed)
+    {
+      TRACE (GLIB_MAIN_CONTEXT_AFTER_CHECK (context, 0));
+
+      return FALSE;
+    }
+
+  /* The linear iteration below relies on the assumption that both
+   * poll records and the fds array are incrementally sorted by file
+   * descriptor identifier.
+   */
+   /*
+    * 遍历 pol_records
+    */
+  pollrec = context->poll_records;
+  i = 0;
+  while (pollrec && i < n_fds)
+    {
+      /* Make sure that fds is sorted by file descriptor identifier. */
+      g_assert (i <= 0 || fds[i - 1].fd < fds[i].fd);
+
+      /* Skip until finding the first GPollRec matching the current GPollFD. */
+      //查找到fd相同的 pollrec
+      while (pollrec && pollrec->fd->fd != fds[i].fd)
+        pollrec = pollrec->next;
+
+      /* Update all consecutive GPollRecs that match. */
+      while (pollrec && pollrec->fd->fd == fds[i].fd)
+        {
+          //找到优先级比 max_priority 的pollrec, 然后置位 pollrec->rd->revents
+          if (pollrec->priority <= max_priority)
+            {
+              pollrec->fd->revents =
+                fds[i].revents & (pollrec->fd->events | G_IO_ERR | G_IO_HUP | G_IO_NVAL);
+            }
+          pollrec = pollrec->next;
+        }
+
+      /* Iterate to next GPollFD. */
+      i++;
+    }
+
+  g_source_iter_init (&iter, context, TRUE);
+  //遍历每一个source
+  while (g_source_iter_next (&iter, &source))
+    {
+      if (SOURCE_DESTROYED (source) || SOURCE_BLOCKED (source))
+	continue;
+      //如果有ready, 而且source->priority > max_priority
+      //这里就需要break,个人感觉是处完这轮，就立马处理
+      //更高优先级的事件
+      if ((n_ready > 0) && (source->priority > max_priority))
+	break;
+      //如果没有READY, 就需要检测下这轮的poll是否让事件变ready了
+      if (!(source->flags & G_SOURCE_READY))
+	{
+          gboolean result;
+          gboolean (* check) (GSource *source);
+
+          check = source->source_funcs->check;
+
+          if (check)
+            {
+              gint64 begin_time_nsec G_GNUC_UNUSED;
+
+              /* If the check function is set, call it. */
+              context->in_check_or_prepare++;
+              UNLOCK_CONTEXT (context);
+
+              begin_time_nsec = G_TRACE_CURRENT_TIME;
+              //调用check, 如果result为true,则表示需要dispatch
+              result = (* check) (source);
+
+              TRACE (GLIB_MAIN_AFTER_CHECK (source, check, result));
+
+              g_trace_mark (begin_time_nsec, G_TRACE_CURRENT_TIME - begin_time_nsec,
+                            "GLib", "GSource.check",
+                            "%s ⇒ %s",
+                            (g_source_get_name (source) != NULL) ? g_source_get_name (source) : "(unnamed)",
+                            result ? "dispatch" : "ignore");
+
+              LOCK_CONTEXT (context);
+              context->in_check_or_prepare--;
+            }
+          else
+            result = FALSE;
+          /*
+           * 如果result为false, 这里仍然检查下 source->priv->fds链表中的
+           * 事件是否有ready的(pollfd->revents中是否有返回的事件，如果有
+           * 也认为ready, 需要dispatch
+           */
+          if (result == FALSE)
+            {
+              GSList *tmp_list;
+
+              /* If not already explicitly flagged ready by ->check()
+               * (or if we have no check) then we can still be ready if
+               * any of our fds poll as ready.
+               */
+              for (tmp_list = source->priv->fds; tmp_list; tmp_list = tmp_list->next)
+                {
+                  GPollFD *pollfd = tmp_list->data;
+
+                  if (pollfd->revents)
+                    {
+                      result = TRUE;
+                      break;
+                    }
+                }
+            }
+          //如果result == False, 并且 有ready_time, 这时候需要检测
+          //事件有没有超时, 逻辑和prepare 一样
+          if (result == FALSE && source->priv->ready_time != -1)
+            {
+              if (!context->time_is_fresh)
+                {
+                  context->time = g_get_monotonic_time ();
+                  context->time_is_fresh = TRUE;
+                }
+
+              if (source->priv->ready_time <= context->time)
+                result = TRUE;
+            }
+       //如果 result == TRUE, 这是需要将source->flags 置位 G_SOURCE_READY
+       //然后 source->priv->parent 家族也同样置位
+	  if (result)
+	    {
+	      GSource *ready_source = source;
+
+	      while (ready_source)
+		{
+		  ready_source->flags |= G_SOURCE_READY;
+		  ready_source = ready_source->priv->parent_source;
+		}
+	    }
+	}
+      //如果是ready的状态
+      if (source->flags & G_SOURCE_READY)
+	{
+          //增加引用计数
+          g_source_ref (source);
+          //将其放入 pending_dispatches array中
+	  g_ptr_array_add (context->pending_dispatches, source);
+
+	  n_ready++;
+
+          /* never dispatch sources with less priority than the first
+           * one we choose to dispatch
+           */
+          //重新置位max_priority
+          max_priority = source->priority;
+	}
+    }
+  g_source_iter_clear (&iter);
+
+  TRACE (GLIB_MAIN_CONTEXT_AFTER_CHECK (context, n_ready));
+
+  return n_ready > 0;
+}
+```
+
+### g_main_context_dispatch_unlocked 
+```cpp
+
+static void
+g_main_context_dispatch_unlocked (GMainContext *context)
+{
+  TRACE (GLIB_MAIN_CONTEXT_BEFORE_DISPATCH (context));
+
+  if (context->pending_dispatches->len > 0)
+    {
+      g_main_dispatch (context);
+    }
+
+  TRACE (GLIB_MAIN_CONTEXT_AFTER_DISPATCH (context));
+}
+/* HOLDS: context's lock */
+static void
+g_main_dispatch (GMainContext *context)
+{
+  GMainDispatch *current = get_dispatch ();
+  guint i;
+  //便利 pending_dispatches
+  for (i = 0; i < context->pending_dispatches->len; i++)
+    {
+      GSource *source = context->pending_dispatches->pdata[i];
+
+      context->pending_dispatches->pdata[i] = NULL;
+      g_assert (source);
+      //取消ready 位
+      source->flags &= ~G_SOURCE_READY;
+      //没有destroyed
+      if (!SOURCE_DESTROYED (source))
+	{
+	  gboolean was_in_call;
+	  gpointer user_data = NULL;
+	  GSourceFunc callback = NULL;
+	  GSourceCallbackFuncs *cb_funcs;
+	  gpointer cb_data;
+	  gboolean need_destroy;
+
+	  gboolean (*dispatch) (GSource *,
+				GSourceFunc,
+				gpointer);
+          GSource *prev_source;
+          gint64 begin_time_nsec G_GNUC_UNUSED;
+
+	  dispatch = source->source_funcs->dispatch;
+	  cb_funcs = source->callback_funcs;
+	  cb_data = source->callback_data;
+      //如果有callback_funcs ,先调用cb->ref 
+	  if (cb_funcs)
+	    cb_funcs->ref (cb_data);
+	  
+	  if ((source->flags & G_SOURCE_CAN_RECURSE) == 0)
+	    block_source (source);
+	  
+	  was_in_call = source->flags & G_HOOK_FLAG_IN_CALL;
+	  source->flags |= G_HOOK_FLAG_IN_CALL;
+      //然后调用cb->get
+	  if (cb_funcs)
+	    cb_funcs->get (cb_data, source, &callback, &user_data);
+
+	  UNLOCK_CONTEXT (context);
+
+          /* These operations are safe because 'current' is thread-local
+           * and not modified from anywhere but this function.
+           */
+          prev_source = current->source;
+          current->source = source;
+          current->depth++;
+
+          begin_time_nsec = G_TRACE_CURRENT_TIME;
+
+          TRACE (GLIB_MAIN_BEFORE_DISPATCH (g_source_get_name (source), source,
+                                            dispatch, callback, user_data));
+          //调用 dispatch ,如果返回False,则表示需要销毁, 这里会把callback传进去
+          need_destroy = !(* dispatch) (source, callback, user_data);
+          TRACE (GLIB_MAIN_AFTER_DISPATCH (g_source_get_name (source), source,
+                                           dispatch, need_destroy));
+
+          g_trace_mark (begin_time_nsec, G_TRACE_CURRENT_TIME - begin_time_nsec,
+                        "GLib", "GSource.dispatch",
+                        "%s ⇒ %s",
+                        (g_source_get_name (source) != NULL) ? g_source_get_name (source) : "(unnamed)",
+                        need_destroy ? "destroy" : "keep");
+
+          current->source = prev_source;
+          current->depth--;
+      //调用cb->unref
+	  if (cb_funcs)
+	    cb_funcs->unref (cb_data);
+
+ 	  LOCK_CONTEXT (context);
+	  
+	  if (!was_in_call)
+	    source->flags &= ~G_HOOK_FLAG_IN_CALL;
+
+	  if (SOURCE_BLOCKED (source) && !SOURCE_DESTROYED (source))
+	    unblock_source (source);
+	  
+	  /* Note: this depends on the fact that we can't switch
+	   * sources from one main context to another
+	   */
+	  if (need_destroy && !SOURCE_DESTROYED (source))
+	    {
+	      g_assert (source->context == context);
+          //如果需要destroy ,在这里destroy
+	      g_source_destroy_internal (source, context, TRUE);
+	    }
+	}
+      //下面看 
+      g_source_unref_internal (source, context, TRUE);
+    }
+  //清空该链表
+  g_ptr_array_set_size (context->pending_dispatches, 0);
+}
+```
+## g_source_unref_internal
+```cpp
+/* g_source_unref() but possible to call within context lock
+ */
+static void
+g_source_unref_internal (GSource      *source,
+			 GMainContext *context,
+			 gboolean      have_lock)
+{
+  gpointer old_cb_data = NULL;
+  GSourceCallbackFuncs *old_cb_funcs = NULL;
+
+  g_return_if_fail (source != NULL);
+
+  if (!have_lock && context)
+    LOCK_CONTEXT (context);
+  //查看ref_count, 如果减1后，变为0
+  if (g_atomic_int_dec_and_test (&source->ref_count))
+    {
+      /* If there's a dispose function, call this first */
+      //这个先不看
+      if (source->priv->dispose)
+        {
+          /* Temporarily increase the ref count again so that GSource methods
+           * can be called from dispose(). */
+          g_atomic_int_inc (&source->ref_count);
+          if (context)
+            UNLOCK_CONTEXT (context);
+          source->priv->dispose (source);
+          if (context)
+            LOCK_CONTEXT (context);
+
+          /* Now the reference count might be bigger than 0 again, in which
+           * case we simply return from here before freeing the source */
+          if (!g_atomic_int_dec_and_test (&source->ref_count))
+            {
+              if (!have_lock && context)
+                UNLOCK_CONTEXT (context);
+              return;
+            }
+        }
+
+      TRACE (GLIB_SOURCE_BEFORE_FREE (source, context,
+                                      source->source_funcs->finalize));
+
+      old_cb_data = source->callback_data;
+      old_cb_funcs = source->callback_funcs;
+
+      source->callback_data = NULL;
+      source->callback_funcs = NULL;
+
+      if (context)
+	{
+	  if (!SOURCE_DESTROYED (source))
+	    g_warning (G_STRLOC ": ref_count == 0, but source was still attached to a context!");
+	  source_remove_from_context (source, context);
+
+          g_hash_table_remove (context->sources, GUINT_TO_POINTER (source->source_id));
+	}
+      //如果有 finalize
+      if (source->source_funcs->finalize)
+	{
+          gint old_ref_count;
+
+          /* Temporarily increase the ref count again so that GSource methods
+           * can be called from finalize(). */
+          //先增加ref_count
+          g_atomic_int_inc (&source->ref_count);
+	  if (context)
+	    UNLOCK_CONTEXT (context);
+        //调用 finalize
+	  source->source_funcs->finalize (source);
+	  if (context)
+	    LOCK_CONTEXT (context);
+          //减少ref_count
+          old_ref_count = g_atomic_int_add (&source->ref_count, -1);
+          g_warn_if_fail (old_ref_count == 1);
+	}
+
+      if (old_cb_funcs)
+        {
+          gint old_ref_count;
+
+          /* Temporarily increase the ref count again so that GSource methods
+           * can be called from callback_funcs.unref(). */
+          g_atomic_int_inc (&source->ref_count);
+          if (context)
+            UNLOCK_CONTEXT (context);
+          //调用 cb->unref
+          old_cb_funcs->unref (old_cb_data);
+
+          if (context)
+            LOCK_CONTEXT (context);
+          old_ref_count = g_atomic_int_add (&source->ref_count, -1);
+          g_warn_if_fail (old_ref_count == 1);
+        }
+
+      if (!source->priv->static_name)
+        g_free (source->name);
+      source->name = NULL;
+      //释放poll_fds
+      g_slist_free (source->poll_fds);
+      source->poll_fds = NULL;
+      //释放source->priv->fds
+      g_slist_free_full (source->priv->fds, g_free);
+      //将每个child_source族释放
+      while (source->priv->child_sources)
+        {
+          GSource *child_source = source->priv->child_sources->data;
+
+          source->priv->child_sources =
+            g_slist_remove (source->priv->child_sources, child_source);
+          child_source->priv->parent_source = NULL;
+
+          g_source_unref_internal (child_source, context, TRUE);
+        }
+
+      g_slice_free (GSourcePrivate, source->priv);
+      source->priv = NULL;
+      //在最后释放source
+      g_free (source);
+    }
+
+  if (!have_lock && context)
+    UNLOCK_CONTEXT (context);
+}
+```
 # 参考链接
 [三个案例轻松搞定 glib 事件循环](https://github.com/liyansong2018/glib_demo)
 
