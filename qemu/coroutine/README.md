@@ -16,7 +16,7 @@ struct Coroutine {
     size_t locks_held;
 
     /* Only used when the coroutine has yielded.  */
-    //仅用于协程调度出去
+    //仅用于协程调度出去, 在virtio submit_request中会讲解到
     AioContext *ctx;
 
     /* Used to catch and abort on illegal co-routine entry.
@@ -159,19 +159,56 @@ Coroutine *qemu_coroutine_new(void)
 #endif
 
     arg.p = co;
-
+    //makecontext, 在下面的swapcontext 会跳转出去
     makecontext(&uc, (void (*)(void))coroutine_trampoline,
                 2, arg.i[0], arg.i[1]);
 
     /* swapcontext() in, siglongjmp() back out */
+    /*
+     * 注释中也提到了，会在 swapcontext 换出上下文,
+     * 在换出的上下文中(coroutine_trampoline), 在换回来, 我们接下来看下
+     */
     if (!sigsetjmp(old_env, 0)) {
         start_switch_fiber(&fake_stack_save, co->stack, co->stack_size);
+        //在这里切出
         swapcontext(&old_uc, &uc);
     }
 
     finish_switch_fiber(fake_stack_save);
 
     return &co->base;
+}
+```
+### coroutine_trampoline
+```cpp
+static void coroutine_trampoline(int i0, int i1)
+{
+    union cc_arg arg;
+    CoroutineUContext *self;
+    Coroutine *co;
+    void *fake_stack_save = NULL;
+
+    finish_switch_fiber(NULL);
+
+    arg.i[0] = i0;
+    arg.i[1] = i1;
+    self = arg.p;
+    co = &self->base;
+
+    /* Initialize longjmp environment and switch back the caller */
+    //设置跳转点, 方便之后切入, self env始终指向这个地方
+    if (!sigsetjmp(self->env, 0)) {
+        start_switch_fiber(&fake_stack_save,
+                           leader.stack, leader.stack_size);
+        siglongjmp(*(sigjmp_buf *)co->entry_arg, 1);
+    }
+
+    finish_switch_fiber(fake_stack_save);
+
+    while (true) {
+        co->entry(co->entry_arg);
+        qemu_coroutine_switch(co, co->caller, COROUTINE_TERMINATE);
+    }
 }
 ```
 # 参考链接
