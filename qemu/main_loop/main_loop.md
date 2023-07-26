@@ -211,7 +211,7 @@ AioContext *aio_context_new(Error **errp)
     int ret;
     AioContext *ctx;
     //创建g_source, 设置 aio_source_funcs
-    ctx = (AioContext *) g_source_new(&aio_source_funcs, sizeof(AioContext)); aio_context_setup(ctx);
+    ctx = (AioContext *) g_source_new(&aio_source_funcs, sizeof(AioContext)); 
     //create ctx->epollfd, 这个文件描述符暂时不清楚作用
     aio_context_setup(ctx);
     //创建eventfd
@@ -411,7 +411,7 @@ static GSourceFuncs aio_source_funcs = {
     aio_ctx_finalize
 };
 ```
-#### aio_ctx_preare
+#### aio_ctx_prepare
 这个函数在main loop 中貌似没有调用到
 ```cpp
 static gboolean
@@ -481,7 +481,11 @@ aio_ctx_check(GSource *source)
     atomic_and(&ctx->notify_me, ~1);
     //accept notify (ctx->notfier 不太清楚做啥用的)
     aio_notify_accept(ctx);
-    //和bh相关
+    /*
+     * 和bh相关，bh可以简单认为是类似于中断的bh, 在中断上下文中
+     * 处理一些流程，而这个也是这样，在事件dispatch的上下文中，
+     * 可以处理一些流程。
+     */
     for (bh = ctx->first_bh; bh; bh = bh->next) {
         if (bh->scheduled) {
             return true;
@@ -599,5 +603,3 @@ static bool aio_dispatch_handlers(AioContext *ctx)
     return progress;
 }
 ```
-
-# 

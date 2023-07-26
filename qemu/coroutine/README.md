@@ -2,7 +2,7 @@
 ## struct Coroutine 
 ```cpp
 struct Coroutine {
-    CoroutineEntry *entry;
+    CoroutineEntry *entry; //typedef void coroutine_fn CoroutineEntry(void *opaque);
     void *entry_arg;
     Coroutine *caller;
 
@@ -217,10 +217,19 @@ static void coroutine_trampoline(int i0, int i1)
 在`coroutine_trampoline`(1)处跳出之后，会回到`qemu_coroutine_new`, 执行下面
 的流程，一直到函数返回。那该协程什么时候，在跳转回来呢?
 
-## aio_co_enter
+## enter -- aio_co_enter
 ```cpp
 void aio_co_enter(AioContext *ctx, struct Coroutine *co)
 {
+    /*
+     * 因为协程属于一个线程, 每个ctx属于一个线程
+     *
+     * 所以这里需要注意几点:
+     *   1. 当前ctx是不是该协程的ctx，如果不是，需要使用 
+     *     aio_co_schedule 调度下, 下面会讲
+     *   2. 是不是已经在协程中，如果是，这里不能直接切，而是需要
+     *     将该协程加入wakeup队列
+     */
     if (ctx != qemu_get_current_aio_context()) {
         aio_co_schedule(ctx, co);
         return;
@@ -229,6 +238,9 @@ void aio_co_enter(AioContext *ctx, struct Coroutine *co)
     if (qemu_in_coroutine()) {
         Coroutine *self = qemu_coroutine_self();
         assert(self != co);
+        /* 将需要进入的协程链入 当前协程的 co_queue_wakeup, 
+         * 在当前协程执行完后，再执行 co_queue_wakeup中的协程
+         */
         QSIMPLEQ_INSERT_TAIL(&self->co_queue_wakeup, co, co_queue_next);
     } else {
         aio_context_acquire(ctx);
@@ -237,6 +249,7 @@ void aio_co_enter(AioContext *ctx, struct Coroutine *co)
     }
 }
 ```
+
 ### qemu_aio_coroutine_enter
 ```cpp
  void qemu_aio_coroutine_enter(AioContext *ctx, Coroutine *co)
@@ -288,6 +301,10 @@ void aio_co_enter(AioContext *ctx, struct Coroutine *co)
 
          /* Queued coroutines are run depth-first; previously pending coroutines
           * run after those queued more recently.
+          */
+         /* to的协程可能会调用其他协程，但是在enter的流程中不能直接
+          * 进入目标协程，需要先链入 to->co_queue_wakeup, 然后在to
+          * 协程执行完之后，在执行目标协程
           */
          QSIMPLEQ_PREPEND(&pending, &to->co_queue_wakeup);
 
@@ -345,7 +362,7 @@ qemu_coroutine_switch(Coroutine *from_, Coroutine *to_,
 }
 ```
 
-## qemu_coroutine_yield
+## yield -- qemu_coroutine_yield
 ```cpp
 void coroutine_fn qemu_coroutine_yield(void)
 {
@@ -366,7 +383,77 @@ void coroutine_fn qemu_coroutine_yield(void)
     qemu_coroutine_switch(self, to, COROUTINE_YIELD);
 }
 ```
-##  coroutine_delete
+## schedule -- aio_co_schedule
+```cpp
+void aio_co_schedule(AioContext *ctx, Coroutine *co)
+{
+    trace_aio_co_schedule(ctx, co);
+    //将 co->scheduled 设置为null, 表示需要调度
+    const char *scheduled = atomic_cmpxchg(&co->scheduled, NULL,
+                                           __func__);
+    //如果已经调度了，则报错
+    if (scheduled) {
+        fprintf(stderr,
+                "%s: Co-routine was already scheduled in '%s'\n",
+                __func__, scheduled);
+        abort();
+    }
+
+    /* The coroutine might run and release the last ctx reference before we
+     * invoke qemu_bh_schedule().  Take a reference to keep ctx alive until
+     * we're done.
+     */
+    aio_context_ref(ctx);
+    //将协程假如 ctx的调度队列
+    QSLIST_INSERT_HEAD_ATOMIC(&ctx->scheduled_coroutines,
+                              co, co_scheduled_next);
+    //通过co_schedule_bh 通知
+    qemu_bh_schedule(ctx->co_schedule_bh);
+
+    aio_context_unref(ctx);
+}
+```
+### co_schedule_bh_cb
+```cpp
+AioContext *aio_context_new(Error **errp)
+{
+    ...
+    //将ctx的co_schedule_bh设置为 co_schedule_bh_cb
+    ctx->co_schedule_bh = aio_bh_new(ctx, co_schedule_bh_cb, ctx);
+    ...
+}
+static void co_schedule_bh_cb(void *opaque)
+{
+    AioContext *ctx = opaque;
+    QSLIST_HEAD(, Coroutine) straight, reversed;
+    /*
+     * 先将 scheduled_coroutines 链表中的成员移动到 reversed 链表
+     * 再将其一个个移动到straight, 不太清楚为什么
+     */
+    QSLIST_MOVE_ATOMIC(&reversed, &ctx->scheduled_coroutines);
+    QSLIST_INIT(&straight);
+
+    while (!QSLIST_EMPTY(&reversed)) {
+        Coroutine *co = QSLIST_FIRST(&reversed);
+        QSLIST_REMOVE_HEAD(&reversed, co_scheduled_next);
+        QSLIST_INSERT_HEAD(&straight, co, co_scheduled_next);
+    }
+
+    while (!QSLIST_EMPTY(&straight)) {
+        Coroutine *co = QSLIST_FIRST(&straight);
+        QSLIST_REMOVE_HEAD(&straight, co_scheduled_next);
+        trace_aio_co_schedule_bh_cb(ctx, co);
+        aio_context_acquire(ctx);
+
+        /* Protected by write barrier in qemu_aio_coroutine_enter */
+        atomic_set(&co->scheduled, NULL);
+        //进入该协程
+        qemu_aio_coroutine_enter(ctx, co);
+        aio_context_release(ctx);
+    }
+}
+```
+## delete -- coroutine_delete
 ```cpp
 static void coroutine_delete(Coroutine *co)
 {
