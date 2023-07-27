@@ -263,8 +263,8 @@ static struct kioctx *ioctx_alloc(unsigned nr_events)
         ¦* expected: additionally, we move req_batch slots to/from percpu
         ¦* counters at a time, so make sure that isn't 0:
         ¦*/
-        /* 我这里我个人感觉可能说的有问题:
-         * 最差的情况是每个cpu拿一个:一共拿了多少个到 per cpu呢？
+        /* 我这里我个人感觉可能实现的有问题:
+         * 最差的情况是每个cpu拿一个:一共拿了多少个到 per cpu呢:  num_possible_cpus()
          * ctx->nr_events 为补偿后的nr_events数量
          *
          * ctx->req_batch * (num_possible_cpus)
@@ -308,7 +308,7 @@ static struct kioctx *ioctx_alloc(unsigned nr_events)
         ctx = kmem_cache_zalloc(kioctx_cachep, GFP_KERNEL);
         if (!ctx)
                 return ERR_PTR(-ENOMEM);
-
+        //用户态传递下来的
         ctx->max_reqs = max_reqs;
 
         spin_lock_init(&ctx->ctx_lock);
@@ -333,16 +333,21 @@ static struct kioctx *ioctx_alloc(unsigned nr_events)
         err = aio_setup_ring(ctx, nr_events);
         if (err < 0)
                 goto err;
-        //nr_events - 1 为了去除  aio_ring
+
         atomic_set(&ctx->reqs_available, ctx->nr_events - 1);
+
+        //设置req_batch
         ctx->req_batch = (ctx->nr_events - 1) / (num_possible_cpus() * 4);
+        //如果 < 1 ,设置为 1
         if (ctx->req_batch < 1)
                 ctx->req_batch = 1;
 
         /* limit the number of system wide aios */
         spin_lock(&aio_nr_lock);
+        //全局的 reqs
         if (aio_nr + ctx->max_reqs > aio_max_nr ||
-        ¦   aio_nr + ctx->max_reqs < aio_nr) {
+            //这个表示溢出了
+            aio_nr + ctx->max_reqs < aio_nr) {
                 spin_unlock(&aio_nr_lock);
                 err = -EAGAIN;
                 goto err_ctx;
@@ -401,7 +406,7 @@ static int aio_setup_ring(struct kioctx *ctx, unsigned int nr_events)
         nr_pages = PFN_UP(size);
         if (nr_pages < 0)
                 return -EINVAL;
-
+        //创建private file
         file = aio_private_file(ctx, nr_pages);
         if (IS_ERR(file)) {
                 ctx->aio_ring_file = NULL;
@@ -411,7 +416,7 @@ static int aio_setup_ring(struct kioctx *ctx, unsigned int nr_events)
         ctx->aio_ring_file = file;
         nr_events = (PAGE_SIZE * nr_pages - sizeof(struct aio_ring))
                         / sizeof(struct io_event);
-
+        //如果 internal_pages够用，就用 internal_pages
         ctx->ring_pages = ctx->internal_pages;
         if (nr_pages > AIO_RING_PAGES) {
                 ctx->ring_pages = kcalloc(nr_pages, sizeof(struct page *),
@@ -421,9 +426,10 @@ static int aio_setup_ring(struct kioctx *ctx, unsigned int nr_events)
                         return -ENOMEM;
                 }
         }
-
+        //填充page pointer array
         for (i = 0; i < nr_pages; i++) {
                 struct page *page;
+                //find page
                 page = find_or_create_page(file->f_mapping,
                                         ¦  i, GFP_HIGHUSER | __GFP_ZERO);
                 if (!page)
@@ -451,7 +457,7 @@ static int aio_setup_ring(struct kioctx *ctx, unsigned int nr_events)
                 aio_free_ring(ctx);
                 return -EINTR;
         }
-
+        //memory map
         ctx->mmap_base = do_mmap_pgoff(ctx->aio_ring_file, 0, ctx->mmap_size,
                                 ¦      PROT_READ | PROT_WRITE,
                                 ¦      MAP_SHARED, 0, &unused, NULL);
@@ -466,7 +472,7 @@ static int aio_setup_ring(struct kioctx *ctx, unsigned int nr_events)
 
         ctx->user_id = ctx->mmap_base;
         ctx->nr_events = nr_events; /* trusted copy */
-
+        //kmap，初始化 aio_ring
         ring = kmap_atomic(ctx->ring_pages[0]);
         ring->nr = nr_events;   /* user copy */
         ring->id = ~0U;
@@ -480,6 +486,11 @@ static int aio_setup_ring(struct kioctx *ctx, unsigned int nr_events)
 
         return 0;
 }
+```
+
+## io_submit
+```
+
 ```
 # TMP
 ## aio_get_req
