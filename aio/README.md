@@ -116,7 +116,9 @@ struct kioctx {
         struct percpu_ref       reqs;
 
         unsigned long           user_id;
-
+        /*
+         * per cpu变量可以 减少catch line 的冲突
+         */
         struct __percpu kioctx_cpu *cpu;
 
         /*
@@ -126,6 +128,8 @@ struct kioctx {
         /*
          * 对于percpu reqs_available, 我们一次从 global counter 中 move to/from
          * 的slot 数量
+         *
+         * 这里是配合上面使用的, 可以控制修改全局 reqs_available 频率
          */
         unsigned                req_batch;
         /*
@@ -143,7 +147,7 @@ struct kioctx {
 
         unsigned long           mmap_base;
         unsigned long           mmap_size;
-
+        //指向 ring array
         struct page             **ring_pages;
         long                    nr_pages;
 
@@ -186,8 +190,13 @@ struct kioctx {
                 unsigned        completed_events;
                 spinlock_t      completion_lock;
         } ____cacheline_aligned_in_smp;
-
+        //内置的page pointer array
         struct page             *internal_pages[AIO_RING_PAGES];
+        /*
+         * ring file
+         * anon inode file
+         * 方便将 ring page mmap 到用户态
+         */
         struct file             *aio_ring_file;
 
         unsigned                id;
@@ -254,7 +263,36 @@ static struct kioctx *ioctx_alloc(unsigned nr_events)
         ¦* expected: additionally, we move req_batch slots to/from percpu
         ¦* counters at a time, so make sure that isn't 0:
         ¦*/
-        //
+        /* 我这里我个人感觉可能说的有问题:
+         * 最差的情况是每个cpu拿一个:一共拿了多少个到 per cpu呢？
+         * ctx->nr_events 为补偿后的nr_events数量
+         *
+         * ctx->req_batch * (num_possible_cpus)
+         *   = ((ctx->nr_events - 1) / ((num_possible_cpus() * 4))  * num_possible_cpus()
+         *   = (ctx->nr_events -1 ) / 4
+         *
+         * 用户这边期望看到剩余的io_events数量为:
+         * nr_events  - num_possible_cpus()
+         *
+         * 那现在剩余的:
+         * ctx->nr_events - (ctx->nr_event - 1) / 4
+         *
+         * 在 nr_events 远大于 num_possible_cpus()，应该怎么补偿呢?
+         * 期望剩余 = 现在剩余:
+         * 那么可以得出:
+         *  nr_events - num_possible_cpus() = ctx->nr_events - (ctx->nr_events - 1) /4
+         *  nr_events = ctx->nr_events - ctx->nr_events / 4
+         *  nr_events = 3/4(ctx->nr_events)
+         *
+         * 当 nr_events 最小的时候呢? = num_possible_cpus() * 4
+         *
+         * nr_events - num_possible_cpus() = ctx->nr_events - (ctx->nr_event - 1) /4
+         * nr_events - nr_events / 4 = ctx->nr_events - ctx->nr_events / 4
+         * nr_events = ctx->nr_events
+         *
+         * 所以在最差的情况下:
+         * 将ctx->nr_events = 4/3 * nr_events 即可
+         */
         nr_events = max(nr_events, num_possible_cpus() * 4);
         nr_events *= 2;
 
@@ -291,11 +329,11 @@ static struct kioctx *ioctx_alloc(unsigned nr_events)
         ctx->cpu = alloc_percpu(struct kioctx_cpu);
         if (!ctx->cpu)
                 goto err;
-        //初始化ring
+        /* 初始化ring */
         err = aio_setup_ring(ctx, nr_events);
         if (err < 0)
                 goto err;
-
+        //nr_events - 1 为了去除  aio_ring
         atomic_set(&ctx->reqs_available, ctx->nr_events - 1);
         ctx->req_batch = (ctx->nr_events - 1) / (num_possible_cpus() * 4);
         if (ctx->req_batch < 1)
@@ -598,4 +636,39 @@ static void refill_reqs_available(struct kioctx *ctx, unsigned head,
         ctx->completed_events -= completed;
         put_reqs_available(ctx, completed);
 }
+```
+
+## AIO_EVENTS_PER_PAGE
+```cpp
+#define AIO_EVENTS_PER_PAGE     (PAGE_SIZE / sizeof(struct io_event))
+#define AIO_EVENTS_FIRST_PAGE   ((PAGE_SIZE - sizeof(struct aio_ring)) / sizeof(struct io_event))
+#define AIO_EVENTS_OFFSET       (AIO_EVENTS_PER_PAGE - AIO_EVENTS_FIRST_PAGE)
+
+
+AIO_EVENTS_OFFSET:
+        PAGE_SIZE / sizeof(struct io_event) - 
+        PAGE_SIZE / sizeof(struct io_event) + sizeof(struct aio_ring) / sizeof(io_event) \
+~=      sizeof(aio_ring) / sizeof(io_event)
+
+那为什么不能直接空 sizeof(aio_ring) / sizeof(io_event) 作为 pos的偏移呢?
+
+其实这样计算不合适，因为必须确认取整的方式， 举个例子:
+
+PAGE_SIZE = 4096, sizeof(aio_ring) = 96, sizeof(io_event) = 200
+
+其实这样来, first page aio event number 和 second page aio event number 一样。
+
+而刚刚说的计算方式就需要向下取整， 那我们再看一个
+
+PAGE_SIZE = 4000, sizeof(aio_ring) = 100, sizeof(io_event) = 200
+我们来看下 first page aio event number 为 20
+second page aio event number 19
+所以有需要向上取整。
+
+而向上面计算，首先计算出first page aio event number, 在计算出second page aio event number
+一相减，就可以知道first page 和 second page 差距多少个 io_events number。
+
+这样就可以使用:
+pos = tail + AIO_EVENTS_OFFSET (加上第一个page缺少的 io event number，这样就等于 second page io event number)
+pos / AIO_EVENTS_PER_PAGE 得到 page index
 ```
