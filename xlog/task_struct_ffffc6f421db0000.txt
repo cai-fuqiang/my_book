@@ -1,0 +1,692 @@
+crash> struct task_struct ffffc6f421db0000
+struct task_struct {
+  thread_info = {
+    flags = 18446681351247368192,
+    addr_limit = 0,
+    preempt_count = 0
+  },
+  state = 0,
+  stack = 0x80,
+  usage = {
+    counter = 128
+  },
+  flags = 0,
+  ptrace = 32,
+  wake_entry = {
+    next = 0xffffc6f4507d2c00
+  },
+  on_cpu = 0,
+  cpu = 0,
+  wakee_flips = 16,
+  wakee_flip_decay_ts = 0,
+  last_wakee = 0x100020000,
+  recent_used_cpu = 1241282048,
+  wake_cpu = -14604,
+  on_rq = 504961016,
+  prio = -43559,
+  static_prio = 1325835904,
+  normal_prio = -22796,
+  rt_priority = 0,
+  sched_class = 0xffffc6f421db0080,
+  se = {
+    load = {
+      weight = 0,
+      inv_weight = 0
+    },
+    runnable_weight = 0,
+    run_node = {
+      __rb_parent_color = 0,
+      rb_right = 0x203,
+      rb_left = 0x0
+    },
+    group_node = {
+      next = 0x1000,
+      prev = 0x1
+    },
+    on_rq = 0,
+    exec_start = 19136512,
+    sum_exec_runtime = 0,
+    vruntime = 0,
+    prev_sum_exec_runtime = 7260232796130508800,
+    nr_migrations = 307543000,
+    statistics = {
+      wait_start = 8589934592,
+      wait_max = 737645,
+      wait_count = 0,
+      wait_sum = 0,
+      iowait_count = 0,
+      iowait_sum = 18446556989734071040,
+      sleep_start = 18446681351274684416,
+      sleep_max = 18446681350575162032,
+      sum_sleep_runtime = -62722423718784,
+      block_start = 128,
+      block_max = 19,
+      exec_max = 4096,
+      slice_max = 1690786595,
+      nr_migrations_cold = 350123355,
+      nr_failed_migrations_affine = 1690786595,
+      nr_failed_migrations_running = 340114127,
+      nr_failed_migrations_hot = 1690786595,
+      nr_forced_migrations = 340114127,
+      nr_wakeups = 0,
+      nr_wakeups_sync = 12,
+      nr_wakeups_migrate = 0,
+      nr_wakeups_local = 0,
+      nr_wakeups_remote = 0,
+      nr_wakeups_affine = 18446681350575161832,
+      nr_wakeups_affine_attempts = 18446681350575161832,
+      nr_wakeups_passive = 0,
+      nr_wakeups_idle = 0
+    },
+    depth = 0,
+    parent = 0x0,
+    cfs_rq = 0x0,
+    my_q = 0xffffc6f421db0218,
+    avg = {
+      last_update_time = 0,
+      load_sum = 18446681350575161928,
+      runnable_load_sum = 18446681350575161928,
+      util_sum = 1267525064,
+      period_contrib = 4294952692,
+      load_avg = 18446681350575329880,
+      runnable_load_avg = 18446681350575161960,
+      util_avg = 18446681350575161960,
+      util_est = {
+        enqueued = 541765872,
+        ewma = 4294952692
+      }
+    },
+    rh_reserved1 = 0,
+    rh_reserved2 = 65,
+    rh_reserved3 = 2,
+    rh_reserved4 = 0
+  },
+  rt = {
+    run_list = {
+      next = 0x0,
+      prev = 0x0
+    },
+    timeout = 0,
+    watchdog_stamp = 0,
+    time_slice = 0,
+    on_rq = 0,
+    on_list = 0,
+    back = 0x0,
+    parent = 0xffffc6f421db02f0,
+    rt_rq = 0xffffc6f421db02f0,
+    my_q = 0x0
+  },
+  sched_task_group = 0x0,
+  dl = {
+    rb_node = {
+      __rb_parent_color = 0,
+      rb_right = 0x0,
+      rb_left = 0x0
+    },
+    dl_runtime = 18446556990072334304,
+    dl_deadline = 0,
+    dl_period = 27584865545224192,
+    dl_bw = 18446681350575162176,
+    dl_density = 18446681350575162176,
+    runtime = 0,
+    deadline = 0,
+    flags = 0,
+    dl_throttled = 0,
+    dl_boosted = 0,
+    dl_yielded = 0,
+    dl_non_contending = 0,
+    dl_overrun = 0,
+    dl_timer = {
+      node = {
+        node = {
+          __rb_parent_color = 0,
+          rb_right = 0x0,
+          rb_left = 0x0
+        },
+        expires = -62723134389376
+      },
+      _softexpires = -62723134389376,
+      function = 0x914,
+      base = 0x0,
+      state = 0 '\000',
+      is_rel = 0 '\000',
+      is_soft = 0 '\000',
+      hrtimer_size_rh = 0,
+      hrtimer_rh = 0x0
+    },
+    inactive_timer = {
+      node = {
+        node = {
+          __rb_parent_color = 0,
+          rb_right = 0xffffc6f421db3000,
+          rb_left = 0x0
+        },
+        expires = 0
+      },
+      _softexpires = 0,
+      function = 0x0,
+      base = 0x0,
+      state = 0 '\000',
+      is_rel = 0 '\000',
+      is_soft = 0 '\000',
+      hrtimer_size_rh = 0,
+      hrtimer_rh = 0xffffc6f449ec1000
+    }
+  },
+  preempt_notifiers = {
+    first = 0x0
+  },
+  btrace_seq = 0,
+  policy = 0,
+  nr_cpus_allowed = 0,
+  cpus_allowed = {
+    bits = {1569, 1568, 33554464, 0, 18446681351186892192, 4294967312, 0, 4295098368, 18446681351226746752, 18446556989734067056, 18446681213930351552, 0, 18446681350575162496, 18446681350575162496, 0, 18446681213992737027, 0, 18446681350575162536, 18446681350575162536, 0, 18446646028672582147, 0, 0, 0, 515, 0, 69832, 18, 4294967296, 33554432, 0, 2, 7260232899209723904, 620000000, 8589934592, 885229, 17592186044416, 0, 0, 18446556989734071296, 18446681351274684416, 18446681350575163056, 18446681351285774752, 1569, 1, 69832, 1690750861, 619095634, 1639387301, 0, 1690404699, 620000000, 0, 12, 0, 0, 0, 18446681350575162856, 18446681350575162856, 0, 18446681351473454083, 0, 0, 0}
+  },
+  sched_info = {
+    pcount = 18446681350575162904,
+    run_delay = 18446681350575162920,
+    last_arrival = 18446681350575162920,
+    last_queued = 18446681214075697240
+  },
+  tasks = {
+    next = 0x0,
+    prev = 0xffffc6f421db0648
+  },
+  pushable_tasks = {
+    prio = 568002120,
+    prio_list = {
+      next = 0xffffc6f421dbf658,
+      prev = 0xffffc6f421dbe658
+    },
+    node_list = {
+      next = 0xffffc6f421db0668,
+      prev = 0xffffc6f421db0668
+    }
+  },
+  pushable_dl_tasks = {
+    __rb_parent_color = 18446681350548918832,
+    rb_right = 0x0,
+    rb_left = 0x17
+  },
+  mm = 0x1,
+  active_mm = 0x0,
+  vmacache = {
+    seqnum = 18446556989734070280,
+    vmas = {0x0, 0xffffc6f421db0538, 0x58002000000000, 0xffffc6f4202beafa}
+  },
+  rss_stat = {
+    events = 0,
+    count = {0, 0, 0, 2108751384}
+  },
+  exit_state = -22833,
+  exit_code = 1254820200,
+  exit_signal = -14604,
+  pdeath_signal = 0,
+  jobctl = 18446681350575163120,
+  personality = 568002288,
+  sched_reset_on_fork = 0,
+  sched_contributes_to_load = 0,
+  sched_migrated = 1,
+  sched_remote_wakeup = 0,
+  sched_psi_wake_requeue = 1,
+  in_execve = 0,
+  in_iowait = 0,
+  in_user_fault = 0,
+  rh_reserved_memcg_kmem_skip_account = 0,
+  no_cgroup_migration = 0,
+  use_memdelay = 0,
+  frozen = 0,
+  atomic_flags = 0,
+  restart_block = {
+    fn = 0x2,
+    {
+      futex = {
+        uaddr = 0x0,
+        val = 0,
+        flags = 0,
+        bitset = 504964192,
+        time = 0,
+        uaddr2 = 0x62004a00000000
+      },
+      nanosleep = {
+        clockid = 0,
+        type = TT_NONE,
+        {
+          rmtp = 0x0,
+          compat_rmtp = 0x0
+        },
+        expires = 18446556989734069344
+      },
+      poll = {
+        ufds = 0x0,
+        nfds = 0,
+        has_timeout = 0,
+        tv_sec = 18446556989734069344,
+        tv_nsec = 0
+      }
+    }
+  },
+  pid = 568002368,
+  tgid = -14604,
+  stack_canary = 18446681350575163200,
+  real_parent = 0x0,
+  parent = 0x0,
+  children = {
+    next = 0x0,
+    prev = 0x0
+  },
+  sibling = {
+    next = 0x0,
+    prev = 0x0
+  },
+  group_leader = 0xffffc6f421db0780,
+  ptraced = {
+    next = 0xffffc6f421db0780,
+    prev = 0x0
+  },
+  ptrace_entry = {
+    next = 0x5031d3fd,
+    prev = 0x0
+  },
+  active_memcg = 0x0,
+  rh_reserved2 = 0,
+  thread_pid = 0x0,
+  rh_reserved3 = -62723134331904,
+  rh_reserved4 = 0,
+  rh_pgid = 0x0,
+  {
+    sequential_io = 0,
+    __UNIQUE_ID_rh_kabi_hide8 = {
+      rh_reserved5 = 0
+    },
+    {<No data fields>}
+  },
+  {
+    sequential_io_avg = 0,
+    __UNIQUE_ID_rh_kabi_hide9 = {
+      rh_reserved6 = 0
+    },
+    {<No data fields>}
+  },
+  rh_sid = 0x0,
+  thread_group = {
+    next = 0x0,
+    prev = 0x0
+  },
+  thread_node = {
+    next = 0xffffc6f449ec1000,
+    prev = 0x0
+  },
+  vfork_done = 0x0,
+  set_child_tid = 0x0,
+  clear_child_tid = 0x20089705,
+  utime = 279578368,
+  stime = 167772192,
+  gtime = 0,
+  prev_cputime = {
+    utime = 0,
+    stime = 4294967312,
+    lock = {
+      raw_lock = {
+        {
+          val = {
+            counter = 0
+          },
+          {
+            locked = 0 '\000',
+            pending = 0 '\000'
+          },
+          {
+            locked_pending = 0,
+            tail = 0
+          }
+        }
+      }
+    }
+  },
+  vtime = {
+    seqcount = {
+      sequence = 131072
+    },
+    starttime = 18446681351226763648,
+    state = (unknown: 504961904),
+    utime = 18446681351509570112,
+    stime = 0,
+    gtime = 18446681350575163520
+  },
+  tick_dep_mask = {
+    counter = 568002688
+  },
+  nvcsw = 0,
+  nivcsw = 18446681213992737027,
+  start_time = 0,
+  real_start_time = 18446681350575163560,
+  min_flt = 18446681350575163560,
+  maj_flt = 0,
+  cputime_expires = {
+    utime = 0,
+    stime = 0,
+    sum_exec_runtime = 0
+  },
+  cpu_timers = {{
+      next = 0x0,
+      prev = 0x203
+    }, {
+      next = 0x0,
+      prev = 0x49
+    }, {
+      next = 0x1,
+      prev = 0x100000000
+    }},
+  ptracer_cred = 0x2000000,
+  real_cred = 0x0,
+  cred = 0x0,
+  comm = "\000\000\000\000\377!\301d\337/\233\037\000\000\000",
+  nameidata = 0x200000000,
+  sysvsem = {
+    undo_list = 0xd81a4
+  },
+  sysvshm = {
+    shm_clist = {
+      next = 0x100000000000,
+      prev = 0x0
+    }
+  },
+  last_switch_count = 0,
+  fs = 0xffff55d91e192c00 <xfs_inode_operations>,
+  files = 0xffffc6f44b8ce000,
+  nsproxy = 0xffffc6f421db0ab0,
+  signal = 0x0,
+  sighand = 0x20089705,
+  blocked = {
+    sig = {1}
+  },
+  real_blocked = {
+    sig = {73}
+  },
+  saved_sigmask = {
+    sig = {1690660195}
+  },
+  pending = {
+    list = {
+      next = 0x2e7ddb00,
+      prev = 0x6182edbd
+    },
+    signal = {
+      sig = {0}
+    }
+  },
+  sas_ss_sp = 1690378751,
+  sas_ss_size = 530264031,
+  sas_ss_flags = 0,
+  task_works = 0xc,
+  audit_context = 0x0,
+  loginuid = {
+    val = 0
+  },
+  sessionid = 0,
+  seccomp = {
+    mode = 0,
+    filter = 0xffffc6f421db09e8
+  },
+  parent_exec_id = 568003048,
+  self_exec_id = 4294952692,
+  alloc_lock = {
+    {
+      rlock = {
+        raw_lock = {
+          {
+            val = {
+              counter = 0
+            },
+            {
+              locked = 0 '\000',
+              pending = 0 '\000'
+            },
+            {
+              locked_pending = 0,
+              tail = 0
+            }
+          }
+        }
+      }
+    }
+  },
+  pi_lock = {
+    raw_lock = {
+      {
+        val = {
+          counter = 0
+        },
+        {
+          locked = 0 '\000',
+          pending = 0 '\000'
+        },
+        {
+          locked_pending = 0,
+          tail = 0
+        }
+      }
+    }
+  },
+  wake_q = {
+    next = 0x0
+  },
+  pi_waiters = {
+    rb_root = {
+      rb_node = 0x0
+    },
+    rb_leftmost = 0x0
+  },
+  pi_top_task = 0x0,
+  pi_blocked_on = 0xffffc6f421db0a18,
+  journal_info = 0xffffc6f421db0a28,
+  bio_list = 0xffffc6f421db0a28,
+  plug = 0x0,
+  reclaim_state = 0x0,
+  backing_dev_info = 0xffffc6f421db0a48,
+  io_context = 0xffffc6f421db0a48,
+  ptrace_message = 18446681350580176472,
+  {
+    last_siginfo = 0xffffc6f4222bbe58,
+    __UNIQUE_ID_rh_kabi_hide10 = {
+      last_siginfo = 0xffffc6f4222bbe58
+    },
+    {<No data fields>}
+  },
+  ioac = {
+    rchar = 18446681350575164008,
+    wchar = 18446681350575164008,
+    syscr = 18446681350556411440,
+    syscw = 0,
+    read_bytes = 3,
+    write_bytes = 1,
+    cancelled_write_bytes = 0
+  },
+  acct_rss_mem1 = 18446556989734070280,
+  acct_vm_mem1 = 0,
+  acct_timexpd = 18446681350575163704,
+  mems_allowed = {
+    bits = {24769935389491200}
+  },
+  mems_allowed_seq = {
+    sequence = 3172867904
+  },
+  cpuset_mem_spread_rotor = -32783,
+  cpuset_slab_spread_rotor = 0,
+  psi_flags = 0,
+  cgroups = 0x0,
+  cg_list = {
+    next = 0x0,
+    prev = 0x0
+  },
+  robust_list = 0x0,
+  pi_state_list = {
+    next = 0xffffc6f421db0af0,
+    prev = 0xffffc6f421db0af0
+  },
+  pi_state_cache = 0x0,
+  perf_event_ctxp = {0x0, 0x1},
+  perf_event_mutex = {
+    owner = {
+      counter = 0
+    },
+    wait_lock = {
+      {
+        rlock = {
+          raw_lock = {
+            {
+              val = {
+                counter = 0
+              },
+              {
+                locked = 0 '\000',
+                pending = 0 '\000'
+              },
+              {
+                locked_pending = 0,
+                tail = 0
+              }
+            }
+          }
+        }
+      }
+    },
+    osq = {
+      tail = {
+        counter = 0
+      }
+    },
+    wait_list = {
+      next = 0xffff55d91e192460 <xfs_address_space_operations>,
+      prev = 0x0
+    }
+  },
+  perf_event_list = {
+    next = 0x62004a00000000,
+    prev = 0xffffc6f421db0b40
+  },
+  mempolicy = 0xffffc6f421db0b40,
+  il_prev = 0,
+  pref_node_fork = 0,
+  numa_scan_seq = 0,
+  numa_scan_period = 0,
+  numa_scan_period_max = 0,
+  numa_preferred_nid = 0,
+  numa_migrate_retry = 0,
+  node_stamp = 0,
+  last_task_numa_placement = 0,
+  last_sum_exec_runtime = 18446681350575164288,
+  numa_work = {
+    next = 0xffffc6f421db0b80,
+    func = 0x0
+  },
+  numa_entry = {
+    next = 0x62479188,
+    prev = 0x0
+  },
+  numa_group = 0x0,
+  numa_faults = 0x0,
+  total_numa_faults = 0,
+  numa_faults_locality = {18446681350575168512, 0, 0},
+  numa_pages_migrated = 0,
+  rseq = 0x0,
+  rseq_len = 0,
+  rseq_sig = 0,
+  rseq_event_mask = 0,
+  tlb_ubc = {<No data fields>},
+  rcu = {
+    next = 0x0,
+    func = 0xffffc6f449ec1000
+  },
+  splice_pipe = 0x0,
+  task_frag = {
+    page = 0x0,
+    offset = 0,
+    size = 0
+  },
+  delays = 0x4b8,
+  nr_dirtied = 1184,
+  nr_dirtied_pause = 0,
+  dirty_paused_when = 805306400,
+  timer_slack_ns = 0,
+  default_timer_slack_ns = 18446681351186885600,
+  curr_ret_stack = 16,
+  ret_stack = 0x0,
+  ftrace_timestamp = 4295098368,
+  trace_overrun = {
+    counter = 1236130688
+  },
+  tracing_graph_pause = {
+    counter = -14604
+  },
+  trace = 18446556989734067056,
+  trace_recursion = 18446646027226927936,
+  memcg_in_oom = 0x0,
+  memcg_oom_gfp_mask = 568003712,
+  memcg_oom_order = -14604,
+  memcg_nr_pages_over_high = 568003712,
+  throttle_queue = 0x0,
+  utask = 0xffffa6d3ad2a6403,
+  pagefault_disabled = 0,
+  oom_reaper_list = 0xffffc6f421db0ca8,
+  stack_vm_area = 0xffffc6f421db0ca8,
+  stack_refcount = {
+    counter = 0
+  },
+  security = 0xffffa6d3ad2a6403,
+  pid_links = {{
+      next = 0x0,
+      pprev = 0x0
+    }, {
+      next = 0x0,
+      pprev = 0x203
+    }, {
+      next = 0x0,
+      pprev = 0x5c878
+    }, {
+      next = 0x5d,
+      pprev = 0x100000000
+    }},
+  thread = {
+    cpu_context = {
+      x19 = 0,
+      x20 = 2,
+      x21 = 7260232894914756608,
+      x22 = 670000000,
+      x23 = 8589934592,
+      x24 = 885229,
+      x25 = 17592186044416,
+      x26 = 0,
+      x27 = 0,
+      x28 = 18446556989734071296,
+      fp = 18446681351274684416,
+      sp = 18446681350575165104,
+      pc = 18446681351285781272
+    },
+    uw = {
+      tp_value = 1,
+      tp2_value = 379000,
+      fpsimd_state = {
+        vregs = {0x000000001b7ae0440000000064c6cd62, 1635945108, 0x0000000027ef63800000000064c1875a, 0x000000000000000c0000000000000000, 0, 0xffffc6f421db0de80000000000000000, 18446681350575164904, 0, 0, 0xffffc6f421db0e28ffffc6f421db0e18, 0xffffc6d459da7858ffffc6f421db0e28, 0xffffc6f421db0e480000000000000000, 0xffffc6f421dbce58ffffc6f421db0e48, 0xffffc6f421db0e68ffffc6f421db9a58, 0xffffc6f4204a5c30ffffc6f421db0e68, 0x00000000000000150000000000000000, 1, 18446556989734070280, 0x0058002000000000ffffc6f421db0d38, 18446681350546855050, 0xffffc6f44bdf61500000000000000000, 18446681351261992168, 0xffffc6f421db0ef0ffffc6f421db0ef0, 0, 5, 0xffff55d91e1924600000000000000000, 0x0062004a000000000000000000000000, 0xffffc6f421db0f40ffffc6f421db0f40, 0, 0, 0, 0xffffc6f421db0f80ffffc6f421db0f80},
+        fpsr = 0,
+        fpcr = 0,
+        __reserved = {2017719509, 0}
+      }
+    },
+    fpsimd_cpu = 0,
+    sve_state = 0x0,
+    sve_vl = 0,
+    sve_vl_onexec = 0,
+    fault_address = 0,
+    fault_code = 18446681350575200256,
+    debug = {
+      suspended_step = 0,
+      bps_disabled = 0,
+      wps_disabled = 0,
+      hbp_break = {0x0, 0x0, 0x0, 0x0, 0x0, 0xffffc6f449ec1000, 0x0, 0x0, 0x0, 0x22fa, 0x22e0, 0x34000020, 0x0, 0x0, 0x13, 0x0},
+      hbp_watch = {0x10000, 0xffffc6f451031180, 0xffff55d91e191b70 <xfs_dir3_nondir_ops>, 0xffffa6f41042ccc0, 0x0, 0xffffc6f421db1080, 0xffffc6f421db1080, 0x0, 0xffffc6d454e89903, 0x0, 0xffffc6f421db10a8, 0xffffc6f421db10a8, 0x0, 0x0, 0x0, 0x0}
+    }
+  }
+}
+

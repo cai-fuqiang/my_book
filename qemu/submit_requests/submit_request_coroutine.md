@@ -238,6 +238,132 @@ static int coroutine_fn raw_co_prw(BlockDriverState *bs, uint64_t offset,
 
 ## AIO
 在了解aio之前，我们需要了解一些libaio的api:
+
+### laio_co_submit
+```cpp
+
+int coroutine_fn laio_co_submit(BlockDriverState *bs, LinuxAioState *s, int fd,
+                                uint64_t offset, QEMUIOVector *qiov, int type)
+{
+    int ret;
+    struct qemu_laiocb laiocb = {
+        .co         = qemu_coroutine_self(),
+        .nbytes     = qiov->size,
+        .ctx        = s,
+        .ret        = -EINPROGRESS,
+        .is_read    = (type == QEMU_AIO_READ),
+        .qiov       = qiov,
+    };
+
+    ret = laio_do_submit(fd, &laiocb, offset, type);
+    if (ret < 0) {
+        return ret;
+    }
+    /* 一般情况下，这里不会改, 还是 上面静态定义中的值，表示
+     * 该io已经入队，等待异步处理。
+     * 
+     * 在kernel 中, 一般各个文件系统的处理函数会在异步io中返回
+     * 该值，但是io_submit返回值表示已经处理了多少个io请求, 所以
+     * 这里可以认为，如果没有任何io返回，则返回值为-EINPROGRESS
+     *
+     * 这时该协程会退出调度，等待wakeup
+     */
+    if (laiocb.ret == -EINPROGRESS) {
+        qemu_coroutine_yield();
+    }
+    return laiocb.ret;
+}
 ```
+### laio_do_submit
+```cpp
+static int laio_do_submit(int fd, struct qemu_laiocb *laiocb, off_t offset,
+                          int type)
+{
+    LinuxAioState *s = laiocb->ctx;
+    struct iocb *iocbs = &laiocb->iocb;
+    QEMUIOVector *qiov = laiocb->qiov;
+
+    switch (type) {
+    case QEMU_AIO_WRITE:
+        io_prep_pwritev(iocbs, fd, qiov->iov, qiov->niov, offset);
+        break;
+    case QEMU_AIO_READ:
+        io_prep_preadv(iocbs, fd, qiov->iov, qiov->niov, offset);
+        break;
+    /* Currently Linux kernel does not support other operations */
+    default:
+        fprintf(stderr, "%s: invalid AIO request type 0x%x.\n",
+                        __func__, type);
+        return -EIO;
+    }
+    //该接口为libaio接口，将 s->e (eventfd)和aio请求进行绑定
+    io_set_eventfd(&laiocb->iocb, event_notifier_get_fd(&s->e));
+    //加入到pending 队列
+    QSIMPLEQ_INSERT_TAIL(&s->io_q.pending, laiocb, next);
+    //这里 in_queue 表示的队列就是 s->io_q.pending
+    s->io_q.in_queue++;
+    /*
+     * s->io_q.plugged: 表示该队列有io在处理
+     * s->io_q.in_queue: 已经加入到pending队列但是没有io_submit
+     * s->io_q.in_flight: 已经io_submit, 但是io还没有complete
+     *
+     * 在 laio_io_plug()会自增 s->io_q.plugged
+     * 在 laio_io_unplug() 会自减，并且如果有pending,则调用 ioq_submit
+     */
+    /*
+     * MAX_EVENTS为io_setup是传入的参数，kernel注释中描述为可以接受的
+     * 最低的events 数量，但是这里将其作为event数量的上限
+     */
+    /* commit 5e1b34a3fa0a0fbf46628aab10cc49f6f855520e
+     * Author: Roman Pen <roman.penyaev@profitbricks.com>
+     * Date:   Wed Jul 13 15:03:24 2016 +0200
+     *
+     *    linux-aio: prevent submitting more than MAX_EVENTS
+     *
+     * commit 43f2376e096382df44d9322ae0cbdca89612d464
+     * Author: Paolo Bonzini <pbonzini@redhat.com>
+     * Date:   Thu Dec 11 14:52:27 2014 +0100
+     * 
+     *     linux-aio: track whether the queue is blocked
+     */
+
+    if (!s->io_q.blocked &&
+        (!s->io_q.plugged ||
+         s->io_q.in_flight + s->io_q.in_queue >= MAX_EVENTS)) {
+        ioq_submit(s);
+    }
+
+    return 0;
+}
+```
+# TMP
+## laio_io_unplug
+```cpp
+void laio_io_unplug(BlockDriverState *bs, LinuxAioState *s)
+{
+    assert(s->io_q.plugged);
+    //plugged减少为0
+    //并且 io_q.blocked 为0, io_q.pending 不是空
+    if (--s->io_q.plugged == 0 &&
+        !s->io_q.blocked && !QSIMPLEQ_EMPTY(&s->io_q.pending)) {
+        ioq_submit(s);
+    }
+}
+```
+
+# commit
+```
+commit 28b240877bbcdc8add61be227f429b536edd4653
+Author: Paolo Bonzini <pbonzini@redhat.com>
+Date:   Thu Dec 11 14:52:26 2014 +0100
+
+    linux-aio: queue requests that cannot be submitted
+
+
+commit 1b3abdcccf18d98c3952b41be0bc1db3ef6009dd
+Author: Ming Lei <ming.lei@canonical.com>
+Date:   Fri Jul 4 18:04:34 2014 +0800
+
+    linux-aio: implement io plug, unplug and flush io queue
 
 ```

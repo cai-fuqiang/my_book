@@ -1,0 +1,418 @@
+struct xfs_inode {
+  i_mount = 0xffffc6f449ec1000,
+  i_udquot = 0x0,
+  i_gdquot = 0x0,
+  i_pdquot = 0x0,
+  i_ino = 128,
+  i_imap = {
+    im_blkno = 128,
+    im_len = 32,
+    im_boffset = 0
+  },
+  i_afp = 0xffffc6f4507d2c00,
+  i_cowfp = 0x0,
+  i_df = {
+    if_bytes = 16,
+    if_seq = 1,
+    if_broot = 0x0,
+    if_broot_bytes = 0,
+    if_flags = 2 '\002',
+    if_height = 1,
+    if_u1 = {
+      if_root = 0xffffc6f449fc7600,
+      if_data = 0xffffc6f449fc7600 ""
+    }
+  },
+  d_ops = 0xffff55d91e1917f8 <xfs_dir3_ops>,
+  i_itemp = 0xffffa6f44f06a680,
+  i_lock = {
+    mr_lock = {
+      count = {
+        counter = -8589934591
+      },
+      wait_list = {
+        next = 0xffff00004a9afa98,
+        prev = 0xffff00004270fa98
+      },
+      wait_lock = {
+        raw_lock = {
+          {
+            val = {
+              counter = 0
+            },
+            {
+              locked = 0 '\000',
+              pending = 0 '\000'
+            },
+            {
+              locked_pending = 0,
+              tail = 0
+            }
+          }
+        }
+      },
+      osq = {
+        tail = {
+          counter = 0
+        }
+      },
+      owner = 0xffffa6d3acfd4300
+    }
+  },
+  i_mmaplock = {
+    mr_lock = {
+      count = {
+        counter = 0
+      },
+      wait_list = {
+        next = 0xffffc6f421db00a8,
+        prev = 0xffffc6f421db00a8
+      },
+      wait_lock = {
+        raw_lock = {
+          {
+            val = {
+              counter = 0
+            },
+            {
+              locked = 0 '\000',
+              pending = 0 '\000'
+            },
+            {
+              locked_pending = 0,
+              tail = 0
+            }
+          }
+        }
+      },
+      osq = {
+        tail = {
+          counter = 0
+        }
+      },
+      owner = 0x0
+    }
+  },
+  i_pincount = {
+    counter = 1
+  },
+  i_flags_lock = {
+    {
+      rlock = {
+        raw_lock = {
+          {
+            val = {
+              counter = 0
+            },
+            {
+              locked = 0 '\000',
+              pending = 0 '\000'
+            },
+            {
+              locked_pending = 0,
+              tail = 0
+            }
+          }
+        }
+      }
+    }
+  },
+  i_flags = 0,
+  i_delayed_blks = 0,
+  i_d = {
+    di_version = 3 '\003',
+    di_format = 2 '\002',
+    di_flushiter = 0,
+    di_uid = 0,
+    di_gid = 0,
+    di_projid_lo = 0,
+    di_projid_hi = 0,
+    di_size = 4096,
+    di_nblocks = 1,
+    di_extsize = 0,
+    di_nextents = 1,
+    di_anextents = 0,
+    di_forkoff = 36 '$',
+    di_aformat = 1 '\001',
+    di_dmevmask = 0,
+    di_dmstate = 0,
+    di_flags = 0,
+    di_flags2 = 0,
+    di_cowextsize = 0,
+    di_crtime = {
+      t_sec = 1690404675,
+      t_nsec = 307543000
+    }
+  },
+  i_cnextents = 0,
+  i_cformat = 2,
+  i_vnode = {
+    i_mode = 16749,
+    i_opflags = 11,
+    i_uid = {
+      val = 0
+    },
+    i_gid = {
+      val = 0
+    },
+    i_flags = 0,
+    i_acl = 0x0,
+    i_default_acl = 0x0,
+    i_op = 0xffff55d91e192b00 <xfs_dir_inode_operations>,
+    i_sb = 0xffffc6f44b8ce000,
+    i_mapping = 0xffffc6f421db02b0,
+    i_security = 0xffffc6f44c36fc80,
+    i_ino = 128,
+    {
+      i_nlink = 18,
+      __i_nlink = 18
+    },
+    i_rdev = 0,
+    i_size = 4096,
+    i_atime = {
+      tv_sec = 1690783291,
+      tv_nsec = 960405603
+    },
+    i_mtime = {
+      tv_sec = 1690783076,
+      tv_nsec = 417162156
+    },
+    i_ctime = {
+      tv_sec = 1690783076,
+      tv_nsec = 417162156
+    },
+    i_lock = {
+      {
+        rlock = {
+          raw_lock = {
+            {
+              val = {
+                counter = 0
+              },
+              {
+                locked = 0 '\000',
+                pending = 0 '\000'
+              },
+              {
+                locked_pending = 0,
+                tail = 0
+              }
+            }
+          }
+        }
+      }
+    },
+    i_bytes = 0,
+    i_blkbits = 12,
+    i_write_hint = WRITE_LIFE_NOT_SET,
+    i_blocks = 0,
+    i_state = 0,
+    i_rwsem = {
+      count = {
+        counter = -8589934591
+      },
+      wait_list = {
+        next = 0xffff00005cf4fb78,
+        prev = 0xffff00005dfafb78
+      },
+      wait_lock = {
+        raw_lock = {
+          {
+            val = {
+              counter = 0
+            },
+            {
+              locked = 0 '\000',
+              pending = 0 '\000'
+            },
+            {
+              locked_pending = 0,
+              tail = 0
+            }
+          }
+        }
+      },
+      osq = {
+        tail = {
+          counter = 0
+        }
+      },
+      owner = 0xffffa6d3acfd4300
+    },
+    dirtied_when = 0,
+    dirtied_time_when = 0,
+    i_hash = {
+      next = 0x0,
+      pprev = 0xffffc6f421db0218
+    },
+    i_io_list = {
+      next = 0xffffc6f421db0228,
+      prev = 0xffffc6f421db0228
+    },
+    i_wb = 0x0,
+    i_wb_frn_winner = 0,
+    i_wb_frn_avg_time = 0,
+    i_wb_frn_history = 0,
+    i_lru = {
+      next = 0xffffc6f421db0248,
+      prev = 0xffffc6f421db0248
+    },
+    i_sb_list = {
+      next = 0xffffc6f44b8ce5c8,
+      prev = 0xffffc6f421dd9258
+    },
+    i_wb_list = {
+      next = 0xffffc6f421db0268,
+      prev = 0xffffc6f421db0268
+    },
+    {
+      i_dentry = {
+        first = 0xffffc6f4204ab0f0
+      },
+      i_rcu = {
+        next = 0xffffc6f4204ab0f0,
+        func = 0x0
+      }
+    },
+    i_version = {
+      counter = 65
+    },
+    i_count = {
+      counter = 3
+    },
+    i_dio_count = {
+      counter = 0
+    },
+    i_writecount = {
+      counter = 0
+    },
+    i_fop = 0xffff55d91e1926e8 <xfs_dir_file_operations>,
+    i_flctx = 0x0,
+    i_data = {
+      host = 0xffffc6f421db0138,
+      i_pages = {
+        xa_lock = {
+          {
+            rlock = {
+              raw_lock = {
+                {
+                  val = {
+                    counter = 0
+                  },
+                  {
+                    locked = 0 '\000',
+                    pending = 0 '\000'
+                  },
+                  {
+                    locked_pending = 0,
+                    tail = 0
+                  }
+                }
+              }
+            }
+          }
+        },
+        xa_flags = 5767200,
+        xa_head = 0x0,
+        xarray_size_rh = 0,
+        xarray_rh = {<No data fields>}
+      },
+      i_mmap_writable = {
+        counter = 0
+      },
+      i_mmap = {
+        rb_root = {
+          rb_node = 0x0
+        },
+        rb_leftmost = 0x0
+      },
+      i_mmap_rwsem = {
+        count = {
+          counter = 0
+        },
+        wait_list = {
+          next = 0xffffc6f421db02f0,
+          prev = 0xffffc6f421db02f0
+        },
+        wait_lock = {
+          raw_lock = {
+            {
+              val = {
+                counter = 0
+              },
+              {
+                locked = 0 '\000',
+                pending = 0 '\000'
+              },
+              {
+                locked_pending = 0,
+                tail = 0
+              }
+            }
+          }
+        },
+        osq = {
+          tail = {
+            counter = 0
+          }
+        },
+        owner = 0x0
+      },
+      nrpages = 0,
+      nrexceptional = 0,
+      writeback_index = 0,
+      a_ops = 0xffff55d93242a7e0,
+      flags = 0,
+      private_lock = {
+        {
+          rlock = {
+            raw_lock = {
+              {
+                val = {
+                val = {
+                  counter = 0
+                },
+                {
+                  locked = 0 '\000',
+                  pending = 0 '\000'
+                },
+                {
+                  locked_pending = 0,
+                  tail = 0
+                }
+              }
+            }
+          }
+        }
+      },
+      gfp_mask = 6422602,
+      private_list = {
+        next = 0xffffc6f421db0340,
+        prev = 0xffffc6f421db0340
+      },
+      private_data = 0x0,
+      wb_err = 0,
+      rh_reserved1 = 0,
+      rh_reserved2 = 0,
+      rh_reserved3 = 0,
+      rh_reserved4 = 0
+    },
+    i_devices = {
+      next = 0xffffc6f421db0380,
+      prev = 0xffffc6f421db0380
+    },
+    {
+      i_pipe = 0x912,
+      i_bdev = 0x912,
+      i_cdev = 0x912,
+      i_link = 0x912 <Address 0x912 out of bounds>,
+      i_dir_seq = 2322
+    },
+    i_generation = 0,
+    i_fsnotify_mask = 134260736,
+    i_fsnotify_marks = 0xffffa6f450506600,
+    i_private = 0x0,
+    rh_reserved1 = 0,
+    rh_reserved2 = 0
+  }
+}
