@@ -366,4 +366,15 @@ Date:   Fri Jul 4 18:04:34 2014 +0800
 
     linux-aio: implement io plug, unplug and flush io queue
 
+commit 2cdff7f620ebd3b5246cf0c0d1f6fa0eededa4ca
+Author: Stefan Hajnoczi <stefanha@redhat.com>
+Date:   Mon Aug 4 16:56:33 2014 +0100
+
+    linux-aio: avoid deadlock in nested aio_poll() calls
 ```
+# 参考链接
+[Improving the QEMU Event Loop](http://events17.linuxfoundation.org/sites/events/files/slides/Improving%20the%20QEMU%20Event%20Loop%20-%203.pdf)
+
+[QEMU Internals: Event loops](https://blog.vmsplice.net/2020/08/qemu-internals-event-loops.html)
+
+[main_loop_wait vs aio_poll](https://www.twblogs.net/a/5f04dbfad2a5b2920a96d3a4)

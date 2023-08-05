@@ -1,3 +1,5 @@
+# no last_avail_idx
+```
 BEG======virtio_split_should_notify=====
 count (127)
 old(51228) new(51229) v(1) used_event_idx(51101)
@@ -316,5 +318,207 @@ old_count is 1
 idx(0) old(21942) new(21943) used_event_idx(21942)
 END=========================================
 
+```
+# have last_avail_idx
 
+```
+
+BEG======virtio_split_should_notify=====
+count (121)
+old(31454) new(31455) v(1) used_event_idx(31333)
+vq->signalled_used_valid(1)
+END======virtio_split_should_notify=====
+
+
+BEG======virtio_split_should_notify=====
+count (122)
+old(31455) new(31456) v(1) used_event_idx(31333)
+vq->signalled_used_valid(1)
+END======virtio_split_should_notify=====
+
+
+BEG======virtio_split_should_notify=====
+count (123)
+old(31456) new(31457) v(1) used_event_idx(31333)
+vq->signalled_used_valid(1)
+END======virtio_split_should_notify=====
+
+
+BEG======virtio_split_should_notify=====
+count (124)
+old(31457) new(31458) v(1) used_event_idx(31333)
+vq->signalled_used_valid(1)
+END======virtio_split_should_notify=====
+
+
+BEG======virtio_split_should_notify=====
+count (125)
+old(31458) new(31459) v(1) used_event_idx(31333)
+vq->signalled_used_valid(1)
+END======virtio_split_should_notify=====
+
+
+BEG======virtio_split_should_notify=====
+count (126)
+old(31459) new(31460) v(1) used_event_idx(31333)
+vq->signalled_used_valid(1)
+END======virtio_split_should_notify=====
+
+
+BEG======virtio_split_should_notify=====
+count (127)
+old(31460) new(31461) v(1) used_event_idx(31333)
+vq->signalled_used_valid(1)
+END======virtio_split_should_notify=====
+
+
+BEG======virtio_split_should_notify=====
+count (128)
+old(31461) new(31462) v(1) used_event_idx(31461)
+vq->signalled_used_valid(1)
+END======virtio_split_should_notify=====
+
+
+virtio_notify_irqfd, 128, vdev = aaaadd29ea90
+BEG=========================================
+/////idx(0) old(31333) new(31334) used_event_idx(31333) last_avail_idx(31461) --->notify interrupt
+
+
+
+new arr
+count is 128
+idx(0) old(31334) new(31335) used_event_idx(31333) last_avail_idx(31461)
+idx(1) old(31335) new(31336) used_event_idx(31333) last_avail_idx(31461)
+idx(2) old(31336) new(31337) used_event_idx(31333) last_avail_idx(31461)
+idx(3) old(31337) new(31338) used_event_idx(31333) last_avail_idx(31461)
+idx(4) old(31338) new(31339) used_event_idx(31333) last_avail_idx(31461)
+idx(5) old(31339) new(31340) used_event_idx(31333) last_avail_idx(31461)
+idx(6) old(31340) new(31341) used_event_idx(31333) last_avail_idx(31461)
+idx(7) old(31341) new(31342) used_event_idx(31333) last_avail_idx(31461)
+idx(8) old(31342) new(31343) used_event_idx(31333) last_avail_idx(31461)
+idx(9) old(31343) new(31344) used_event_idx(31333) last_avail_idx(31461)
+idx(10) old(31344) new(31345) used_event_idx(31333) last_avail_idx(31461)
+idx(11) old(31345) new(31346) used_event_idx(31333) last_avail_idx(31461)
+idx(12) old(31346) new(31347) used_event_idx(31333) last_avail_idx(31461)
+idx(13) old(31347) new(31348) used_event_idx(31333) last_avail_idx(31461)
+idx(14) old(31348) new(31349) used_event_idx(31333) last_avail_idx(31461)
+idx(15) old(31349) new(31350) used_event_idx(31333) last_avail_idx(31461)
+idx(16) old(31350) new(31351) used_event_idx(31333) last_avail_idx(31461)
+idx(17) old(31351) new(31352) used_event_idx(31333) last_avail_idx(31461)
+idx(18) old(31352) new(31353) used_event_idx(31333) last_avail_idx(31461)
+idx(19) old(31353) new(31354) used_event_idx(31333) last_avail_idx(31461)
+idx(20) old(31354) new(31355) used_event_idx(31333) last_avail_idx(31461)
+idx(21) old(31355) new(31356) used_event_idx(31333) last_avail_idx(31461)
+idx(22) old(31356) new(31357) used_event_idx(31333) last_avail_idx(31461)
+idx(23) old(31357) new(31358) used_event_idx(31333) last_avail_idx(31461)
+idx(24) old(31358) new(31359) used_event_idx(31333) last_avail_idx(31461)
+idx(25) old(31359) new(31360) used_event_idx(31333) last_avail_idx(31461)
+idx(26) old(31360) new(31361) used_event_idx(31333) last_avail_idx(31461)
+idx(27) old(31361) new(31362) used_event_idx(31333) last_avail_idx(31461)
+idx(28) old(31362) new(31363) used_event_idx(31333) last_avail_idx(31461)
+idx(29) old(31363) new(31364) used_event_idx(31333) last_avail_idx(31461)
+idx(30) old(31364) new(31365) used_event_idx(31333) last_avail_idx(31461)
+idx(31) old(31365) new(31366) used_event_idx(31333) last_avail_idx(31461)
+idx(32) old(31366) new(31367) used_event_idx(31333) last_avail_idx(31461)
+idx(33) old(31367) new(31368) used_event_idx(31333) last_avail_idx(31461)
+idx(34) old(31368) new(31369) used_event_idx(31333) last_avail_idx(31461)
+idx(35) old(31369) new(31370) used_event_idx(31333) last_avail_idx(31461)
+idx(36) old(31370) new(31371) used_event_idx(31333) last_avail_idx(31461)
+idx(37) old(31371) new(31372) used_event_idx(31333) last_avail_idx(31461)
+idx(38) old(31372) new(31373) used_event_idx(31333) last_avail_idx(31461)
+idx(39) old(31373) new(31374) used_event_idx(31333) last_avail_idx(31461)
+idx(40) old(31374) new(31375) used_event_idx(31333) last_avail_idx(31461)
+idx(41) old(31375) new(31376) used_event_idx(31333) last_avail_idx(31461)
+idx(42) old(31376) new(31377) used_event_idx(31333) last_avail_idx(31461)
+idx(43) old(31377) new(31378) used_event_idx(31333) last_avail_idx(31461)
+idx(44) old(31378) new(31379) used_event_idx(31333) last_avail_idx(31461)
+idx(45) old(31379) new(31380) used_event_idx(31333) last_avail_idx(31461)
+idx(46) old(31380) new(31381) used_event_idx(31333) last_avail_idx(31461)
+idx(47) old(31381) new(31382) used_event_idx(31333) last_avail_idx(31461)
+idx(48) old(31382) new(31383) used_event_idx(31333) last_avail_idx(31461)
+idx(49) old(31383) new(31384) used_event_idx(31333) last_avail_idx(31461)
+idx(50) old(31384) new(31385) used_event_idx(31333) last_avail_idx(31461)
+idx(51) old(31385) new(31386) used_event_idx(31333) last_avail_idx(31461)
+idx(52) old(31386) new(31387) used_event_idx(31333) last_avail_idx(31461)
+idx(53) old(31387) new(31388) used_event_idx(31333) last_avail_idx(31461)
+idx(54) old(31388) new(31389) used_event_idx(31333) last_avail_idx(31461)
+idx(55) old(31389) new(31390) used_event_idx(31333) last_avail_idx(31461)
+idx(56) old(31390) new(31391) used_event_idx(31333) last_avail_idx(31461)
+idx(57) old(31391) new(31392) used_event_idx(31333) last_avail_idx(31461)
+idx(58) old(31392) new(31393) used_event_idx(31333) last_avail_idx(31461)
+idx(59) old(31393) new(31394) used_event_idx(31333) last_avail_idx(31461)
+idx(60) old(31394) new(31395) used_event_idx(31333) last_avail_idx(31461)
+idx(61) old(31395) new(31396) used_event_idx(31333) last_avail_idx(31461)
+idx(62) old(31396) new(31397) used_event_idx(31333) last_avail_idx(31461)
+idx(63) old(31397) new(31398) used_event_idx(31333) last_avail_idx(31461)
+idx(64) old(31398) new(31399) used_event_idx(31333) last_avail_idx(31461)
+idx(65) old(31399) new(31400) used_event_idx(31333) last_avail_idx(31461)
+idx(66) old(31400) new(31401) used_event_idx(31333) last_avail_idx(31461)
+idx(67) old(31401) new(31402) used_event_idx(31333) last_avail_idx(31461)
+idx(68) old(31402) new(31403) used_event_idx(31333) last_avail_idx(31461)
+idx(69) old(31403) new(31404) used_event_idx(31333) last_avail_idx(31461)
+idx(70) old(31404) new(31405) used_event_idx(31333) last_avail_idx(31461)
+idx(71) old(31405) new(31406) used_event_idx(31333) last_avail_idx(31461)
+idx(72) old(31406) new(31407) used_event_idx(31333) last_avail_idx(31461)
+idx(73) old(31407) new(31408) used_event_idx(31333) last_avail_idx(31461)
+idx(74) old(31408) new(31409) used_event_idx(31333) last_avail_idx(31461)
+idx(75) old(31409) new(31410) used_event_idx(31333) last_avail_idx(31461)
+idx(76) old(31410) new(31411) used_event_idx(31333) last_avail_idx(31461)
+idx(77) old(31411) new(31412) used_event_idx(31333) last_avail_idx(31461)
+idx(78) old(31412) new(31413) used_event_idx(31333) last_avail_idx(31461)
+idx(79) old(31413) new(31414) used_event_idx(31333) last_avail_idx(31461)
+idx(80) old(31414) new(31415) used_event_idx(31333) last_avail_idx(31461)
+idx(81) old(31415) new(31416) used_event_idx(31333) last_avail_idx(31461)
+idx(82) old(31416) new(31417) used_event_idx(31333) last_avail_idx(31461)
+idx(83) old(31417) new(31418) used_event_idx(31333) last_avail_idx(31461)
+idx(84) old(31418) new(31419) used_event_idx(31333) last_avail_idx(31461)
+idx(85) old(31419) new(31420) used_event_idx(31333) last_avail_idx(31461)
+idx(86) old(31420) new(31421) used_event_idx(31333) last_avail_idx(31461)
+idx(87) old(31421) new(31422) used_event_idx(31333) last_avail_idx(31461)
+idx(88) old(31422) new(31423) used_event_idx(31333) last_avail_idx(31461)
+idx(89) old(31423) new(31424) used_event_idx(31333) last_avail_idx(31461)
+idx(90) old(31424) new(31425) used_event_idx(31333) last_avail_idx(31461)
+idx(91) old(31425) new(31426) used_event_idx(31333) last_avail_idx(31461)
+idx(92) old(31426) new(31427) used_event_idx(31333) last_avail_idx(31461)
+idx(93) old(31427) new(31428) used_event_idx(31333) last_avail_idx(31461)
+idx(94) old(31428) new(31429) used_event_idx(31333) last_avail_idx(31461)
+idx(95) old(31429) new(31430) used_event_idx(31333) last_avail_idx(31461)
+idx(96) old(31430) new(31431) used_event_idx(31333) last_avail_idx(31461)
+idx(97) old(31431) new(31432) used_event_idx(31333) last_avail_idx(31461)
+idx(98) old(31432) new(31433) used_event_idx(31333) last_avail_idx(31461)
+idx(99) old(31433) new(31434) used_event_idx(31333) last_avail_idx(31461)
+idx(100) old(31434) new(31435) used_event_idx(31333) last_avail_idx(31461)
+idx(101) old(31435) new(31436) used_event_idx(31333) last_avail_idx(31461)
+idx(102) old(31436) new(31437) used_event_idx(31333) last_avail_idx(31461)
+idx(103) old(31437) new(31438) used_event_idx(31333) last_avail_idx(31461)
+idx(104) old(31438) new(31439) used_event_idx(31333) last_avail_idx(31461)
+idx(105) old(31439) new(31440) used_event_idx(31333) last_avail_idx(31461)
+idx(106) old(31440) new(31441) used_event_idx(31333) last_avail_idx(31461)
+idx(107) old(31441) new(31442) used_event_idx(31333) last_avail_idx(31461)
+idx(108) old(31442) new(31443) used_event_idx(31333) last_avail_idx(31461)
+idx(109) old(31443) new(31444) used_event_idx(31333) last_avail_idx(31461)
+idx(110) old(31444) new(31445) used_event_idx(31333) last_avail_idx(31461)
+idx(111) old(31445) new(31446) used_event_idx(31333) last_avail_idx(31461)
+idx(112) old(31446) new(31447) used_event_idx(31333) last_avail_idx(31461)
+idx(113) old(31447) new(31448) used_event_idx(31333) last_avail_idx(31461)
+idx(114) old(31448) new(31449) used_event_idx(31333) last_avail_idx(31461)
+idx(115) old(31449) new(31450) used_event_idx(31333) last_avail_idx(31461)
+idx(116) old(31450) new(31451) used_event_idx(31333) last_avail_idx(31461)
+idx(117) old(31451) new(31452) used_event_idx(31333) last_avail_idx(31461)
+idx(118) old(31452) new(31453) used_event_idx(31333) last_avail_idx(31461)
+idx(119) old(31453) new(31454) used_event_idx(31333) last_avail_idx(31461)
+idx(120) old(31454) new(31455) used_event_idx(31333) last_avail_idx(31461)
+idx(121) old(31455) new(31456) used_event_idx(31333) last_avail_idx(31461)
+idx(122) old(31456) new(31457) used_event_idx(31333) last_avail_idx(31461)
+idx(123) old(31457) new(31458) used_event_idx(31333) last_avail_idx(31461)
+idx(124) old(31458) new(31459) used_event_idx(31333) last_avail_idx(31461)
+idx(125) old(31459) new(31460) used_event_idx(31333) last_avail_idx(31461)
+idx(126) old(31460) new(31461) used_event_idx(31333) last_avail_idx(31461)
+idx(127) old(31461) new(31462) used_event_idx(31461) last_avail_idx(31498)
+
+old arr
+old_count is 1
+idx(0) old(31333) new(31334) used_event_idx(31333) last_avail_idx(31461)
+END=========================================
+```
 
