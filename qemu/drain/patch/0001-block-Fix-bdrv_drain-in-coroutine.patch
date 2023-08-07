@@ -1,0 +1,157 @@
+From a77fd4bb2988c05953fdc9f1524085870ec1c939 Mon Sep 17 00:00:00 2001
+From: Fam Zheng <famz@redhat.com>
+Date: Tue, 5 Apr 2016 19:20:52 +0800
+Subject: [PATCH] block: Fix bdrv_drain in coroutine
+
+Using the nested aio_poll() in coroutine is a bad idea. This patch
+replaces the aio_poll loop in bdrv_drain with a BH, if called in
+coroutine.
+
+For example, the bdrv_drain() in mirror.c can hang when a guest issued
+request is pending on it in qemu_co_mutex_lock().
+
+Mirror coroutine in this case has just finished a request, and the block
+job is about to complete. It calls bdrv_drain() which waits for the
+other coroutine to complete. The other coroutine is a scsi-disk request.
+The deadlock happens when the latter is in turn pending on the former to
+yield/terminate, in qemu_co_mutex_lock(). The state flow is as below
+(assuming a qcow2 image):
+
+  mirror coroutine               scsi-disk coroutine
+  -------------------------------------------------------------
+  do last write
+
+    qcow2:qemu_co_mutex_lock()
+    ...
+                                 scsi disk read
+
+                                   tracked request begin
+
+                                   qcow2:qemu_co_mutex_lock.enter
+
+    qcow2:qemu_co_mutex_unlock()
+
+  bdrv_drain
+    while (has tracked request)
+      aio_poll()
+
+In the scsi-disk coroutine, the qemu_co_mutex_lock() will never return
+because the mirror coroutine is blocked in the aio_poll(blocking=true).
+
+With this patch, the added qemu_coroutine_yield() allows the scsi-disk
+coroutine to make progress as expected:
+
+  mirror coroutine               scsi-disk coroutine
+  -------------------------------------------------------------
+  do last write
+
+    qcow2:qemu_co_mutex_lock()
+    ...
+                                 scsi disk read
+
+                                   tracked request begin
+
+                                   qcow2:qemu_co_mutex_lock.enter
+
+    qcow2:qemu_co_mutex_unlock()
+
+  bdrv_drain.enter
+>   schedule BH
+>   qemu_coroutine_yield()
+>                                  qcow2:qemu_co_mutex_lock.return
+>                                  ...
+                                   tracked request end
+    ...
+    (resumed from BH callback)
+  bdrv_drain.return
+  ...
+
+Reported-by: Laurent Vivier <lvivier@redhat.com>
+Signed-off-by: Fam Zheng <famz@redhat.com>
+Message-id: 1459855253-5378-2-git-send-email-famz@redhat.com
+Suggested-by: Paolo Bonzini <pbonzini@redhat.com>
+Signed-off-by: Fam Zheng <famz@redhat.com>
+Signed-off-by: Stefan Hajnoczi <stefanha@redhat.com>
+---
+ block/io.c            | 45 +++++++++++++++++++++++++++++++++++++++++++
+ include/block/block.h |  1 +
+ 2 files changed, 46 insertions(+)
+
+diff --git a/block/io.c b/block/io.c
+index c4869b96c5..a7dbf85b19 100644
+--- a/block/io.c
++++ b/block/io.c
+@@ -253,6 +253,47 @@ static void bdrv_drain_recurse(BlockDriverState *bs)
+     }
+ }
+ 
++typedef struct {
++    Coroutine *co;
++    BlockDriverState *bs;
++    QEMUBH *bh;
++    bool done;
++} BdrvCoDrainData;
++
++static void bdrv_co_drain_bh_cb(void *opaque)
++{
++    BdrvCoDrainData *data = opaque;
++    Coroutine *co = data->co;
++
++    qemu_bh_delete(data->bh);
++    bdrv_drain(data->bs);
++    data->done = true;
++    qemu_coroutine_enter(co, NULL);
++}
++
++void coroutine_fn bdrv_co_drain(BlockDriverState *bs)
++{
++    BdrvCoDrainData data;
++
++    /* Calling bdrv_drain() from a BH ensures the current coroutine yields and
++     * other coroutines run if they were queued from
++     * qemu_co_queue_run_restart(). */
++
++    assert(qemu_in_coroutine());
++    data = (BdrvCoDrainData) {
++        .co = qemu_coroutine_self(),
++        .bs = bs,
++        .done = false,
++        .bh = aio_bh_new(bdrv_get_aio_context(bs), bdrv_co_drain_bh_cb, &data),
++    };
++    qemu_bh_schedule(data.bh);
++
++    qemu_coroutine_yield();
++    /* If we are resumed from some other event (such as an aio completion or a
++     * timer callback), it is a bug in the caller that should be fixed. */
++    assert(data.done);
++}
++
+ /*
+  * Wait for pending requests to complete on a single BlockDriverState subtree,
+  * and suspend block driver's internal I/O until next request arrives.
+@@ -269,6 +310,10 @@ void bdrv_drain(BlockDriverState *bs)
+     bool busy = true;
+ 
+     bdrv_drain_recurse(bs);
++    if (qemu_in_coroutine()) {
++        bdrv_co_drain(bs);
++        return;
++    }
+     while (busy) {
+         /* Keep iterating */
+          bdrv_flush_io_queue(bs);
+diff --git a/include/block/block.h b/include/block/block.h
+index 6a39f946f5..3a731377db 100644
+--- a/include/block/block.h
++++ b/include/block/block.h
+@@ -372,6 +372,7 @@ int bdrv_flush(BlockDriverState *bs);
+ int coroutine_fn bdrv_co_flush(BlockDriverState *bs);
+ void bdrv_close_all(void);
+ void bdrv_drain(BlockDriverState *bs);
++void coroutine_fn bdrv_co_drain(BlockDriverState *bs);
+ void bdrv_drain_all(void);
+ 
+ int bdrv_discard(BlockDriverState *bs, int64_t sector_num, int nb_sectors);
+-- 
+2.39.0
+

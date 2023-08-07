@@ -1,0 +1,288 @@
+From 0563e191516289c9d2f282a8c50f2eecef2fa773 Mon Sep 17 00:00:00 2001
+From: Zhi Yong Wu <wuzhy@linux.vnet.ibm.com>
+Date: Thu, 3 Nov 2011 16:57:25 +0800
+Subject: [PATCH] block: add the blockio limits command line support
+
+Signed-off-by: Zhi Yong Wu <wuzhy@linux.vnet.ibm.com>
+Signed-off-by: Stefan Hajnoczi <stefanha@linux.vnet.ibm.com>
+Signed-off-by: Kevin Wolf <kwolf@redhat.com>
+---
+ block.c         | 39 +++++++++++++++++++++++++++++++++++++++
+ block.h         |  4 ++++
+ block_int.h     | 29 +++++++++++++++++++++++++++++
+ blockdev.c      | 44 ++++++++++++++++++++++++++++++++++++++++++++
+ qemu-config.c   | 24 ++++++++++++++++++++++++
+ qemu-options.hx |  1 +
+ 6 files changed, 141 insertions(+)
+
+diff --git a/block.c b/block.c
+index d0158877d6..8cb41c0b41 100644
+--- a/block.c
++++ b/block.c
+@@ -30,6 +30,7 @@
+ #include "qjson.h"
+ #include "qemu-coroutine.h"
+ #include "qmp-commands.h"
++#include "qemu-timer.h"
+ 
+ #ifdef CONFIG_BSD
+ #include <sys/types.h>
+@@ -105,6 +106,36 @@ int is_windows_drive(const char *filename)
+ }
+ #endif
+ 
++/* throttling disk I/O limits */
++static void bdrv_block_timer(void *opaque)
++{
++    BlockDriverState *bs = opaque;
++
++    qemu_co_queue_next(&bs->throttled_reqs);
++}
++
++void bdrv_io_limits_enable(BlockDriverState *bs)
++{
++    qemu_co_queue_init(&bs->throttled_reqs);
++    bs->block_timer = qemu_new_timer_ns(vm_clock, bdrv_block_timer, bs);
++    bs->slice_time  = 5 * BLOCK_IO_SLICE_TIME;
++    bs->slice_start = qemu_get_clock_ns(vm_clock);
++    bs->slice_end   = bs->slice_start + bs->slice_time;
++    memset(&bs->io_base, 0, sizeof(bs->io_base));
++    bs->io_limits_enabled = true;
++}
++
++bool bdrv_io_limits_enabled(BlockDriverState *bs)
++{
++    BlockIOLimit *io_limits = &bs->io_limits;
++    return io_limits->bps[BLOCK_IO_LIMIT_READ]
++         || io_limits->bps[BLOCK_IO_LIMIT_WRITE]
++         || io_limits->bps[BLOCK_IO_LIMIT_TOTAL]
++         || io_limits->iops[BLOCK_IO_LIMIT_READ]
++         || io_limits->iops[BLOCK_IO_LIMIT_WRITE]
++         || io_limits->iops[BLOCK_IO_LIMIT_TOTAL];
++}
++
+ /* check if the path starts with "<protocol>:" */
+ static int path_has_protocol(const char *path)
+ {
+@@ -1526,6 +1557,14 @@ void bdrv_get_geometry_hint(BlockDriverState *bs,
+     *psecs = bs->secs;
+ }
+ 
++/* throttling disk io limits */
++void bdrv_set_io_limits(BlockDriverState *bs,
++                        BlockIOLimit *io_limits)
++{
++    bs->io_limits = *io_limits;
++    bs->io_limits_enabled = bdrv_io_limits_enabled(bs);
++}
++
+ /* Recognize floppy formats */
+ typedef struct FDFormat {
+     FDriveType drive;
+diff --git a/block.h b/block.h
+index a826059897..2d244088c3 100644
+--- a/block.h
++++ b/block.h
+@@ -98,6 +98,10 @@ void bdrv_info(Monitor *mon, QObject **ret_data);
+ void bdrv_stats_print(Monitor *mon, const QObject *data);
+ void bdrv_info_stats(Monitor *mon, QObject **ret_data);
+ 
++/* disk I/O throttling */
++void bdrv_io_limits_enable(BlockDriverState *bs);
++bool bdrv_io_limits_enabled(BlockDriverState *bs);
++
+ void bdrv_init(void);
+ void bdrv_init_with_whitelist(void);
+ BlockDriver *bdrv_find_protocol(const char *filename);
+diff --git a/block_int.h b/block_int.h
+index 77c0187c3d..97b1c2be54 100644
+--- a/block_int.h
++++ b/block_int.h
+@@ -34,6 +34,12 @@
+ #define BLOCK_FLAG_ENCRYPT	1
+ #define BLOCK_FLAG_COMPAT6	4
+ 
++#define BLOCK_IO_LIMIT_READ     0
++#define BLOCK_IO_LIMIT_WRITE    1
++#define BLOCK_IO_LIMIT_TOTAL    2
++
++#define BLOCK_IO_SLICE_TIME     100000000
++
+ #define BLOCK_OPT_SIZE          "size"
+ #define BLOCK_OPT_ENCRYPT       "encryption"
+ #define BLOCK_OPT_COMPAT6       "compat6"
+@@ -50,6 +56,16 @@ typedef struct AIOPool {
+     BlockDriverAIOCB *free_aiocb;
+ } AIOPool;
+/*
+ * MY_NOTE: 
+ *
+ * IOPS: io per second, 每秒IO的次数
+ * bps: 每秒读写的数据量
+ */
++typedef struct BlockIOLimit {
++    int64_t bps[3];
++    int64_t iops[3];
++} BlockIOLimit;
++
++typedef struct BlockIOBaseValue {
++    uint64_t bytes[2];
++    uint64_t ios[2];
++} BlockIOBaseValue;
++
+ struct BlockDriver {
+     const char *format_name;
+     int instance_size;
+@@ -201,6 +217,16 @@ struct BlockDriverState {
+ 
+     void *sync_aiocb;
+ 
++    /* the time for latest disk I/O */
++    int64_t slice_time;
++    int64_t slice_start;
++    int64_t slice_end;
++    BlockIOLimit io_limits;
++    BlockIOBaseValue  io_base;
++    CoQueue      throttled_reqs;
++    QEMUTimer    *block_timer;
++    bool         io_limits_enabled;
++
+     /* I/O stats (display with "info blockstats"). */
+     uint64_t nr_bytes[BDRV_MAX_IOTYPE];
+     uint64_t nr_ops[BDRV_MAX_IOTYPE];
+@@ -244,6 +270,9 @@ void *qemu_aio_get(AIOPool *pool, BlockDriverState *bs,
+                    BlockDriverCompletionFunc *cb, void *opaque);
+ void qemu_aio_release(void *p);
+ 
++void bdrv_set_io_limits(BlockDriverState *bs,
++                        BlockIOLimit *io_limits);
++
+ #ifdef _WIN32
+ int is_windows_drive(const char *filename);
+ #endif
+diff --git a/blockdev.c b/blockdev.c
+index 222818690d..bbe5f11be7 100644
+--- a/blockdev.c
++++ b/blockdev.c
+@@ -216,6 +216,26 @@ static int parse_block_error_action(const char *buf, int is_read)
+     }
+ }
+ 
++static bool do_check_io_limits(BlockIOLimit *io_limits)
++{
++    bool bps_flag;
++    bool iops_flag;
++
++    assert(io_limits);
++
++    bps_flag  = (io_limits->bps[BLOCK_IO_LIMIT_TOTAL] != 0)
++                 && ((io_limits->bps[BLOCK_IO_LIMIT_READ] != 0)
++                 || (io_limits->bps[BLOCK_IO_LIMIT_WRITE] != 0));
++    iops_flag = (io_limits->iops[BLOCK_IO_LIMIT_TOTAL] != 0)
++                 && ((io_limits->iops[BLOCK_IO_LIMIT_READ] != 0)
++                 || (io_limits->iops[BLOCK_IO_LIMIT_WRITE] != 0));
++    if (bps_flag || iops_flag) {
++        return false;
++    }
++
++    return true;
++}
++
+ DriveInfo *drive_init(QemuOpts *opts, int default_to_scsi)
+ {
+     const char *buf;
+@@ -235,6 +255,7 @@ DriveInfo *drive_init(QemuOpts *opts, int default_to_scsi)
+     int on_read_error, on_write_error;
+     const char *devaddr;
+     DriveInfo *dinfo;
++    BlockIOLimit io_limits;
+     int snapshot = 0;
+     int ret;
+ 
+@@ -353,6 +374,26 @@ DriveInfo *drive_init(QemuOpts *opts, int default_to_scsi)
+         }
+     }
+ 
++    /* disk I/O throttling */
++    io_limits.bps[BLOCK_IO_LIMIT_TOTAL]  =
++                           qemu_opt_get_number(opts, "bps", 0);
++    io_limits.bps[BLOCK_IO_LIMIT_READ]   =
++                           qemu_opt_get_number(opts, "bps_rd", 0);
++    io_limits.bps[BLOCK_IO_LIMIT_WRITE]  =
++                           qemu_opt_get_number(opts, "bps_wr", 0);
++    io_limits.iops[BLOCK_IO_LIMIT_TOTAL] =
++                           qemu_opt_get_number(opts, "iops", 0);
++    io_limits.iops[BLOCK_IO_LIMIT_READ]  =
++                           qemu_opt_get_number(opts, "iops_rd", 0);
++    io_limits.iops[BLOCK_IO_LIMIT_WRITE] =
++                           qemu_opt_get_number(opts, "iops_wr", 0);
++
++    if (!do_check_io_limits(&io_limits)) {
++        error_report("bps(iops) and bps_rd/bps_wr(iops_rd/iops_wr) "
++                     "cannot be used at the same time");
++        return NULL;
++    }
++
+     on_write_error = BLOCK_ERR_STOP_ENOSPC;
+     if ((buf = qemu_opt_get(opts, "werror")) != NULL) {
+         if (type != IF_IDE && type != IF_SCSI && type != IF_VIRTIO && type != IF_NONE) {
+@@ -460,6 +501,9 @@ DriveInfo *drive_init(QemuOpts *opts, int default_to_scsi)
+ 
+     bdrv_set_on_error(dinfo->bdrv, on_read_error, on_write_error);
+ 
++    /* disk I/O throttling */
++    bdrv_set_io_limits(dinfo->bdrv, &io_limits);
++
+     switch(type) {
+     case IF_IDE:
+     case IF_SCSI:
+diff --git a/qemu-config.c b/qemu-config.c
+index 597d7e10b1..1aa080fbcb 100644
+--- a/qemu-config.c
++++ b/qemu-config.c
+@@ -85,6 +85,30 @@ static QemuOptsList qemu_drive_opts = {
+             .name = "readonly",
+             .type = QEMU_OPT_BOOL,
+             .help = "open drive file as read-only",
++        },{
++            .name = "iops",
++            .type = QEMU_OPT_NUMBER,
++            .help = "limit total I/O operations per second",
++        },{
++            .name = "iops_rd",
++            .type = QEMU_OPT_NUMBER,
++            .help = "limit read operations per second",
++        },{
++            .name = "iops_wr",
++            .type = QEMU_OPT_NUMBER,
++            .help = "limit write operations per second",
++        },{
++            .name = "bps",
++            .type = QEMU_OPT_NUMBER,
++            .help = "limit total bytes per second",
++        },{
++            .name = "bps_rd",
++            .type = QEMU_OPT_NUMBER,
++            .help = "limit read bytes per second",
++        },{
++            .name = "bps_wr",
++            .type = QEMU_OPT_NUMBER,
++            .help = "limit write bytes per second",
+         },
+         { /* end of list */ }
+     },
+diff --git a/qemu-options.hx b/qemu-options.hx
+index 681eaf198e..25a7be7948 100644
+--- a/qemu-options.hx
++++ b/qemu-options.hx
+@@ -136,6 +136,7 @@ DEF("drive", HAS_ARG, QEMU_OPTION_drive,
+     "       [,cache=writethrough|writeback|none|directsync|unsafe][,format=f]\n"
+     "       [,serial=s][,addr=A][,id=name][,aio=threads|native]\n"
+     "       [,readonly=on|off]\n"
++    "       [[,bps=b]|[[,bps_rd=r][,bps_wr=w]]][[,iops=i]|[[,iops_rd=r][,iops_wr=w]]\n"
+     "                use 'file' as a drive image\n", QEMU_ARCH_ALL)
+ STEXI
+ @item -drive @var{option}[,@var{option}[,@var{option}[,...]]]
+-- 
+2.39.0
+
