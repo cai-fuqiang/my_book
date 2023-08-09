@@ -33,3 +33,6 @@ Date:   Tue Nov 8 13:00:14 2011 +0800
 
     block: add I/O throttling algorithm
 ```
+
+# new blockio limits
+https://mail.gnu.org/archive/html/qemu-devel/2013-09/msg00052.html
