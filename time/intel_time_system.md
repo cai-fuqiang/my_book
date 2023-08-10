@@ -425,3 +425,49 @@ VMX-preemption timer 运行在 c-states C0, C1, C2; 它也可以运行
 的其他的任意状态下 count down 到0, logical processor 会转换到C0 C-state
 并且产生一个 VM exit。如果timer 在wait-for-SIPI state 中count down to 0,
 将不会产生vm-exit。timer 也不会在 deeper than C2 的C-state 下 decrement。
+
+# PS
+## CPUID 15H
+> NOTES:
+>
+> If EBX[31:0] is 0, the TSC/”core crystal clock” ratio is not enumerated.
+>
+> EBX[31:0]/EAX[31:0] indicates the ratio of the TSC frequency and the core crystal clock frequency.
+>
+> If ECX is 0, the nominal core crystal clock frequency is not enumerated.
+>
+> “TSC frequency” = “core crystal clock frequency” * EBX/EAX.
+>
+> The core crystal clock may differ from the reference clock, bus clock, or core clock frequencies.
+>
+> nominal frequency 频率标准值   (nominal 名义上的)
+> 
+> crystal: 晶体, core crystal clock frequency : 晶振提供的核心频率
+>
+> 关于频率相关知识见: 
+> 
+> [perf中cycles，ref-cycles与bus-cycles的调查研究](https://zhuanlan.zhihu.com/p/474082387)
+>
+> 上面一段话的意思:
+> 如果 EBX[31:0] 为0, 则 TSC/"core crystal clock" ratio 没有再此列出来
+>  EBX[31:0]/EAX[31:0] : 指示 tsc frequency 和 core crystal clock frequency 之间的 ratio, 
+>> 这个 ratio是基于core crystal clock frequency 上面的连接中提到过，该频率和TSC
+>> 之前有一个倍率(因为晶振提供的频率不高，需要在 CPU 侧进行频率的倍增。所以其中间
+>> 存在着一个倍率关系
+>
+> 如果ECX为0, nominal core crystal clock frequency 再此不列出。
+>
+> core crystal clock 可能和 reference clock ,bus clock, 以及 core clock
+> frequency 不同
+>> 关于上面提到的几个clock频率, 在 [intel perfmon events](https://perfmon-events.intel.com/)
+>> 链接中有提到，不同微架构事件可能不同
+
+* EAX Bits 31-00: An unsigned integer which is the denominator of the TSC/”core crystal clock” ratio.
+* EBX Bits 31-00: An unsigned integer which is the numerator of the TSC/”core crystal clock” ratio.
+* ECX Bits 31-00: An unsigned integer which is the nominal frequency of the core crystal clock in Hz.
+* EDX Bits 31-00: Reserved = 0.
+
+所以, tsc 频率的算法是:
+```
+CPUID.15:ECX * (CPUID.15:EBX / CPUID.15:EAX)
+```
