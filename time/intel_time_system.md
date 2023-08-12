@@ -426,6 +426,8 @@ VMX-preemption timer 运行在 c-states C0, C1, C2; 它也可以运行
 并且产生一个 VM exit。如果timer 在wait-for-SIPI state 中count down to 0,
 将不会产生vm-exit。timer 也不会在 deeper than C2 的C-state 下 decrement。
 
+# 
+
 # PS
 ## CPUID 15H
 > NOTES:
