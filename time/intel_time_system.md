@@ -397,7 +397,7 @@ MSR都是64-bit unsigned integers)
  WRMSR to deadline顺序; 不需要 fencing)
 
 ## VMX-Preemption Timer
-该timer是给 VMX non-root operation 下用的，细节如下:
+该timer是给 VMX non-root operation 下用的. intel sdm中有三个地方讲解了
 
 如果设置了`active VMX-preemption timer`为1, `VMX-preemption timer` 就会在VMX
 non-root operation 中 count down(VM entry 时会load (详见intel sdm 26.7.4 ))。
