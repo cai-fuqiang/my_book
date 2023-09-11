@@ -16,3 +16,6 @@
   * [kvm patch](./kvm/patch.md)
 * [time subsystem](time/README.md)
   * [intel time system](./time/intel_time_system.md)
+* [lock](lock/README.md)
+  * [Spin Lock](./lock/spinlock/README.md)
+* [目录 -- 按日期排序](./list_older_by_data.md)
