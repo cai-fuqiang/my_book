@@ -421,7 +421,7 @@ void queued_spin_lock_slowpath(struct qspinlock *lock, u32 val)
 ```
 1. 关于此处的分析，请看<br/>
     + [locking/qspinlock: Ensure node is initialised before updating 
-      prev->next](./patch/locking-qspinlock-Ensure-node-is-initialised-before-.patch)<br/>
+      prev->next](./patch/locking-qspinlock-Ensure-node-is-initialised-before-.md)<br/>
     + [locking/qspinlock: Elide back-to-back RELEASE operations 
     with smp_wmb](./patch/locking-qspinlock-Elide-back-to-back-RELEASE-operati.patch)<br/>
 2. publish the updated tail (替换tail)
