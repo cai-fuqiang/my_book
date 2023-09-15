@@ -1,3 +1,4 @@
+```diff
 From 5cf9ce6e5ea50f805c6188c04ed0daaec7b6887d Mon Sep 17 00:00:00 2001
 From: Marc Zyngier <marc.zyngier@arm.com>
 Date: Tue, 29 May 2018 13:11:07 +0100
@@ -7,6 +8,8 @@ Subject: [PATCH 03/14] arm64: Add per-cpu infrastructure to call
 In a heterogeneous system, we can end up with both affected and
 unaffected CPUs. Let's check their status before calling into the
 firmware.
+
+heterogeneous : 由不同种类构成的;成分复杂的
 
 Reviewed-by: Julien Grall <julien.grall@arm.com>
 Reviewed-by: Mark Rutland <mark.rutland@arm.com>
@@ -75,4 +78,15 @@ index f33e6aed3037..29ad672a6abd 100644
  	msr	elr_el1, x21			// set up the return data
 -- 
 2.39.0
+```
+* `arm64_ssbd_callback_required`
+    + > 0 : 表示需要调用 `apply_ssbd()` 进行 mitigation ssbd 
+      (也可能关闭 mitigation ssbd)
+    + = 0 : 不需要
+    + 这个变量设置为  per-cpu的是因为，每个CPU 可能 有不同的
+    ssbd的状态, 有的cpu 可能 没有ssb。
+    + 后面的patch会看到该变量的初始化
 
+* 这里给 `apply_ssbd()` 增加参数，`tmp1`, `tmp2`是临时寄存器,
+`targ`是跳转点, 如果 `arm64_ssbd_callback_required`为0, 表示不需要。
+则跳转。

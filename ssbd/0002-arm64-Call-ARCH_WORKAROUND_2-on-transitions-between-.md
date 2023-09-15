@@ -130,7 +130,8 @@ index c89da86de99f..ca1d2cc2cdfa 100644
 @@ -80,6 +80,11 @@
  			   ARM_SMCCC_SMC_32,				\
  			   0, 0x8000)
- 
+
+//===============(4)====================
 +#define ARM_SMCCC_ARCH_WORKAROUND_2					\
 +	ARM_SMCCC_CALL_VAL(ARM_SMCCC_FAST_CALL,				\
 +			   ARM_SMCCC_SMC_32,				\
@@ -186,3 +187,11 @@ ARM_SMCCC_ARCH_WORKAROUND_2`的另一个参数
 ![kernel_exit_apply_ssbd](pic/kernel_exit_apply_ssbd.png)
 
 这部分代码在kernel_exit比较靠后的位置（在恢复现场之前)
+
+4. 对于 smccc 有两种调用方式, yield call和 fast call, 
+这里使用的是fast call 指的是，对于调用的PE来说，看起来是一个原子
+操作。这里就不再展开。 解释下各个参数:
+* ARM_SMCCC_FAST_CALL： bits 31： 表示 Fast call
+* ARM_SMCCC_SMC_32: 表示是 SMC32/SMC64 (hvc) 这里使用 SMC32
+* 0: 表示 Arm Architecture Calls
+* 0x7fff : WORKAROUND_2 function number
