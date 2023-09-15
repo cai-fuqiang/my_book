@@ -3,6 +3,6 @@
 
 # patch
 * [arm/arm64: smccc: Add SMCCC-specific return codes](./0001-arm-arm64-smccc-Add-SMCCC-specific-return-codes.patch)
-
+* [arm64: Call ARCH_WORKAROUND_2 on transitions between EL0 and EL1](./0002-arm64-Call-ARCH_WORKAROUND_2-on-transitions-between-.md)
 # 其他参考资料
 [Speculative Processor Vulnerability](http://www.irmak-bilgisayar.com/speculative-processor-vulnerability.html)
