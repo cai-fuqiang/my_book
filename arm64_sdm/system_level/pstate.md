@@ -217,6 +217,7 @@ SPSR用于在进入异常时 save pstate -> SPSR, 在退出异常时 restore pst
 
 我们以 `AArch64.SystemAccessTrap`为例:
 伪代码如下:
+
 ![AArch64_SystemAccessTrap](img/AArch64_SystemAccessTrap.png)
 
 最终调用到 `AArch64.TakeException`(其他类型异常也是这样)。
@@ -224,9 +225,11 @@ SPSR用于在进入异常时 save pstate -> SPSR, 在退出异常时 restore pst
 这部分代码有点多我们截取我们关心的。
 
 * 在更改PSTATE之前<br/>
+
 ![TakeException_save_spsr](img/TakeException_save_spsr.png), 
 
 * 更改 PSTATE  && 保存 SPSR
+
 ![TakeException_PSTATE_SPSR](img/TakeException_PSTATE_SPSR.png)
 
 总的执行顺序如下:
@@ -245,6 +248,7 @@ SPSR用于在进入异常时 save pstate -> SPSR, 在退出异常时 restore pst
 我们再来看下`GetPSRFromPSTATE()`
 
 ![GetPSRFromPSTATE_1](img/GetPSRFromPSTATE_1.png)
+
 ![GetPSRFromPSTATE_2](img/GetPSRFromPSTATE_2.png)
 
 以`SSBS`为例，这里也是通过 `HaveSSBSExt()`是否有`FEAT_SSBS`的功能，然后在
@@ -268,6 +272,7 @@ and branches to the address held in the ELR.
 接着看下`AArch64.ExceptionReturn()`
 
 截取部分片段:
+
 ![ExceptionReturn](img/ExceptionReturn.png)
 
 `SetPSTATEFromPSR()`函数，会将`SPSR_Elx x=current_el` retore to PSTATE。
