@@ -1,3 +1,4 @@
+```diff
 From 986372c4367f46b34a3c0f6918d7fb95cbdf39d6 Mon Sep 17 00:00:00 2001
 From: Marc Zyngier <marc.zyngier@arm.com>
 Date: Tue, 29 May 2018 13:11:11 +0100
@@ -61,5 +62,5 @@ index 29ad672a6abd..e6f6e2339b22 100644
  	cbz	\tmp2, \targ
  	mov	w0, #ARM_SMCCC_ARCH_WORKAROUND_2
 -- 
-2.39.0
-
+2.41.0
+```

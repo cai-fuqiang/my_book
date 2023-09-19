@@ -1,3 +1,5 @@
+# patch
+```diff
 From c32e1736ca03904c03de0e4459a673be194f56fd Mon Sep 17 00:00:00 2001
 From: Marc Zyngier <marc.zyngier@arm.com>
 Date: Tue, 29 May 2018 13:11:10 +0100
@@ -41,4 +43,6 @@ index b50650f3e496..b0fc3224ce8a 100644
  #endif
 -- 
 2.39.0
+```
 
+在kernel 的多个地方都可能用到 ssbd state, 这里增加一个接口用于对其访问。

@@ -1,3 +1,4 @@
+```diff
 From 647d0519b53f440a55df163de21c52a8205431cc Mon Sep 17 00:00:00 2001
 From: Marc Zyngier <marc.zyngier@arm.com>
 Date: Tue, 29 May 2018 13:11:12 +0100
@@ -98,4 +99,4 @@ index a307b9e13392..70c283368b64 100644
  /*
 -- 
 2.39.0
-
+```

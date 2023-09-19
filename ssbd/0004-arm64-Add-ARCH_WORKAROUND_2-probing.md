@@ -1,11 +1,13 @@
+
+```diff
 From a725e3dda1813ed306734823ac4c65ca04e38500 Mon Sep 17 00:00:00 2001
 From: Marc Zyngier <marc.zyngier@arm.com>
 Date: Tue, 29 May 2018 13:11:08 +0100
 Subject: [PATCH 04/14] arm64: Add ARCH_WORKAROUND_2 probing
 
+//=====================(1)=====================
 As for Spectre variant-2, we rely on SMCCC 1.1 to provide the
 discovery mechanism for detecting the SSBD mitigation.
-
 A new capability is also allocated for that purpose, and a
 config option.
 
@@ -118,6 +120,7 @@ index cd91ca0250f1..7e8f12d85d99 100644
 +	}
 +
 +	if (supported) {
+        //=============(2)============
 +		__this_cpu_write(arm64_ssbd_callback_required, 1);
 +		arm64_set_ssbd_mitigation(true);
 +	}
@@ -144,4 +147,39 @@ index cd91ca0250f1..7e8f12d85d99 100644
  	}
 -- 
 2.39.0
+```
+1. SMCCC 1.1 提供了 为 detecting SSBD mitigation 提供了一个discovery的机制。
+该patch提供了一个 capability 来表示 该cpu是否支持 SSBD mitigation.<br/>
+我们来看下手册中对于该功能的描述
 
+![Discovery_workaround_2](img/Discovery_workaround_2.png)
+
+可以看到是通过 `SMCCC_ARCH_FEATURES` fucntion
+
+![SMCCC_ARCH_FEATURES](img/SMCCC_ARCH_FEATURES.png)
+
+之前也提到过，返回值增加了 `NOT_REQUIRED`（-2)
+
+我们来分别解释其返回值:
+* NOT_SUPPORTED
+  + must not be invoked on any PE in the system
+  + 表示至少有一个受 CVE-2018-3639 影响的 PE没有
+   firmware available, 或者 firmware 并没有提供
+   关于 firmware mitigation是否 required/enabled
+   相关信息
+* NOT_REQUIRED
+  + must not be invoked on any PE in the system
+  + 表示可能全程enabled或者 not required
+* 0
+  + can be invoked safely on all PEs in the system
+  + 支持 dynamic firmware mitigation
+* 1
+  + can be invoked safely on all PEs in the system
+  + 表示不需要 dynamic firmware mitigation
+   可能全程enable 或者 not required
+
+综上所述，只有`0` 可以实现 `dynamic firmware mitigation`
+
+2. 如果支持，设置 `arm64_ssbd_callback_required`为`1`, 
+并且设置 ssbd mitigation 为 true。这样kernel早期
+的处理流程也能支持 ssbd

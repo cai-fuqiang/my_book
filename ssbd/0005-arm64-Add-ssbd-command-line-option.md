@@ -1,3 +1,5 @@
+# patch
+```diff
 From a43ae4dfe56a01f5b98ba0cb2f784b6a43bafcc6 Mon Sep 17 00:00:00 2001
 From: Marc Zyngier <marc.zyngier@arm.com>
 Date: Tue, 29 May 2018 13:11:09 +0100
@@ -30,6 +32,7 @@ index 11fc28ecdb6d..7db8868fabab 100644
  			expediting.  Set to zero to disable automatic
  			expediting.
  
+//===================(1)====================== 
 +	ssbd=		[ARM64,HW]
 +			Speculative Store Bypass Disable control
 +
@@ -57,7 +60,8 @@ index 09b0f2a80c8f..b50650f3e496 100644
 @@ -537,6 +537,12 @@ static inline u64 read_zcr_features(void)
  	return zcr;
  }
- 
+
+//===================(2)====================== 
 +#define ARM64_SSBD_UNKNOWN		-1
 +#define ARM64_SSBD_FORCE_DISABLE	0
 +#define ARM64_SSBD_KERNEL		1
@@ -74,7 +78,7 @@ index 7e8f12d85d99..1075f90fdd8c 100644
 @@ -235,6 +235,38 @@ enable_smccc_arch_workaround_1(const struct arm64_cpu_capabilities *entry)
  #ifdef CONFIG_ARM64_SSBD
  DEFINE_PER_CPU_READ_MOSTLY(u64, arm64_ssbd_callback_required);
- 
+
 +int ssbd_state __read_mostly = ARM64_SSBD_KERNEL;
 +
 +static const struct ssbd_options {
@@ -168,6 +172,7 @@ index 7e8f12d85d99..1075f90fdd8c 100644
 +		return false;
 +
 +	case SMCCC_RET_SUCCESS:
+        //===================(3)====================== 
 +		required = true;
 +		break;
 +
@@ -189,6 +194,7 @@ index 7e8f12d85d99..1075f90fdd8c 100644
 +
 +	case ARM64_SSBD_KERNEL:
 +		if (required) {
+            //==============(4)============
 +			__this_cpu_write(arm64_ssbd_callback_required, 1);
 +			arm64_set_ssbd_mitigation(true);
 +		}
@@ -212,4 +218,27 @@ index 7e8f12d85d99..1075f90fdd8c 100644
  
 -- 
 2.39.0
+```
+1. 增加内核启动参数: `ssbd=`
+   + force-on : 对于 **kernel && userspace** 无条件 **enable**
+   + force-off: 对于 **kernel && userspace** 无条件 **disable**
+   + kernel : 在 **kernel** 中 **enable**, 对于用户态，提供
+   了一个 `prctl` 接口，用于 **允许用户态自己设置其 是否
+   mitigated**
+2. 说一下几种 ssbd_state
 
+
+| ssbd state | kernel enable | user space enable |说明|
+|----|----|----|----|
+|ARM64_SSBD_UNKNOWN|N|N|表示 psci 不支持 mitigated|
+|ARM64_SSBD_KERNEL : default|Y|使用`prctl` enable userspace|类似于 ssbd=kernel|
+|ARM64_SSBD_MITIGATED|Y|Y|表示该CPU不需要 mitigation, 类似于该cpu 不支持 ssb,
+或者 ssbd始终 enable, 不支持动态调整|
+|ARM64_SSBD_FORCE_DISABLE|N|N| 类似于 ssbd=force-off|
+|ARM64_SSBD_FORCE_ENABLE|Y|Y| 类似于 ssbd=force-on|
+3. 只有 smccc 返回 0 时候，才支持动态调整 ssbd 
+4. 在 AM64_SSBD_KERNEL 状态下，并且`required`的情况下，才需要动态调整
+> NOTE
+>
+> 这里说明下， 其他的情况，kernel状态和用户态状态是一致的
+> 不需要动态调整，只有 `AM64_SSBD_KERNEL` 才可能两者状态不同
