@@ -1,5 +1,6 @@
 # main list
-* [MAIL LIST](https://marc.info/?l=linux-arm-kernel&m=152700180727545&w=2)
+<!--* [MAIL LIST](https://marc.info/?l=linux-arm-kernel&m=152700180727545&w=2) -->
+* [MAIL LIST](https://lore.kernel.org/all/20180529121121.24927-1-marc.zyngier@arm.com/)
 
 # patch
 * [arm/arm64: smccc: Add SMCCC-specific return codes](./0001-arm-arm64-smccc-Add-SMCCC-specific-return-codes.patch)
