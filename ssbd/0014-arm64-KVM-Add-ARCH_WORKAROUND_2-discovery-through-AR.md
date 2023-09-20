@@ -84,7 +84,7 @@ index 3256b9228e75..a74311beda35 100644
 @@ -122,6 +122,10 @@ int kvm_reset_vcpu(struct kvm_vcpu *vcpu)
  	/* Reset PMU */
  	kvm_pmu_vcpu_reset(vcpu);
- 
+    //============(1)============ 
 +	/* Default workaround setup is enabled (if supported) */
 +	if (kvm_arm_have_ssbd() == KVM_SSBD_KERNEL)
 +		vcpu->arch.workaround_flags |= VCPU_WORKAROUND_2_FLAG;
@@ -114,12 +114,15 @@ index c4762bef13c6..c95ab4c5a475 100644
 +			break;
 +		case ARM_SMCCC_ARCH_WORKAROUND_2:
 +			switch (kvm_arm_have_ssbd()) {
+            //===========(2)===========
 +			case KVM_SSBD_FORCE_DISABLE:
 +			case KVM_SSBD_UNKNOWN:
 +				break;
+            //===========(3)===========
 +			case KVM_SSBD_KERNEL:
 +				val = SMCCC_RET_SUCCESS;
 +				break;
+            //===========(4)===========
 +			case KVM_SSBD_FORCE_ENABLE:
 +			case KVM_SSBD_MITIGATED:
 +				val = SMCCC_RET_NOT_REQUIRED;
@@ -131,3 +134,10 @@ index c4762bef13c6..c95ab4c5a475 100644
 -- 
 2.39.0
 ```
+该patch主要是增加一个 smccc function discovery 的模拟:
+
+1. 这里默认vcpu 是 workaround的
+2. 如果是 force disable 和 unknown 则 返回 `SMCCC_RET_NOT_SUPPORTED`
+3. 如果是 kernel ， 返回 SUCCESS, 表示 支持 workaround 并且 可以 动态配置
+4. 如果是 force disable, 或者 mitigated, 返回`SMCCC_RET_NOT_REQUIRED`, 表示
+是 ssbd的，但是不能动态调整。
