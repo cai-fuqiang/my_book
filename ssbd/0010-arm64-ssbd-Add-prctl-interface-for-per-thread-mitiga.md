@@ -1,3 +1,4 @@
+```diff
 From 9cdc0108baa8ef87c76ed834619886a46bd70cbe Mon Sep 17 00:00:00 2001
 From: Marc Zyngier <marc.zyngier@arm.com>
 Date: Tue, 29 May 2018 13:11:14 +0100
@@ -8,6 +9,8 @@ If running on a system that performs dynamic SSBD mitigation, allow
 userspace to request the mitigation for itself. This is implemented
 as a prctl call, allowing the mitigation to be enabled or disabled at
 will for this particular thread.
+
+允许 在其特定的线程上 enable disable mitgation
 
 Acked-by: Will Deacon <will.deacon@arm.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
@@ -60,6 +63,7 @@ index 000000000000..3432e5ef9f41
 +	if (state == ARM64_SSBD_UNKNOWN)
 +		return -EINVAL;
 +
+    //============(1)================
 +	/* Treat the unaffected/mitigated state separately */
 +	if (state == ARM64_SSBD_MITIGATED) {
 +		switch (ctrl) {
@@ -77,6 +81,7 @@ index 000000000000..3432e5ef9f41
 +	 * speculation*. So much fun.
 +	 */
 +	switch (ctrl) {
+    //============(2)================
 +	case PR_SPEC_ENABLE:
 +		/* If speculation is force disabled, enable is not allowed */
 +		if (state == ARM64_SSBD_FORCE_ENABLE ||
@@ -85,12 +90,14 @@ index 000000000000..3432e5ef9f41
 +		task_clear_spec_ssb_disable(task);
 +		clear_tsk_thread_flag(task, TIF_SSBD);
 +		break;
+    //============(3)================
 +	case PR_SPEC_DISABLE:
 +		if (state == ARM64_SSBD_FORCE_DISABLE)
 +			return -EPERM;
 +		task_set_spec_ssb_disable(task);
 +		set_tsk_thread_flag(task, TIF_SSBD);
 +		break;
+    //============(4)================
 +	case PR_SPEC_FORCE_DISABLE:
 +		if (state == ARM64_SSBD_FORCE_DISABLE)
 +			return -EPERM;
@@ -148,4 +155,35 @@ index 000000000000..3432e5ef9f41
 +#endif	/* PR_SPEC_STORE_BYPASS */
 -- 
 2.39.0
+```
+1. 如果是 `ARM64_SSBD_MITIGATED`, 说明该cpu是 不受SSB影响的.所以, 
+只能允许 disable 或者 force disable (ssb) 不能 enable 
+2. 当 `ssbd_state`为 FORCE ENABLE 时(注意这里是 ssbd_state force enable, 也就是
+ssb force disable)，或者已经 force disable ssb 了, 不能在 
+ENABLE, 否则 将会 清空 `ssb_disable`, 并且清空 `TIF_SSBD`
+3. 当 `ssbd_state` 为 FORCE DISABLE(ssbd force disable, ssb force enable), 
+这时，不能在 disable, 否则 将设置 ssb disable, 并且 设置 TIF_SSBD
+4. 同3, 不过要设置 ssb force disable
 
+> NOTE
+>
+> `task_set_spec_ssb_disable()` / `....enable()` 定义:
+> 以 disable 为例 :
+> ```cpp
+> TASK_PFA_TEST(SPEC_SSB_DISABLE, spec_ssb_disable)
+> TASK_PFA_SET(SPEC_SSB_DISABLE, spec_ssb_disable)
+> TASK_PFA_CLEAR(SPEC_SSB_DISABLE, spec_ssb_disable)
+> #define TASK_PFA_TEST(name, func)                                       \
+>         static inline bool task_##func(struct task_struct *p)           \
+>         { return test_bit(PFA_##name, &p->atomic_flags); }
+> 
+> #define TASK_PFA_SET(name, func)                                        \
+>         static inline void task_set_##func(struct task_struct *p)       \
+>         { set_bit(PFA_##name, &p->atomic_flags); }
+> 
+> #define TASK_PFA_CLEAR(name, func)                                      \
+>         static inline void task_clear_##func(struct task_struct *p)     \
+>         { clear_bit(PFA_##name, &p->atomic_flags); }
+> ```
+> 可以看到是对 `task_struct->atomic_flags`做操作。这个操作是atmoic的，主要
+> 用于 在 (1)

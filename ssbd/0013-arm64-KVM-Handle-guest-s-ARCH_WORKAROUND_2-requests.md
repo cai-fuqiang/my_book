@@ -10,6 +10,10 @@ be taken to track the state of the guest itself by updating the
 workaround flags. We also rely on patching to enable calls into
 the firmware.
 
+为了将 guest's ARCH_WORKAROUND_2 调用 转发到 EL3, 在 EL2中增加了
+一个 small(-ish) sequence 来处理他。 必须特别注意通过update workaround flags 
+来跟踪来宾本身的状态。我们还依靠patching 启用对固件的调用。 
+
 Note that since we need to execute branches, this always executes
 after the Spectre-v2 mitigation has been applied.
 
@@ -44,6 +48,7 @@ index bffece27b5c1..05d836979032 100644
 +	cbz	w1, wa_epilogue
 +
 +	/* ARM_SMCCC_ARCH_WORKAROUND_2 handling */
++	//异或运算
 +	eor	w1, w1, #(ARM_SMCCC_ARCH_WORKAROUND_1 ^ \
 +			  ARM_SMCCC_ARCH_WORKAROUND_2)
  	cbnz	w1, el1_trap

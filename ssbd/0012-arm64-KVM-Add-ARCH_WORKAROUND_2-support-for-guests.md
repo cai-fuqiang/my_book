@@ -7,10 +7,23 @@ Subject: [PATCH 12/14] arm64: KVM: Add ARCH_WORKAROUND_2 support for guests
 In order to offer ARCH_WORKAROUND_2 support to guests, we need
 a bit of infrastructure.
 
+为了在 guest中支持 ARCH_WORKAROUND_2, 我们需要一些  infrastructure(基础设施)
+
 Let's add a flag indicating whether or not the guest uses
 SSBD mitigation. Depending on the state of this flag, allow
 KVM to disable ARCH_WORKAROUND_2 before entering the guest,
 and enable it when exiting it.
+
+增加一个flags 来指示 guest 是否用到了 SSBD mitigation。
+借助 该 flags 表示的 state , 允许 KVM 来 disable ARCH_WORKAROUND_2 在
+其进入 guest 之前，并且在 exit 时候 enable 。
+
+NOTE:
+和用户态一样， guest host 如果状态不一致，只有 
+guest : disable ARCH_WORKAROUND_2
+host : enable  ARCH_WORKAROUND_2
+
+这时在切换的时候，需要切换下 mitigation 的状态。
 
 Reviewed-by: Christoffer Dall <christoffer.dall@arm.com>
 Reviewed-by: Mark Rutland <mark.rutland@arm.com>
@@ -62,7 +75,7 @@ index 469de8acd06f..9bef3f69bdcd 100644
 @@ -216,6 +216,9 @@ struct kvm_vcpu_arch {
  	/* Exception Information */
  	struct kvm_vcpu_fault_info fault;
- 
+    //============(1)=============
 +	/* State of various workarounds, see kvm_asm.h for bit assignment */
 +	u64 workaround_flags;
 +
@@ -87,6 +100,7 @@ index f74987b76d91..fbe4ddd9da09 100644
 +	for_each_possible_cpu(cpu) {
 +		u64 *ptr;
 +
+    //============(2)=============
 +		ptr = per_cpu_ptr(&arm64_ssbd_callback_required, cpu);
 +		err = create_hyp_mappings(ptr, ptr + 1, PAGE_HYP);
 +		if (err)
@@ -125,6 +139,7 @@ index d9645236e474..c50cedc447f1 100644
 +	if (!cpus_have_const_cap(ARM64_SSBD))
 +		return false;
 +
+    //============(3)=============
 +	return !(vcpu->arch.workaround_flags & VCPU_WORKAROUND_2_FLAG);
 +}
 +
@@ -135,6 +150,7 @@ index d9645236e474..c50cedc447f1 100644
 +	 * The host runs with the workaround always present. If the
 +	 * guest wants it disabled, so be it...
 +	 */
+    //============(4)=============
 +	if (__needs_ssbd_off(vcpu) &&
 +	    __hyp_this_cpu_read(arm64_ssbd_callback_required))
 +		arm_smccc_1_1_smc(ARM_SMCCC_ARCH_WORKAROUND_2, 0, NULL);
@@ -147,6 +163,7 @@ index d9645236e474..c50cedc447f1 100644
 +	/*
 +	 * If the guest has disabled the workaround, bring it back on.
 +	 */
+    //============(5)=============
 +	if (__needs_ssbd_off(vcpu) &&
 +	    __hyp_this_cpu_read(arm64_ssbd_callback_required))
 +		arm_smccc_1_1_smc(ARM_SMCCC_ARCH_WORKAROUND_2, 1, NULL);
@@ -210,3 +227,12 @@ index a4c1b76240df..2d9b4795edb2 100644
 -- 
 2.39.0
 ```
+1. 在 kvm_vcpu_arch中增加 workaround_flags 成员
+2. 这里可能会在 el2(novhe)情况下访问 `arm64_ssbd_callback_required`全局变量，
+所以需要在这里建立映射
+3. `__need_ssbd_off` 表示不去workaround
+4. 这里在 `host->guest`时候会调用，判断条件有两个
+   + `__need_ssbd_off()`表示 guest vcpu 不去workaround
+   + `arm64_ssbd_callback_required` 表示物理cpu以及kernel cmdline 支持 动态
+       mitigate
+5. 在 `guest->host`时候调用, 判断条件同上

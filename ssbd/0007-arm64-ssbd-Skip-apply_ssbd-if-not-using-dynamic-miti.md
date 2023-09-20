@@ -10,6 +10,10 @@ kernel entry/exit even if no mitigation is required, let's
 add yet another alternative that by default jumps over the mitigation,
 and that gets nop'ed out if we're doing dynamic mitigation.
 
+为了避免在 每一次 kernel entry/exit 时 检查 arm64_ssbd_callback_required 在
+no mitigation 需要的情况下。 增加另一个 alternative 在默认情况下 跳过
+mitigation的流程, 在需要 dynamic mitigation 的 条件下，替换成 nop
+
 Think of it as a poor man's static key...
 
 Reviewed-by: Julien Grall <julien.grall@arm.com>
@@ -40,6 +44,7 @@ index 1075f90fdd8c..2797bc2c8c6a 100644
 +	 * ARCH_WORKAROUND_2 handling if the SSBD state allows it to
 +	 * be flipped.
 +	 */
+ //===============(1)======================
 +	if (arm64_get_ssbd_state() == ARM64_SSBD_KERNEL)
 +		*updptr = cpu_to_le32(aarch64_insn_gen_nop());
 +}
@@ -55,6 +60,7 @@ index 29ad672a6abd..e6f6e2339b22 100644
  	// to save/restore them if required.
  	.macro	apply_ssbd, state, targ, tmp1, tmp2
  #ifdef CONFIG_ARM64_SSBD
+ //===============(2)======================
 +alternative_cb	arm64_enable_wa2_handling
 +	b	\targ
 +alternative_cb_end
@@ -64,3 +70,10 @@ index 29ad672a6abd..e6f6e2339b22 100644
 -- 
 2.41.0
 ```
+
+1. 上一个patch说道，当`sshd_state`为 `ARM64_SSBD_KERNEL`时，
+才会有`kernel->userspace` or `userspace->kernel`需要更改mitigation
+状态的情况，所以这里当为`ARM64_SSBD_KERNEL`时，将指令替换为
+`nop`, 表示执行后续`apply_ssbd`的流程
+2. 正常情况下, 直接跳回到 targ(相当于跳回到主流程，不执行`apply_ssbd()`
+的后续流程)

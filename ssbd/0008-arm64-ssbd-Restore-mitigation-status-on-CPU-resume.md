@@ -1,3 +1,4 @@
+# Patch
 ```diff
 From 647d0519b53f440a55df163de21c52a8205431cc Mon Sep 17 00:00:00 2001
 From: Marc Zyngier <marc.zyngier@arm.com>
@@ -64,6 +65,7 @@ index 1ec5f28c39fc..6b2686d54411 100644
  
  		sleep_cpu = -EINVAL;
  		__cpu_suspend_exit();
+//====================(1)======================
 +
 +		/*
 +		 * Just in case the boot kernel did turn the SSBD
@@ -86,6 +88,7 @@ index a307b9e13392..70c283368b64 100644
  	 */
  	if (hw_breakpoint_restore)
  		hw_breakpoint_restore(cpu);
+//==================(2)====================
 +
 +	/*
 +	 * On resume, firmware implementing dynamic mitigation will
@@ -100,3 +103,10 @@ index a307b9e13392..70c283368b64 100644
 -- 
 2.39.0
 ```
+
+1. 这个是从 swap suspend 中唤醒，对于这块不是很了解。
+感觉跟重新开机差不多，这时 firmware 是重新初始化好 mitigation(disabled)
+需要我们根据参数 时能 mitigation
+
+2. 这个是从suspend中恢复，firmware 可能在 resume 时，turn mitigation on
+我们在根据参数，看看是否disable mitigation

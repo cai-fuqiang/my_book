@@ -1,3 +1,4 @@
+```diff
 From 85478bab409171de501b719971fd25a3d5d639f9 Mon Sep 17 00:00:00 2001
 From: Marc Zyngier <marc.zyngier@arm.com>
 Date: Tue, 29 May 2018 13:11:15 +0100
@@ -62,4 +63,4 @@ index f6648a3e4152..fefd8cf42c35 100644
  	ldr	\vcpu, [\ctxt, #HOST_CONTEXT_VCPU]
 -- 
 2.39.0
-
+```
