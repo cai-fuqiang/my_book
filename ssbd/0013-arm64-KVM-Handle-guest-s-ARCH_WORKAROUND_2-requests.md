@@ -44,11 +44,12 @@ index bffece27b5c1..05d836979032 100644
 @@ -106,8 +106,44 @@ el1_hvc_guest:
  	 */
  	ldr	x1, [sp]				// Guest's x0
+	//==============(1)==============
  	eor	w1, w1, #ARM_SMCCC_ARCH_WORKAROUND_1
 +	cbz	w1, wa_epilogue
 +
 +	/* ARM_SMCCC_ARCH_WORKAROUND_2 handling */
-+	//异或运算
+	//==============(1)==============
 +	eor	w1, w1, #(ARM_SMCCC_ARCH_WORKAROUND_1 ^ \
 +			  ARM_SMCCC_ARCH_WORKAROUND_2)
  	cbnz	w1, el1_trap
@@ -58,9 +59,11 @@ index bffece27b5c1..05d836979032 100644
 +alternative_cb	arm64_enable_wa2_handling
 +	b	wa2_end
 +alternative_cb_end
+//=================(2)================
 +	get_vcpu_ptr	x2, x0
 +	ldr	x0, [x2, #VCPU_WORKAROUND_FLAGS]
 +
+//=================(3)================
 +	// Sanitize the argument and update the guest flags
 +	ldr	x1, [sp, #8]			// Guest's x1
 +	clz	w1, w1				// Murphy's device:
@@ -73,10 +76,12 @@ index bffece27b5c1..05d836979032 100644
 +	hyp_ldr_this_cpu x0, arm64_ssbd_callback_required, x2
 +	cbz	x0, wa2_end
 +
+//=================(4)================
 +	mov	w0, #ARM_SMCCC_ARCH_WORKAROUND_2
 +	smc	#0
 +
 +	/* Don't leak data from the SMC call */
+//=================(5)================
 +	mov	x3, xzr
 +wa2_end:
 +	mov	x2, xzr
@@ -91,3 +96,49 @@ index bffece27b5c1..05d836979032 100644
 -- 
 2.39.0
 ```
+
+1. 异或指令:<br/>
+异或指令比较好的地方是，支持类似于回溯的功能, 例如:
+```
+A ^ B = C       C ^ B = A
+也就是
+A ^ B ^ B = A ^ (B ^ B) = A ^ 0 = A
+```
+这里如果执行下面两条指令
+```
+eor	w1, w1, #ARM_SMCCC_ARCH_WORKAROUND_1
+eor	w1, w1, #(ARM_SMCCC_ARCH_WORKAROUND_1 ^ \
+		  ARM_SMCCC_ARCH_WORKAROUND_2)
+```
+实际上最终w1 的值为:
+```
+(w1 ^ ARM_SMCCC_ARCH_WORKAROUND_1) ^ (ARM_SMCCC_ARCH_WORKAROUND_1  ^ ARM_SMCCC_ARCH_WORKAROUND_2)
+= w1 ^ (ARM_SMCCC_ARCH_WORKAROUND_1 ^ ARM_SMCCC_ARCH_WORKAROUND_1) ^  ARM_SMCCC_ARCH_WORKAROUND_2
+= w1 ^ 0 ^ ARM_SMCCC_ARCH_WORKAROUND_2
+= w1 ^  ARM_SMCCC_ARCH_WORKAROUND_2
+```
+如果 异或的结果为0 说明 `w1 = ARM_SMCCC_ARCH_WORKAROUND_2`
+
+2. 获取 当前的 `kvm_vcpu_arch` 
+3. 说一下各个指令的作用
+   + clz : 获取第一个非0位的index (从左向右数)
+   + lsr : logical shift 逻辑右移
+   + eor : 异或
+   + bfi Xn, Xm, imm1, imm2 : 将 xm [imm2 + imm1 - 1, imm1] 赋值给 Xn
+ 
+那么我们分情况来看:
+* 如果 w0 > 0
+   + clz = [0, 31]
+   + lsr = 0
+   + eor = 1
+   + bfi = 1
+* 如果 w0 = 0
+   + clz = 32
+   + lsr = 1
+   + eor = 0
+   + bfi = 0
+
+这样做的好处可能是不会有逻辑判断和分支，效率更高一些.
+5. 调用SMCCC 
+4. 之前提到 SMCCC 不保护[x0, x3]寄存器，这里是为了安全，不泄漏
+信息给用户态。
