@@ -119,7 +119,7 @@ eor	w1, w1, #(ARM_SMCCC_ARCH_WORKAROUND_1 ^ \
 ```
 如果 异或的结果为0 说明 `w1 = ARM_SMCCC_ARCH_WORKAROUND_2`
 
-2. 获取 当前的 `kvm_vcpu_arch` 
+2. 获取 当前的 `kvm_vcpu` 结构体, 见 [patch0011](./0011-arm64-KVM-Add-HYP-per-cpu-accessors.md)
 3. 说一下各个指令的作用
    + clz : 获取第一个非0位的index (从左向右数)
    + lsr : logical shift 逻辑右移

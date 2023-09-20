@@ -42,6 +42,7 @@ index f6648a3e4152..fefd8cf42c35 100644
  
 -.macro get_host_ctxt reg, tmp
 -	adr_l	\reg, kvm_host_cpu_state
+
 +.macro hyp_adr_this_cpu reg, sym, tmp
 +	adr_l	\reg, \sym
  	mrs	\tmp, tpidr_el2
@@ -58,9 +59,41 @@ index f6648a3e4152..fefd8cf42c35 100644
 +	hyp_adr_this_cpu \reg, kvm_host_cpu_state, \tmp
 +.endm
 +
+//============(1)=============
  .macro get_vcpu_ptr vcpu, ctxt
  	get_host_ctxt \ctxt, \vcpu
  	ldr	\vcpu, [\ctxt, #HOST_CONTEXT_VCPU]
 -- 
 2.39.0
 ```
+
+1. 该宏为了获取 per cpu (kvm_host_cpu_state)->__hyp_running_vcpu (kvm_vcpu)
+其中 tpdir_el2 表示 
+
+```
+this per cpu addr(&kvm_host_cpu_state) - &kvm_host_cpu_state
+```
+我们以4.18代码为例:
+```cpp
+static inline void __cpu_init_hyp_mode(phys_addr_t pgd_ptr,
+                                       unsigned long hyp_stack_ptr,
+                                       unsigned long vector_ptr)
+{
+    ...
+    u64 tpidr_el2 = ((u64)this_cpu_ptr(&kvm_host_cpu_state) -
+                     (u64)kvm_ksym_ref(kvm_host_cpu_state));
+    ...
+}
+```
+
+所以这里要获取到 el2 中读取 per cpu addr (kvm_host_cpu_state) ：
+```
+this_per_cpu - &kvm_host_cpu_state = tpidr_el2
+
+this_per_cpu = tpdir_el2 + &kvm_host_cpu_state 
+```
+> NOTE
+>
+> kvm_ksym_ref 是后来引入的，表示 el2 和 el1 地址之间的偏移
+>
+> 在这个patch中，el1 address = el2 address
