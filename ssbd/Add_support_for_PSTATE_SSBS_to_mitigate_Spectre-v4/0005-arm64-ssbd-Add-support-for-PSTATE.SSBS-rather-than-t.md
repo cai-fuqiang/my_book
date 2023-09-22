@@ -116,7 +116,7 @@ index dec10898d688..c063490d7b51 100644
 @@ -336,6 +344,11 @@ static bool has_ssbd_mitigation(const struct arm64_cpu_capabilities *entry,
  
  	WARN_ON(scope != SCOPE_LOCAL_CPU || preemptible());
- 
+    //=============(1)=============== 
 +	if (this_cpu_has_cap(ARM64_SSBS)) {
 +		required = false;
 +		goto out_printmsg;
@@ -166,7 +166,7 @@ index 5794959d8beb..9aa18a0df0d7 100644
 @@ -1039,6 +1039,48 @@ static void cpu_has_fwb(const struct arm64_cpu_capabilities *__unused)
  	WARN_ON(val & (7 << 27 | 7 << 21));
  }
- 
+//================(2)===================== 
 +#ifdef CONFIG_ARM64_SSBD
 +static int ssbs_emulation_handler(struct pt_regs *regs, u32 instr)
 +{
@@ -200,6 +200,7 @@ index 5794959d8beb..9aa18a0df0d7 100644
 +	}
 +	spin_unlock(&hook_lock);
 +
+//=================(3)==================
 +	if (arm64_get_ssbd_state() == ARM64_SSBD_FORCE_DISABLE) {
 +		sysreg_clear_set(sctlr_el1, 0, SCTLR_ELx_DSSBS);
 +		arm64_set_ssbd_mitigation(false);
@@ -239,6 +240,7 @@ index 7f1628effe6d..ce99c58cd1f1 100644
  		    cpus_have_const_cap(ARM64_HAS_UAO))
  			childregs->pstate |= PSR_UAO_BIT;
 +
+        //=========(1)==========
 +		if (arm64_get_ssbd_state() == ARM64_SSBD_FORCE_DISABLE)
 +			childregs->pstate |= PSR_SSBS_BIT;
 +
@@ -284,6 +286,7 @@ index 07b12c034ec2..885f13e58708 100644
  			return -EPERM;
  		task_clear_spec_ssb_disable(task);
  		clear_tsk_thread_flag(task, TIF_SSBD);
+        //==========(4)=============
 +		ssbd_ssbs_enable(task);
  		break;
  	case PR_SPEC_DISABLE:
@@ -306,3 +309,15 @@ index 07b12c034ec2..885f13e58708 100644
 -- 
 2.39.0
 ```
+1. 如果cpu支持 `ARM64_SSBS`, 那么在`kernel<->userspace`切换过程中，如果需要切换mitigation
+的状态，只需要切换pstate即可。所以不再需要通过SMCCC陷入固件去做了。可以看到这里
+required设置为 false
+2. 增加undef_hook<br/>
+如果kernel运行在el1, 那么执行 `msr PSTATE, 1`时，出发undef异常，
+该异常陷入el1, 这时将 `regs->pstate |= PSR_SSBS_BIT`, 在kernel 异常处理退出时，
+会将 `regs->pstate`恢复到 `spsr_el1`中，在eret过程中，会将 `spsr_el1` 恢复到
+PSTATE, 此时`kernel pstate.ssbs = 1`, 达到模拟指令的目的
+3.作者的意思是， 只要不是force disable,都需要在kernel侧 mitigation<br/>
+kernel 初始化过程中，没有设置`SCTLR_ELx_DSSBS`位，表示 mitigate, 
+那么这里需要将其设置为1, 当 userspace->kernel, pstate.ssbs=1, not mitigate
+4. 在之前的地方加上乡音的ssbs_enable, ssbs_disable

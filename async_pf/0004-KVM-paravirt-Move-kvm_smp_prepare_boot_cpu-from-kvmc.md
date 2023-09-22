@@ -1,3 +1,4 @@
+```diff
 From ca3f10172eea9b95bbb66487656f3c3e93855702 Mon Sep 17 00:00:00 2001
 From: Gleb Natapov <gleb@redhat.com>
 Date: Thu, 14 Oct 2010 11:22:49 +0200
@@ -94,4 +95,4 @@ index ca43ce31a19c..f98d3eafe07a 100644
  #ifdef CONFIG_KEXEC
 -- 
 2.41.0
-
+```

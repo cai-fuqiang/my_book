@@ -1,3 +1,4 @@
+```diff
 From 631bc4878220932fe67fc46fc7cf7cccdb1ec597 Mon Sep 17 00:00:00 2001
 From: Gleb Natapov <gleb@redhat.com>
 Date: Thu, 14 Oct 2010 11:22:52 +0200
@@ -418,4 +419,4 @@ index b81a9b7c2ca4..93e8120b8021 100644
  		vcpu->arch.regs_dirty &= ~(1 << VCPU_EXREG_PDPTR);
 -- 
 2.41.0
-
+```

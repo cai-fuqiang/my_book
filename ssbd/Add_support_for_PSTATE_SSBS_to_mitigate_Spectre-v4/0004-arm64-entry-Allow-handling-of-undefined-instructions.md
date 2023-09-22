@@ -25,6 +25,7 @@ index 09dbea221a27..8556876c9109 100644
  	mov	x0, sp
  	bl	do_undefinstr
 -	ASM_BUG()
+//===============(1)===================
 +	kernel_exit 1
  el1_dbg:
  	/*
@@ -41,6 +42,7 @@ index 039e9ff379cc..b9da093e0341 100644
 -		return 1;
 -
 -	if (compat_thumb_mode(regs)) {
+    //===============(2)===============
 +	if (!user_mode(regs)) {
 +		__le32 instr_le;
 +		if (probe_kernel_address((__force __le32 *)pc, instr_le))
@@ -61,3 +63,7 @@ index 039e9ff379cc..b9da093e0341 100644
 -- 
 2.39.0
 ```
+1. 该patch为了在 el1中模拟一些指令执行（这些指令会触发undef异常(未定义的),但是可以在异常处理函数中
+通过其他的方式模拟指令，然后跳过该指令执行）
+
+2. 所以该patch 允许在kernel mode下处理 undef异常（前提是该地址kernel可以正常访问)

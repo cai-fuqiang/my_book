@@ -1,3 +1,4 @@
+```diff
 From 2d1b2a91d56b19636b740ea70c8399d1df249f20 Mon Sep 17 00:00:00 2001
 From: Will Deacon <will.deacon@arm.com>
 Date: Fri, 15 Jun 2018 11:50:42 +0100
@@ -33,4 +34,6 @@ index 3432e5ef9f41..07b12c034ec2 100644
 -#endif	/* PR_SPEC_STORE_BYPASS */
 -- 
 2.39.0
+```
 
+这个没太看懂

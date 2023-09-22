@@ -1,3 +1,4 @@
+```cpp
 From 7c36447ae5a090729e7b129f24705bb231a07e0b Mon Sep 17 00:00:00 2001
 From: Will Deacon <will.deacon@arm.com>
 Date: Wed, 8 Aug 2018 16:10:54 +0100
@@ -65,4 +66,4 @@ index 9ce223944983..76d016b446b2 100644
 +}
 -- 
 2.39.0
-
+```

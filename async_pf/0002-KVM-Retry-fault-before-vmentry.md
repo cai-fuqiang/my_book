@@ -1,4 +1,5 @@
-From 56028d0861e48f7cc9c573d79f2d8a0a933a2bba Mon Sep 17 00:00:00 2001
+```diff
+From 56028d0o61e48f7cc9c573d79f2d8a0a933a2bba Mon Sep 17 00:00:00 2001
 From: Gleb Natapov <gleb@redhat.com>
 Date: Sun, 17 Oct 2010 18:13:42 +0200
 Subject: [PATCH 02/11] KVM: Retry fault before vmentry
@@ -169,4 +170,4 @@ index 857d63431cb7..e97eae965a4c 100644
  	list_del(&work->queue);
 -- 
 2.41.0
-
+```

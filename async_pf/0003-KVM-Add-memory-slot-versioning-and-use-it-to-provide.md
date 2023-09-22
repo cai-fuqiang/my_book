@@ -1,3 +1,4 @@
+```diff
 From 49c7754ce57063b819b01eb8a4290841ad0886c4 Mon Sep 17 00:00:00 2001
 From: Gleb Natapov <gleb@redhat.com>
 Date: Mon, 18 Oct 2010 15:22:23 +0200
@@ -234,4 +235,4 @@ index 75fd590c0214..228f00f87966 100644
   */
 -- 
 2.41.0
-
+```

@@ -1,3 +1,4 @@
+```diff
 From 7c90705bf2a373aa238661bdb6446f27299ef489 Mon Sep 17 00:00:00 2001
 From: Gleb Natapov <gleb@redhat.com>
 Date: Thu, 14 Oct 2010 11:22:53 +0200
@@ -194,4 +195,4 @@ index 1f59498561b2..60df9e059e69 100644
  	spin_lock(&vcpu->async_pf.lock);
 -- 
 2.41.0
-
+```

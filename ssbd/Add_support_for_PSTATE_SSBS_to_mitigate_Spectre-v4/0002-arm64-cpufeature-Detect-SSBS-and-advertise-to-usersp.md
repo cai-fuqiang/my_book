@@ -133,7 +133,6 @@ index 7626b80128f5..5794959d8beb 100644
 @@ -164,6 +164,11 @@ static const struct arm64_ftr_bits ftr_id_aa64pfr0[] = {
  	ARM64_FTR_END,
  };
- 
 +static const struct arm64_ftr_bits ftr_id_aa64pfr1[] = {
 +	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64PFR1_SSBS_SHIFT, 4, ID_AA64PFR1_SSBS_PSTATE_NI),
 +	ARM64_FTR_END,
@@ -163,6 +162,7 @@ index 7626b80128f5..5794959d8beb 100644
  		.field_pos = ID_AA64ISAR0_CRC32_SHIFT,
  		.min_field_value = 1,
  	},
+    //============(1)===============
 +	{
 +		.desc = "Speculative Store Bypassing Safe (SSBS)",
 +		.capability = ARM64_SSBS,
@@ -180,6 +180,7 @@ index 7626b80128f5..5794959d8beb 100644
  #ifdef CONFIG_ARM64_SVE
  	HWCAP_CAP(SYS_ID_AA64PFR0_EL1, ID_AA64PFR0_SVE_SHIFT, FTR_UNSIGNED, ID_AA64PFR0_SVE, CAP_HWCAP, HWCAP_SVE),
  #endif
+    //============(2)===============
 +	HWCAP_CAP(SYS_ID_AA64PFR1_EL1, ID_AA64PFR1_SSBS_SHIFT, FTR_UNSIGNED, ID_AA64PFR1_SSBS_PSTATE_INSNS, CAP_HWCAP, HWCAP_SSBS),
  	{},
  };
@@ -199,3 +200,5 @@ index e9ab7b3ed317..dce971f2c167 100644
 -- 
 2.39.0
 ```
+1. 该ARM64_SSBS cap 需要满足 aa64pfr1_el1.ssbs = 0x1, 也就是 FEAT_SSBS2
+2. 该feature 需要满足 aa64pfr1_el1.ssbs = 0x2 , 也就是 FEAT_SSBS

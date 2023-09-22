@@ -1,3 +1,4 @@
+```diff
 From fc5f06fac6fb8ce469ea173370f2cd398f1d9f9a Mon Sep 17 00:00:00 2001
 From: Gleb Natapov <gleb@redhat.com>
 Date: Thu, 14 Oct 2010 11:22:56 +0200
@@ -29,4 +30,4 @@ index fff70b50725c..c0bd2a2b3c0f 100644
  		vcpu->arch.fault.error_code = 0;
 -- 
 2.41.0
-
+```
