@@ -13,6 +13,10 @@ kvm_init_mmu(...) {
 init_kvm_tdp_mmu() {
     ...
     context->shadow_root_level = kvm_x86_ops->get_tdp_level(vcpu);
+    context->direct_map = true;
+    
+    ...
+    context->inject_page_fault = kvm_inject_page_fault
     ...
 }
 
