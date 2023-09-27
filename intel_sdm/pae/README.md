@@ -178,18 +178,44 @@ linear address causes a page-fault exception (see Section 4.7).
 > paging-structures entry或者映射一个page。使用该 paging 
 
 The following bits are reserved with PAE paging:
+
+> PAE paging 时，下面bits是 reserved
+
 * If the P flag (bit 0) of a PDE or a PTE is 1, bits 62:MAXPHYADDR are reserved.
 * If the P flag and the PS flag (bit 7) of a PDE are both 1, bits 20:13 are
-* reserved. 
+reserved. 
 * If IA32_EFER.NXE = 0 and the P flag of a PDE or a PTE is 1, the XD flag (bit
-* 63) is reserved.
+ 63) is reserved.
+> * PDE / PTE 的 P = 1 : 62:MAXPHYADDR 
+> * PDE P = 1 && PS = 1 : BIT[20:13]
+>> NOTE: PS = 1, 表示大页 <br/>
+>> * PTE ref PT (PS = 0)
+>>    + [11, 8] Ignored
+>>    + [M-1, 12] 表示 PT PA 
+>> * PTE ref HUGE PAGE (PS = 1)
+>>    + 8(G) : Global; if CR4.PGE = 1, determines whether the translation is
+>>      global (see Section 4.10); ignored otherwise
+>>    + [11, 9] Ignored
+>>    + 12 (PAT) : if the PAT is supported, indirectly determines the memory
+>>      type used to access the 2-MByte page referenced by this
+>>      entry (see Section 4.9.2); otherwise, reserved (must be 0)<br/>
+>>      > 和 memory type 相关先不看
+>>    + [M -1, 12] : reserved
+
+> * IA32_EFER.NXE = 0 && PDE/PTE P = 1 : XD flags (BIT 63) 
 * If the PAT is not supported:1
     + If the P flag of a PTE is 1, bit 7 is reserved.
     + If the P flag and the PS flag of a PDE are both 1, bit 12 is reserved.
 
+> * 如果 PAT 不支持
+>   + PTE P = 1 :  bit 7 
+>   + PDE P = 1 && PS = 1 : bit 12
+
 A reference using a linear address that is successfully translated to a
 physical address is performed only if allowed by the access rights of the
 translation; see Section 4.6.
+
+> 只有 在 该 translation 的 access rights 允许的情况下 才能成功的将 LA -> PA
 
 ![PAE_4K](pic/PAE_4K.png)
 
