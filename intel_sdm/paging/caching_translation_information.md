@@ -133,11 +133,17 @@ receive special treatment when cached in the TLBs.
 
 Section 4.3, Section 4.4.2, and Section 4.5 give details of how the different
 paging modes translate linear addresses to physical addresses. Specifically,
-the upper bits of a linear address (called the page number) deter- mine the
+the upper bits of a linear address (called the page number) determine the
 upper bits of the physical address (called the page frame); the lower bits of
 the linear address (called the page offset) determine the lower bits of the
 physical address. The boundary between the page number and the page offset is
 determined by the page size. Specifically:
+
+> Section 4.3, Section 4.4.2 和 Section 4.5 给出了不同的paging mode 是如何将
+> liner address 翻译成 physical address。确切的说，线性地址的高位(被称为 page 
+> number)决定了 phyiscal address的高位(被称为 page frame);线性地址的低位(被称为
+> page offset)决定了物理地址的低位。page number和page offset的边界由 page size
+> 决定。确切的说:
 
 * 32-bit paging:
     + If the translation does not use a PTE (because CR4.PSE = 1 and the PS 
@@ -148,12 +154,11 @@ determined by the page size. Specifically:
     number comprises bits 31:12 of the linear address.
 
 * PAE paging:
-    If the translation does not use a PTE (because the PS flag is 1 in the PDE
+    + If the translation does not use a PTE (because the PS flag is 1 in the PDE
     used), the page size is 2 MBytes and the page number comprises bits 31:21
     of the linear address.
-
-     If the translation does use a PTE, the page size is 4 KBytes and the page
-     number comprises bits 31:12 of the linear address.
+    + If the translation does use a PTE, the page size is 4 KBytes and the page
+    number comprises bits 31:12 of the linear address.
 
 * 4-level paging and 5-level paging:
     + If the translation does not use a PDE (because the PS flag is 1 in the
