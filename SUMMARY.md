@@ -22,4 +22,7 @@
   * [system_level](./arm64_sdm/system_level/README.md)
     + [pstate](./arm64_sdm/system_level/pstate.md)
     + [ssbs](./arm64_sdm/system_level/ssbs.md)
+* [intel spec](./intel_sdm/README.md)
+  * [paging](./intel_sdm/paging/README.md)
+    + [caching_translation_information](./intel_sdm/paging/caching_translation_information.md)
 * [目录 -- 按日期排序](./list_older_by_data.md)
