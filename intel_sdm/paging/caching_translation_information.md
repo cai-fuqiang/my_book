@@ -347,8 +347,16 @@ and the choice may be implementation-specific.
 >> NOTE:
 >>
 >> 这里是说，之前页面大小为4Kbyte, 可能有多个连续的页面都创建了TLB entry，
->> 这时如果将其修改为大页，那么对于该大页的访问，就会有 mulitple hits。
+>> 这时如果将其修改为大页，那么对于该大页的某些地址的访问，就会有 mulitple 
+>> hits。
 >>
+>> 举个例子:
+>> 1. 虚拟地址0x1是4KByte映射，现在访问该地址，那么在4KByte
+>> TLB中就会创建对应的entry
+>> 2. 现在将其页修改为大页([0, 2M]为一个大页), 此时访问0x1001, 
+>> 那么在2M TLB中就会创建对应的entry
+>> 3. 现在继续访问0x1地址，那么就会在4KByte 和2M TLB中均会命中。
+>> 
 >> 在上面给出的链接中，提到了关于TLB不同的实现方式，个人感觉无论那种方式的
 >> 实现都可能存在这个问题，原因就在于，当MMU拿到一个线性地址时，该线性地址
 >> 所转换成的最终的页面是否是大页，在线性地址中表现不出来，只能从 final paging-
@@ -472,7 +480,8 @@ cache depends on the paging mode:<br/>
     + If the processor creates a PML4E-cache entry, the processor may retain it
     unmodified even if software subsequently modifies the corresponding PML4E
     in memory.
-> 该部分大部分同上，不再赘述，当时需要注意下面两点:
+> 该部分大部分同上，不再赘述，当时需要注意下面几点:
+> * 用于引用的bits：例如在5-level page中，用于引用的bits为[56:39] 为18-bits
 > * PML4E-cache entry中包含的某些flags, 例如 R/W, U/S ..., 这些flags在cache entry
 > 中保存的是 PML5E && PML4E 的值的 logical-AND / logical-OR
 >> 这样做是为什么呢? 下面章节 `Using the Paging-Structure Caches to Translate 
@@ -480,7 +489,10 @@ cache depends on the paging mode:<br/>
 >> 相反的: Table walk (PML5E, PML4E, PDPTE, PDE, PTE) paging-structure cache(TLB,
 >> PDE cache, PDPTE cache, PML4E cache, PML5E cache) (当然TLB也是这样缓存flag的)
 >> 这样低级的页表缓存需要包含上级页表的所有信息，而这些信息线性地址 translation
->> 中仅需要关心其logical-AND/ logical-OR的结果。
+>> 中仅需要关心其logical-AND/ logical-OR的结果。同样用于引用的bits也是相当于正向
+>> TLB walk 所需要的虚拟地址的 bits。这个cache也可以认为，将 PML5E->PML4E的
+>> table walk的结果缓存了。并不是缓存了PML4E中的某个entry。同样PDE cache 则是
+>> 将 PML5E->PML4E->PDPTE->PDE table walk的结果缓存。
 > * 创建PML4E-cache entry时，需要保证 内存中的 PML5E和PML4E都是1, 当然，在缓存
 > 该translation 之前，处理器也会将这些accessed flags 都设置为1.
 
@@ -566,7 +578,12 @@ table referenced by that PML4E. This is because the R/W flag of each such
 PDPTE-cache entry is the logical-AND of the R/W flags in the appropriate PML4E
 and PDPTE.
 
-> 
+> 来自 paging-structure entry中的信息可以被包含在其他的 paging-stucture entries
+> 的 paging-structure caches中, 这些 paging-structure entries 被 original entry
+> 引用( original entry 也就是最一开始提到的 entry)。例如， 如果 PML4E中的 R/W 
+> flags为0, 那么被该 PML4E 指向的任何 来自pdp table 中的 PDPTE 的 PDPTE-cache 
+> entry的 R/W flag都是0.这时因为每个 PDPTE-cache entry 中的 R/W flag都是 PML4E
+> 和 PDPTE 的 R/W flags logical-AND的结果。
 
 On processors that support HLAT paging (see Section 4.5.1), each entry in a
 paging-structure cache indicates whether the entry was cached during ordinary
@@ -580,37 +597,67 @@ Entries that were cached during HLAT paging also include the restart flag (bit
 paging using such an entry, it immediately restarts (using ordinary paging) if
 this cached restart flag is 1.
 
+> 上面两段和HLAT相关。先不关心。
+
 The paging-structure caches contain information only from paging-structure
 entries that reference other paging structures (and not those that map pages).
 Because the G flag is not used in such paging-structure entries, the
 global-page feature does not affect the behavior of the paging-structure
 caches.
 
+> paging-structure caches包含了某些仅指向其他paging structures
+> 的paging-structure entries的信息( 这些entry并不map pages)。因为 G flags不会
+> 在这些paging-structure entries使用，所以global-page feature 不会影响
+> paging-structure caches的行为。
+
 The processor may create entries in paging-structure caches for translations
 required for prefetches and for accesses that are a result of speculative
 execution that would never actually occur in the executed code path.
 
+> 处理器可能在 paging-structure caches中创建了这些条目: 用于 prefetch 的
+> translation需要 和 预测执行的结果， 该预测执行并没有实际发生在代码执行流里。
+
 As noted in Section 4.10.1, any entries created in paging-structure caches by a
 logical processor are associated with the current PCID.
+
+> 正如Section 4.10.1 中提到的，逻辑处理器在 paging-structure caches中创建的任何
+> entries都需要和current PCID 相关联。
 
 A processor may or may not implement any of the paging-structure caches.
 Software should rely on neither their presence nor their absence. The processor
 may invalidate entries in these caches at any time. Because the processor may
 create the cache entries at the time of translation and not update them
-following subsequent modi- fications to the paging structures in memory,
-software should take care to invalidate the cache entries appropri- ately when
-causing such modifications. The invalidation of TLBs and the paging-structure
-caches is described in Section 4.10.4.
+following subsequent modifications to the paging structures in memory, software
+should take care to invalidate the cache entries appropriately when causing
+such modifications. The invalidation of TLBs and the paging-structure caches is
+described in Section 4.10.4.
+ 
+> absence : 缺席; 离开
+>
+> 处理器可能或者可能没有实现任何的 paging-structure caches. 软件不应该依赖
+> 他们的存在与否。处理器可能在任何时候 无效这些缓存中的 entries.因为处理器
+> 可能在translation发生的时候创建 cache entries并且在修改内存中的paging
+> structures后也不会更新他们，所以软件需要注意，当发生这些内存修改时，正确的
+> 去无效这些 cache entries。关于TLBs和 paging-structure caches的无效操作在
+> Section 4.10.4 中描述。
 
 ### 4.10.3.2 Using the Paging-Structure Caches to Translate Linear Addresses
 
-* When a linear address is accessed, the processor uses a procedure such as the
+When a linear address is accessed, the processor uses a procedure such as the
 following to determine the physical address to which it translates and whether
 the access should be allowed:
+
+> 当线性地址被访问，处理器使用如下的流程来确定该翻译的物理地址和是否可以被访问。
+
 * If the processor finds a TLB entry that is for the page number of the linear
 address and that is associated with the current PCID (or which is global), it
 may use the physical address, access rights, and other attributes from that
 entry.
+
+> 如果逻辑处理器发现了一个TLB entry, 该 TLB entry用于该线性地址的page number
+> 并且可以和当前的 PCID相匹配( 或者是global page),他可能使用该entry的 PA, access
+> rights, 和其他的属性。
+
 * If the processor does not find a relevant TLB entry, it may use the upper bits
 of the linear address to select an entry from the PDE cache that is associated
 with the current PCID (Section 4.10.3.1 indicates which bits are used in each
@@ -618,6 +665,12 @@ paging mode). It can then use that entry to complete the translation process
 (locating a PTE, etc.) as if it had traversed the PDE (and, for 4-level paging
 and 5-level paging, the PDPTE, PML4E, and PML5E, as appropriate) corresponding
 to the PDE-cache entry.
+
+> 如果处理器没有发现相应的 TLB entry, 他可能使用 线性地址的高位去 PDE cache中
+> 选择一个和当前 PCID 匹配的entry。（Section 4.10.3.1 指出了在每个paging mode中
+> 使用那些bits)。然后它可以使用该entry去完成 translation process(定位
+> PTE等) ,就好像他已经遍历了和PDE-cache entry相对应的 PDE (对于 4-LEVEL paging和
+> 5-LEVEL paging, 可能还有 PDPTE, PML4E, PML5E, 视情况而定）
 
 * The following items apply when 4-level paging or 5-level paging is used:
 
@@ -654,9 +707,8 @@ Section 4.5.
 ### 4.10.3.3 Multiple Cached Entries for a Single Paging-Structure Entry
 
 The paging-structure caches and TLBs may contain multiple entries associated
-with a single PCID and with infor- mation derived from a single
-paging-structure entry. The following items give some examples for 4-level
-paging:
+with a single PCID and with information derived from a single paging-structure
+entry. The following items give some examples for 4-level paging:
 
 * Suppose that two PML4Es contain the same physical address and thus reference
 the same page-directory- pointer table. Any PDPTE in that table may result in
