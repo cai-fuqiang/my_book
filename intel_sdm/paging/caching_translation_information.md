@@ -82,7 +82,7 @@ translate a linear address, a logical processor uses only those entries
 associated with the current PCID (see Section 4.10.2.4 for an exception).
 
 > 当逻辑处理器在TLBs中创建了 entries(Section 4.10.2)和paging-structure caches
-> (Section 4.10.3), 它将这些entires和 当前的PCID 联系起来。当使用TLBs和paging-
+> (Section 4.10.3), 它将这些entries和 当前的PCID 联系起来。当使用TLBs和paging-
 > structure中的 entries来 翻译 线性地址时，逻辑处理器只能使用和当前PCID 匹配
 > 的PCID(Section 4.10.2.4是例外)
 
@@ -149,26 +149,34 @@ determined by the page size. Specifically:
     + If the translation does not use a PTE (because CR4.PSE = 1 and the PS 
     flag is 1 in the PDE used), the page size is 4 MBytes and the page number
     comprises bits 31:22 of the linear address.
+    > 如果使用了PDE 大页, page size = 4M,  page number : LA[31:22]
 
     + If the translation does use a PTE, the page size is 4 KBytes and the page
     number comprises bits 31:12 of the linear address.
+    > 如果 使用 PTE, page size = 4K, page number : LA[31:12]
 
 * PAE paging:
     + If the translation does not use a PTE (because the PS flag is 1 in the PDE
     used), the page size is 2 MBytes and the page number comprises bits 31:21
     of the linear address.
+    > 使用PDE大页，page size = 2M , page number : LA[31:22]
+
     + If the translation does use a PTE, the page size is 4 KBytes and the page
     number comprises bits 31:12 of the linear address.
+    > 如果使用PTE，page size = 4K, page number : LA[31:12]
 
 * 4-level paging and 5-level paging:
     + If the translation does not use a PDE (because the PS flag is 1 in the
     PDPTE used), the page size is 1 GByte and the page number comprises bits
     47:30 of the linear address.
+    > 如果使用PDPTE大页，page size = 1G, page number : LA[47:30]
     + If the translation does use a PDE but does not uses a PTE (because the PS
     flag is 1 in the PDE used), the page size is 2 MBytes and the page number
     comprises bits 47:21 of the linear address.
+    > 如果使用PDE 大页， page size = 2M, page number : LA [47:21]
     + If the translation does use a PTE, the page size is 4 KBytes and the page
     number comprises bits 47:12 of the linear address.
+    > 如果使用PTE，page size = 4K, page number : LA[47:12]
     + The page size identified by the preceding items may be reduced if there
      has been a restart of HLAT paging (see Section 4.5.5). Restart of HLAT
      paging always specifies a maximum page size; this page size is determined
@@ -181,6 +189,7 @@ determined by the page size. Specifically:
      2 MBytes. Suppose that the restarted translation encounters a PDPTE that
      sets bit 7, indicating a 1-GByte page. In this case, the translation
      produced will have a page size of 2 MBytes (the smaller of the two sizes).
+     > 以上和HLAT相关，先不看
 
 ### 4.10.2.2 Caching Translations in TLBs
 
@@ -190,32 +199,66 @@ individual translation. Each translation is referenced by a page number. It
 contains the following information from the paging-structure entries used to
 translate linear addresses with the page number:
 
+> 处理器可以通过在 TLBs中缓存单独的 translations加速 paging
+> process。TLB中的每个 entry是一个单独的translation.每一个 translation
+> 由一个page number 引用。它包含来自 paging-structure entries
+> 的以下信息，这些信息用于将线性地址与页码进行转换：
+
 * The physical address corresponding to the page number (the page frame).
- 
+> 物理地址所对应的 page number (page frame)
+>
+>> NOTE: 这里我觉得page number和 page frame都包含了，本身TLB就是为了实现
+>> page number->page frame的翻译
 * The access rights from the paging-structure entries used to translate linear
 addresses with the page number (see Section 4.6):
     + The logical-AND of the R/W flags.
     + The logical-AND of the U/S flags.
     + The logical-OR of the XD flags (necessary only if IA32_EFER.NXE = 1).
     + The protection key (only with 4-level paging and 5-level paging).
+> 用于该page number线性地址翻译的 paging-structure entries的 access rights
+>> 这些会将各个层级的access right flags进行 logical-AND/OR操作
+
 * Attributes from a paging-structure entry that identifies the final page frame
 for the page number (either a PTE or a paging-structure entry in which the PS
 flag is 1):
     + The dirty flag (see Section 4.8).
     + The memory type (see Section 4.9).
+> 最后一个层级的paging-structure entry的某些属性:
+>> 这些属性之后在最后一个层级中有
+>>
+>> 最后一个层级是指: 该页表项不再指向页表，而是指向最终的page frame
+
+> <font size="4" color="red">
+>   这里我们思考下，为什么页表中那么多项，结果tlb
+>   中就只包含这些，原因很简单，因为在address translate的过程中，只
+>   用到了这些。而TLB/paging structure cache的作用，也是加速该过程。
+> </font>
 
 (TLB entries may contain other information as well. A processor may implement
 multiple TLBs, and some of these may be for special purposes, e.g., only for
 instruction fetches. Such special-purpose TLBs may not contain some of this
 information if it is not necessary. For example, a TLB used only for
-instruction fetches need not contain infor- mation about the R/W and dirty
+instruction fetches need not contain information about the R/W and dirty
 flags.)
+
+> (TLB entries 中也可能包含其他的信息。处理器可能实现了multiple TLBs和用于某些
+> 特定目的信息。例如, 只是用于指令预取。某些特定目的的TLBs可能不包含某些不必要
+> 的信息，例如，仅用于指令预取的的TLB不必包含关于R/W和dirty flags的相关信息。
+>
+> 关于 multiple TLBs 的一些解释:
+>
+> [Address translation with multiple pagesize-specific TLBs](https://stackoverflow.com/questions/49842530/address-translation-with-multiple-pagesize-specific-tlbs)
 
 As noted in Section 4.10.1, any TLB entries created by a logical processor are
 associated with the current PCID. Processors need not implement any TLBs.
 Processors that do implement TLBs may invalidate any TLB entry at any time.
 Software should not rely on the existence of TLBs or on the retention of TLB
 entries.
+> retention  [rɪˈtenʃn] : 保留; 保持; 
+>
+> 正如Section 4.10.1中提到的, 逻辑处理器创建任何 TLB entries都要和当前的PCID
+> 相关联。处理器不需要实现任何 TLBs（**这里指不必须么?**)。实现TLB的处理器可以
+> 在任何时候invalidate 任意的TLB。软件不应该依赖TLB的存在或者TLB entries的保留。
 
 ### 4.10.2.3 Details of TLB Use
 
@@ -227,11 +270,25 @@ page number unless the accessed flag is 1 in each of the paging-structure
 entries used during translation; before caching a translation, the processor
 sets any of these accessed flags that is not already 1.
 
+> 因为TLBs cache entries 仅用于线性地址翻译，所以对于一个 page number 能够
+> 作为TLB entry的条件是，只有当P flags = 1 并且每个用于 translate 该 page
+> number 的 paging-structure entries的 reserved bit 都是0。另外，处理器
+> 只有在每个用于 该translation的 paging-structure entries的accessed 
+> flags是1的情况下才会cache 该 translation; 在 cache 该translation之前，
+> 处理器 会设置这些accessed flags不是1的entries, 将accessed flags 设置为1.
+
 Subject to the limitations given in the previous paragraph, the processor may
 cache a translation for any linear address, even if that address is not used to
 access memory. For example, the processor may cache translations required for
 prefetches and for accesses that result from speculative execution that would
 never actually occur in the executed code path.
+
+> Subject to : 从属于; 使服从; 处于...中
+>
+> 受上之前章节中提到的限制的影响，处理器可能缓存对于 任意线性地址的 translation,
+> 即使该address不再用于 access memory。例如，处理器在prefetches或者在
+> speculative evecution，而该 speculative execution从未实际的发生在代码执行
+> 路径中，这样的情况下，需要cache trnaslation
 
 If the page number of a linear address corresponds to a TLB entry associated
 with the current PCID, the processor may use that TLB entry to determine the
@@ -242,6 +299,61 @@ software subsequently modifies the relevant paging-structure entries in memory.
 See Section 4.10.4.2 for how software can ensure that the processor uses the
 modified paging-structure entries.
 
+> 如果线性地址的 page number 和 某个 关联了当前PCID的TLB entry 相匹配，处理器
+> 将会使用该TLB entry 确定 page frame, access rights和其他用于访问线性地址的
+> attributes。在这种情况下，处理器可能不会实际查询内存中的paging structures.
+> 处理器可能保持TLB entry没有更改，即使在软件已经修改了内存中的相应的 paging-
+> structure entries的情况下。查看Section 4.10.4.2 了解软件如何保证处理器使用
+> 修改后的 paging-structure entries。
+
+If the paging structures specify a translation using a page larger than 4
+KBytes, some processors may cache multiple smaller-page TLB entries for that
+translation. Each such TLB entry would be associated with a page number
+corresponding to the smaller page size (e.g., bits 47:12 of a linear address
+with 4-level paging), even though part of that page number (e.g., bits 20:12)
+is part of the offset with respect to the page specified by the paging
+structures. The upper bits of the physical address in such a TLB entry are
+derived from the physical address in the PDE used to create the translation,
+while the lower bits come from the linear address of the access for which the
+translation is created. There is no way for software to be aware that multiple
+translations for smaller pages have been used for a large page. For example, an
+execution of INVLPG for a linear address on such a page invalidates any and
+all smaller-page TLB entries for the translation of any linear address on that
+page.
+
+> 如果paging stuctures 指定了一个使用大于4Kbyte page 的 translation, 某些处理器
+> 可能缓存了多个 smaller-page TLB entries。每个这样的TLB entry关联一个相对应的更小
+> page size的 page number(e.g., 4-level paging 线性地址的[47:12]), 即使page number
+> 的是相对于 paging structure指定的 页面偏移的一部分。这些TLB entry中的物理地址的
+> 高位是从用于创建translation的 PDE 中的物理地址导出的，而低位来自于为其创建 
+> tranlation 的访问的线性地址。(翻译的有点别扭，大概是PDE 提供翻译后物理地址的高位，
+> 线性地址提供翻译后物理地址的低位,实际上就是大页的翻译)。软件无法意识到小页面的
+> multiple translation 已用于大页面。例如，对于一个页面上的线性地址执行 INVLPG 
+> 指令, 会无效任何用于该页面上线性地址翻译的任何TLBs和所有的 smaller-page的 TLB
+> entries
+
+If software modifies the paging structures so that the page size used for a
+4-KByte range of linear addresses changes, the TLBs may subsequently contain
+multiple translations for the address range (one for each page size). A
+reference to a linear address in the address range may use any of these
+translations. Which translation is used may vary from one execution to another,
+and the choice may be implementation-specific.
+
+> 如果软件修改了 paging structures 导致了用于4-KByte range 的page size的改变，
+> TLBs 接下来可能会含有对于该 address range (每个 page size 一个)的多个 
+> translation。哪种 translation 被使用可能因 execution 不同而不同，也可能
+> 根据  implementation-specific 选择。
+>
+>> NOTE:
+>>
+>> 这里是说，之前页面大小为4Kbyte, 可能有多个连续的页面都创建了TLB entry，
+>> 这时如果将其修改为大页，那么对于该大页的访问，就会有 mulitple hits。
+>>
+>> 在上面给出的链接中，提到了关于TLB不同的实现方式，个人感觉无论那种方式的
+>> 实现都可能存在这个问题，原因就在于，当MMU拿到一个线性地址时，该线性地址
+>> 所转换成的最终的页面是否是大页，在线性地址中表现不出来，只能从 final paging-
+>> structure entry中获取。所以MMU拿到线性地址不会去关心其是大页还是normal
+>> size page。
 
 ### 4.10.2.4 Global Pages
 
@@ -254,18 +366,32 @@ only in paging-structure entries that map a page, and because information from
 such entries is not cached in the paging-structure caches, the global-page
 feature does not affect the behavior of the paging-structure caches.
 
+> Intel-64和IA-32架构允许 global poages, 当 CR4 的PGE flags(BIT 7) 为1.
+> 如果映射page的 paging-stuctures entry的 G flags(bit 8) 为1 （指 PTE 
+> 或者PS flags为1 的paging-structure entry), 任何对于缓存该paging-structure 
+> entry的线性地址TLB entry 被认为 global。因为只有在映射页面的paging-structure
+> entry使用了 G flags, 并且因为这些entries 并不缓存在 paging-structure caches,
+> 所以 global-page feature 不会影响paging-structure cache的行为。
+
 A logical processor may use a global TLB entry to translate a linear address,
 even if the TLB entry is associated with a PCID different from the current
 PCID.
+
+> 逻辑处理器可能使用 global TLB entry 去翻译线性地址，即使该TLB entry相关的
+> PCID 和当前的PCID 不同。
 
 ## 4.10.3 Paging-Structure Caches
 
 In addition to the TLBs, a processor may cache other information about the
 paging structures in memory.
 
+> 除了TLBs之外，处理器可能缓存内存中关于 paging strucuture的其他信息。
+
 #### 4.10.3.1 Caches for Paging Structures
 
 A processor may support any or all of the following paging-structure caches:
+
+> 处理器可能支持下面任意的或者所有的 paging-structure caches的
 
 * PML5E cache (5-level paging only). Each PML5E-cache entry is referenced by a
  9-bit value and is used for linear addresses for which bits 56:48 have that
@@ -276,6 +402,7 @@ A processor may support any or all of the following paging-structure caches:
     + The value of the U/S flag of the PML5E.
     + The value of the XD flag of the PML5E.
     + The values of the PCD and PWT flags of the PML5E.
+ >
 * The following items detail how a processor may use the PML5E cache:
     + If the processor has a PML5E-cache entry for a linear address, it may use
     that entry when translating the linear address (instead of the PML5E in
