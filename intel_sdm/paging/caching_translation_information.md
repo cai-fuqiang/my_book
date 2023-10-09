@@ -402,8 +402,8 @@ A processor may support any or all of the following paging-structure caches:
     + The value of the U/S flag of the PML5E.
     + The value of the XD flag of the PML5E.
     + The values of the PCD and PWT flags of the PML5E.
- >
-* The following items detail how a processor may use the PML5E cache:
+ 
+    The following items detail how a processor may use the PML5E cache:
     + If the processor has a PML5E-cache entry for a linear address, it may use
     that entry when translating the linear address (instead of the PML5E in
     memory).
@@ -418,6 +418,26 @@ A processor may support any or all of the following paging-structure caches:
     + If the processor creates a PML5E-cache entry, the processor may retain it
     unmodified even if software subsequently modifies the corresponding PML5E
     in memory.
+ > PML5E cache: 每个 PML5E-cache entry 都由一个 9-bit 的值引用并且用于bit[56:48]
+ > 具有改值的线性地址。该entry包含了来自用于翻译这些线性地址的PML5E的信息:
+ >   + PML4 table physical address 
+ >   + R/W, U/S, XD, PCD && PWD
+ >
+ > 下面的items描述了处理器将会如何使用 PML5E cache:
+ > + 如果处理器有线性地址的 PML5E-cache entry, 当翻译线性地址时，他可以使用该entry(
+ > 而不是使用memory中的PML5E）
+ > + 处理器将只有在内存中的PML5E的 P flags = 1 并且所有的预留位都是0的情况下，才创建
+ > PML5E-cache entry
+ > + 只有 内存中的 PML5E 的access flag 为1的情况下，才会创建 PML5E-cache entry;
+ > 在缓存 translation之前，处理器会设置不是1的accessd flags 为 1
+ > + 处理器可能创建 PML5E-cache entry 即使没有任何线性地址 translation 使用它（e.g.,
+ > 因为其指向的PML4 table的所有entry的 P flags都是0。
+ > + 如果 processor 创建了 PML5E-cache entry, 处理器可能保持其不变，即使软件接下来修改
+ > 内存中相应的 PML5E。
+ >
+ >> NOTE
+ >> 
+ >> 这里所描述的 9-bit的引用，表示其cache的tag。
 
 * PML4E cache (4-level paging and 5-level paging only). The use of the PML4E
 cache depends on the paging mode:<br/>
@@ -452,6 +472,17 @@ cache depends on the paging mode:<br/>
     + If the processor creates a PML4E-cache entry, the processor may retain it
     unmodified even if software subsequently modifies the corresponding PML4E
     in memory.
+> 该部分大部分同上，不再赘述，当时需要注意下面两点:
+> * PML4E-cache entry中包含的某些flags, 例如 R/W, U/S ..., 这些flags在cache entry
+> 中保存的是 PML5E && PML4E 的值的 logical-AND / logical-OR
+>> 这样做是为什么呢? 下面章节 `Using the Paging-Structure Caches to Translate 
+>> Linear Addresses`会介绍，和Table walk不同，paging-structure cache的查询顺序是
+>> 相反的: Table walk (PML5E, PML4E, PDPTE, PDE, PTE) paging-structure cache(TLB,
+>> PDE cache, PDPTE cache, PML4E cache, PML5E cache) (当然TLB也是这样缓存flag的)
+>> 这样低级的页表缓存需要包含上级页表的所有信息，而这些信息线性地址 translation
+>> 中仅需要关心其logical-AND/ logical-OR的结果。
+> * 创建PML4E-cache entry时，需要保证 内存中的 PML5E和PML4E都是1, 当然，在缓存
+> 该translation 之前，处理器也会将这些accessed flags 都设置为1.
 
 * PDPTE cache (4-level paging and 5-level paging only).1 The use of the PML4E
 cache depends on the paging mode:
@@ -465,7 +496,7 @@ cache depends on the paging mode:
     does not apply):
     + The physical address from the PDPTE (the address of the page directory).
     (No PDPTE-cache entry is created for a PDPTE that maps a 1-GByte page.)
-    
+ 
     + The logical-AND of the R/W flags in the PML5E, PML4E, and PDPTE.
     + The logical-AND of the U/S flags in the PML5E, PML4E, and PDPTE.
     + The logical-OR of the XD flags in the PML5E, PML4E, and PDPTE.
@@ -486,7 +517,7 @@ cache depends on the paging mode:
     + If the processor creates a PDPTE-cache entry, the processor may retain it
     unmodified even if software subsequently modifies the corresponding PML5E,
     PML4E, or PDPTE in memory.
-
+> 同上不赘述
 * PDE cache. The use of the PDE cache depends on the paging mode:
     + For 32-bit paging, each PDE-cache entry is referenced by a 10-bit value and
     is used for linear addresses for which bits 31:22 have that value.
@@ -525,6 +556,7 @@ cache depends on the paging mode:
     + If the processor creates a PDE-cache entry, the processor may retain it
     unmodified even if software subse- quently modifies the corresponding
     PML5E, PML4E, PDPTE, or PDE in memory.
+> 同上不赘述
 
 Information from a paging-structure entry can be included in entries in the
 paging-structure caches for other paging-structure entries referenced by the
@@ -533,6 +565,8 @@ will be 0 in any PDPTE-cache entry for a PDPTE from the page-directory-pointer
 table referenced by that PML4E. This is because the R/W flag of each such
 PDPTE-cache entry is the logical-AND of the R/W flags in the appropriate PML4E
 and PDPTE.
+
+> 
 
 On processors that support HLAT paging (see Section 4.5.1), each entry in a
 paging-structure cache indicates whether the entry was cached during ordinary
