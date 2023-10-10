@@ -228,11 +228,11 @@ flag is 1):
 >>
 >> 最后一个层级是指: 该页表项不再指向页表，而是指向最终的page frame
 
-> <font size="4" color="red">
->   这里我们思考下，为什么页表中那么多项，结果tlb
->   中就只包含这些，原因很简单，因为在address translate的过程中，只
->   用到了这些。而TLB/paging structure cache的作用，也是加速该过程。
-> </font>
+> NOTE:
+>
+> 这里我们思考下，为什么页表中那么多项，结果tlb
+> 中就只包含这些，原因很简单，因为在address translate的过程中，只
+> 用到了这些。而TLB/paging structure cache的作用，也是加速该过程。
 
 (TLB entries may contain other information as well. A processor may implement
 multiple TLBs, and some of these may be for special purposes, e.g., only for
@@ -288,7 +288,7 @@ never actually occur in the executed code path.
 > 受上之前章节中提到的限制的影响，处理器可能缓存对于 任意线性地址的 translation,
 > 即使该address不再用于 access memory。例如，处理器在prefetches或者在
 > speculative evecution，而该 speculative execution从未实际的发生在代码执行
-> 路径中，这样的情况下，需要cache trnaslation
+> 路径中，这样的情况下，需要cache translation
 
 If the page number of a linear address corresponds to a TLB entry associated
 with the current PCID, the processor may use that TLB entry to determine the
@@ -696,13 +696,32 @@ to the PDE-cache entry.
     the translation process (locating a PML4E, etc.) as if it had traversed the
     corresponding PML5E.
 
+> 下面的 item 适用于 4-level paging / 5-level paging: 
+> 
+>> NOTE:
+>>
+>> 下面三段就不翻译了，因为每段讲的内容差不多，大概就是如果lower hierarchy 
+>> paging-structure cache 没有话，就去找更higher hierarchy paging-structure cache,
+>> 并且从该cache entry中找到用于遍历到 lower hierarchy paging-structure cache
+>> 的信息(e.g., PA, R/W flags ...), 然后继续完成 translation process.
+>>
+>> 这里还需要注意一点，没有提到PAE, PAE也有PDPTE, 但是其就只有四个条目，
+>> 并且PDPTE 会加载到 PDPTE register中，所以不需要paging-structure cache
+
 (Any of the above steps would be skipped if the processor does not support the
 cache in question.)
+
+> in question : 相关的
+>
+> 如果处理器不支持上述相关的 cache，那么该步骤就会跳过。
 
 If the processor does not find a TLB or paging-structure-cache entry for the
 linear address, it uses the linear address to traverse the entire
 paging-structure hierarchy, as described in Section 4.3, Section 4.4.2, and
 Section 4.5.
+
+> 对于该线性地址，处理器没有发现 TLB/ paging-structure-cache entry, 他将遍历
+> 整个的 paging-structure hierarchy， 正如 Section 4.3, 4.4.2, 4.5 描述的那样
 
 ### 4.10.3.3 Multiple Cached Entries for a Single Paging-Structure Entry
 
@@ -710,16 +729,41 @@ The paging-structure caches and TLBs may contain multiple entries associated
 with a single PCID and with information derived from a single paging-structure
 entry. The following items give some examples for 4-level paging:
 
+> paging-structure caches 和 TLBs 中可能包含了多个这样的entry:
+>  * 相同的 PCID
+>  * 信息都来自同一个 paging-structure entry
+>
+> 下面给出了一些 4-level paging 的例子
+
 * Suppose that two PML4Es contain the same physical address and thus reference
-the same page-directory- pointer table. Any PDPTE in that table may result in
-two PDPTE-cache entries, each associated with a different set of linear
-addresses. Specifically, suppose that the n1th and n2th entries in the PML4
-table contain the same physical address. This implies that the physical address
-in the mth PDPTE in the page-directory-pointer table would appear in the
-PDPTE-cache entries associated with both p1 and p2, where (p1 » 9) = n1, (p2 »
-9) = n2, and (p1 & 1FFH) = (p2 & 1FFH) = m. This is because both PDPTE-cache
-entries use the same PDPTE, one resulting from a reference from the n1th PML4E
-and one from the n2th PML4E.
+    the same page-directory-pointer table. Any PDPTE in that table may result
+    in two PDPTE-cache entries, each associated with a different set of linear
+    addresses. Specifically, suppose that the n<sub>1</sub><sup>th</sup> and
+    n<sub>2</sub><sup>th</sup> entries in the PML4 table contain the same
+    physical address. This implies that the physical address in the
+    m<sup>th</sup> PDPTE in the page-directory-pointer table would appear in
+    the PDPTE-cache entries associated with both p<sub>1</sub> and
+    p<sub>2</sub>, where (p1 » 9) = n1, (p2 » 9) = n2, and (p1 & 1FFH) = (p2 &
+    1FFH) = m. This is because both PDPTE-cache entries use the same PDPTE, one
+    resulting from a reference from the n1th PML4E and one from the n2th PML4E.
+
+> 假设两个 PML4Es中包含了相同的 phyiscal address，因此他们指向了相同的 PDPT。
+> 在该PDPT中的任何PDPTE 都可能会有两个 PDPTE-cache entries, 每一个都会相关联
+> 一组不同的线性地址。确切的说，假设PML4 Table中有两个entry n1th, n2th 包含了
+> 相同的物理地址。这也就意味着 PDPT table 中的mth位置的 PDPTE 可能会在 PDPTE-cache
+> 有有两个entry分别关联 p1, p2, 其中 (p1 >> 9) = n1, (p2 >> 9) = n2, 并且 p1 & 1FFH
+> = p2 & 1FFH = m。这是因为两个 PDPTE-cache entries 都是用了相同的 PDPTE, 一个
+> 是由 n1th位置的PML4E引用，另一个是有n2th位置的 PML4E 引用
+>
+>> NOTE
+>>
+>> 这里 p1 >> 9 = n1, 实际上表示的是PML4E的位置，9 bits正好是用于PDPTE 索引的index, 
+>> 而p1 第9位正好是这9个bits, 所以 p1 & 1FFH = p2 & 1FFH = m, 也就表示该index相同。
+>> 都指向了同一个位置m
+>>
+>> 这个例子简单来说，就是上级页表中有两个表项都指向了同一个 paging-structure entry,
+>> 这样在 该 paging-structure entry cache中就可能有信息完全相同的表项，但是
+>> 用于索引的 LA 不同。
 
 * Suppose that the first PML4E (i.e., the one in position 0) contains the
 physical address X in CR3 (the physical address of the PML4 table). This
@@ -738,32 +782,77 @@ implies the following:
     + Any TLB entry for page number 0 (associated with linear addresses with 0 in
     bits 47:12) translates to page frame X » 12 for similar reasons.
 
-The same PML4E contributes its address X to all these cache entries because the
-self-referencing nature of the entry causes it to be used as a PML4E, a PDPTE,
-a PDE, and a PTE.
+    The same PML4E contributes its address X to all these cache entries because the
+    self-referencing nature of the entry causes it to be used as a PML4E, a PDPTE,
+    a PDE, and a PTE.
+
+> * 假设 第一个PML4E(i.e., 在PML4 table的第一个位置) 包含了物理地址CR3中的物理地址X
+> (PML4 table的物理地址), 这也意味着如下:
+>   + 任何和[bit 47:39] 为0 的线性地址相关的PML4-cache entry 都包含地址 X.
+>   + 任何和[bit 47:30] 为0 的线性地址相关的PDPTE-cache entry 都包含地址 X。这是因为
+>   对于翻译[bit 47:30] 为0 的线性地址使用 [bit 47:39]\(0\)定位到的 page-directory table
+>   位于地址X(PML4 table的地址).使用线性地址的 bit 38:30 （仍然是0) ,再一次定位到
+>   地址X。并且将改地址store 在 PDPTE-cache entry
+>
+>> NOTE
+>> 
+>> 但是这里要注意，这样的配置可以正常 complete translation, page-table  entry
+>> 中的PS位只存在于 not final page table entry中。所以address X 位于的page table
+>> entry, 可以作为PML4E, PDPTE, PDE, PTE使用。
+>
+> 同一个PML4E 为这些所有的 cache entries贡献了他的物理地址X ,因为该entry的自
+> 引用的性质，导致该条目可以用于 PML4E，PDPTE，PDE，PTE
+
+> NOTE
+>
+> 上面给出了两个例子，描述了 page-cache entry中可能出现的有相同信息的page-cache entry 
+> cache。总结了两种情况:
+>
+> * 同一级 page table cache , 有多个相同信息的 page table entry cache
+> * 不同级 page table cache , 有多个相同信息的 page table entry cache
+
 
 ## 4.10.4 Invalidation of TLBs and Paging-Structure Caches
 
 As noted in Section 4.10.2 and Section 4.10.3, the processor may create entries
-in the TLBs and the paging-struc- ture caches when linear addresses are
-translated, and it may retain these entries even after the paging structures
+in the TLBs and the paging-structure caches when linear addresses are
+translated , and it may retain these entries even after the paging structures
 used to create them have been modified. To ensure that linear-address
-translation uses the modified paging struc- tures, software should take action
-to invalidate any cached entries that may contain information that has since
-been modified.
+translation uses the modified paging structures, software should take action to
+invalidate any cached entries that may contain information that has since been
+modified.
+
+> 正如 Section 4.10.2 和 Section 4.10.3 中提到的，处理器可能当执行线性地址翻译
+> 时，在 TLBs和 paging-structure cache中创建了 entries， 并且处理器可能在 创建
+> 他们(cache)的 paging structure 被修改后，仍然持有这些entries。为了保证线性地
+> 址翻译使用修改后的 paging structures, 软件应该去无效那些已经己经被修改的cached
+> entries
 
 ### 4.10.4.1 Operations that Invalidate TLBs and Paging-Structure Caches
 
 The following instructions invalidate entries in the TLBs and the
 paging-structure caches:
 
+> 下面的指令用于无效TLB，paging-structure caches:
+
 * INVLPG. This instruction takes a single operand, which is a linear address. The
 instruction invalidates any TLB entries that are for a page number
 corresponding to the linear address and that are associated with the current
 PCID. It also invalidates any global TLB entries with that page number,
-regardless of PCID (see Section 4.10.2.4).1 INVLPG also invalidates all entries
-in all paging-structure caches associated with the current PCID, regardless of
-the linear addresses to which they correspond.
+regardless of PCID (see Section 4.10.2.4).<sup>1</sup> INVLPG also invalidates
+all entries in all paging-structure caches associated with the current PCID,
+regardless of the linear addresses to which they correspond.
+
+> correspond /ˌkɒrəˈspɒnd/ :  相当于;通信;符合;相一致;类似于
+>
+> INVLPG. 该指令持有一个操作数，该操作数是一个线性地址。该指令会无效下面特征
+> 的所有TLB:
+>  * 和该线性地址对应的 page number 匹配
+>  * 和 current PCID 匹配
+>
+> 它也能无效任何和该 page number 匹配的 global TLB entries，不管PCID(Section
+> 4.10.2.4)。另外，INVLPG 能够无效 所有 paging-structure caches中的所有 和
+> 当前PCID 相关的 entries，不管线性地址是否能够匹配。
 
 * INVPCID. The operation of this instruction is based on instruction operands,
 called the INVPCID type and the INVPCID descriptor. Four INVPCID types are
@@ -782,15 +871,51 @@ currently defined:
     processor invalidates mappings—including global translations—associated
     with all PCIDs.
     + All-context. If the INVPCID type is 3, the logical processor invalidates
-    mappings—except global transla- tions—associated with all PCIDs. (The
+    mappings—except global translations—associated with all PCIDs. (The
     instruction may also invalidate global translations.)
 
     See Chapter 3 of the Intel 64 and IA-32 Architecture Software Developer’s
     Manual, Volume 2A for details of the INVPCID instruction.
 
+> INVPCID. 该指令的操作会基于指令操作数，被称为 INVPCID type和 INVPCID descriptor。
+> 当前定义的四种 INVPCID type 如下:
+> * Individual-address. 如果 INVPCID type = 0, 逻辑处理器会无效下面的映射
+>   + 除了 global translation
+>   + INVPCID descriptor 中指定的PCID 
+>   + INVPCID descriptor 指定的 线性地址
+> 
+>    该指令也可能会无效global translation, 以及其他 PCID , 其他的线性地址
+>    相关的mapping
+>
+> * Single-context. 如果 INVPCID type = 1, logical processor 无效如下映射:
+>   + 除了 global translation
+>   + INVPCID descriptor 中指定的PCID 
+>
+>   同上，也可能通杀
+>
+> * All-context. 如果 INVPCID type = 2:
+>   + 包括 global translation
+>   + 所有 PCIDs
+>
+> * ALL-context. 如果INVPCID type = 3 
+>   + 除了 global translation
+>   + 所有PCIDs
+>
+>  同上，也可能通杀global translation
+>
+>> NOTE
+>>
+>> 通杀的真随意, 不知有何用意
+>
+> 查看Intel sdm Chapter 3 Volume 2A 了解更多关于INVPCID指令的细节
+
 * MOV to CR0. The instruction invalidates all TLB entries (including global
-entries) and all entries in all paging- structure caches (for all PCIDs) if it
+entries) and all entries in all paging-structure caches (for all PCIDs) if it
 changes the value of CR0.PG from 1 to 0.
+
+> MOV to CRO. 如果该指令将它的该由1->0, 指令会无效所有的TLB entries (包括global
+> entries) 以及所有paging-structure caches 的所有entries (也是对于所有PCIDs)
+
 * MOV to CR3. The behavior of the instruction depends on the value of CR4.PCIDE:
     + If CR4.PCIDE = 0, the instruction invalidates all TLB entries associated
     with PCID 000H except those for global pages. It also invalidates all
@@ -804,6 +929,18 @@ changes the value of CR0.PG from 1 to 0.
     + If CR4.PCIDE = 1 and bit 63 of the instruction’s source operand is 1, the
     instruction is not required to invalidate any TLB entries or entries in
     paging-structure caches.
+
+> MOV to CR3. 该行为依赖 CR4.PCIDE的值:
+>   * 如果CR4.PCIDE = 0, 该指令会无效: 
+>     + 除了 global pages
+>     + PCID 000H 相关的所有 TLBs 和 paging-structure caches
+>   * 如果CR4.PCIDE = 1 并且 该指令源操作数bit 63 是0,  该指令会无效
+>     + 除了global pages
+>     + 由指令源操作数 BIT 11：0 指定的PCID相关的所有TLBs 和 paging-structure
+>       caches
+>   * 如果CR4.PCIDE=1, 并且源操作数的63 bit是1, 该指令不需要无效人和的TLBs和
+>   paging-structure caches中的entries
+
 * MOV to CR4. The behavior of the instruction depends on the bits being modified:
     + The instruction invalidates all TLB entries (including global entries) and
     all entries in all paging-structure caches (for all PCIDs) if (1) it
@@ -813,39 +950,92 @@ changes the value of CR0.PG from 1 to 0.
     paging-structure caches for the current PCID if (1) it changes the value of
     CR4.PAE; or (2) it changes the value of CR4.SMEP from 0 to 1.
 
+> MOV to CR4. 该指令的行为依赖某些bits是否被更改
+>  * 该指令会无效所有TLB entries(包括global entries) 以及所有paging-structure
+>  caches中的 所有entries (对于所有的PCIDs): 
+>    + 改变了CR4.PGE 的值
+>    + 将CR4.PCIDE 1->0
+>  * 该指令会无效当前PCID的所有TLB entries和所有paging-structure caches的所有
+>  entries:
+>    + 改变了 CR4.PAE的值
+>    + 将CR4.SMEP 0->1
+
 * Task switch. If a task switch changes the value of CR3, it invalidates all TLB
 entries associated with PCID 000H except those for global pages. It also
 invalidates all entries in all paging-structure caches associated with PCID
-000H.2
+000H.<sup>2</sup>
+
+> 2. Task switches do not occur in IA-32e mode and thus cannot occur with 4-level
+> paging. Since CR4.PCIDE can be set only with 4-level paging, task switches
+> occur only with CR4.PCIDE = 0.
+
+> Task switch. 如果task switch 更改了CR3的值，他将无效所有除了global pages, 和 
+> PCID 000H 相关的的所有TLB，同时也会无效和PCID 000H相关的所有的paging-structure 
+> caches
+>
+> 2. task switch 不会发生在IA-32e mode中因此不会发生在 4-LEVEL paging中。因为
+> CR4.PCIDE 只能在 4-level paging 中被设置，所以task switches 只能发生在 CR4.PCIDE
+> = 0 的情况下
+
 * VMX transitions. See Section 4.11.1.
 
 The processor is always free to invalidate additional entries in the TLBs and
 paging-structure caches. The following are some examples:
 
+> 处理器 总会自由的无效 额外的 TLBs  entries和 paging-structure caches.下面
+> 是一些例子:
+
 * INVLPG may invalidate TLB entries for pages other than the one corresponding to
 its linear-address operand. It may invalidate TLB entries and
 paging-structure-cache entries associated with PCIDs other than the current
 PCID.
+
+> INVLPG 可能会无效除了他线性地址操作数指定的那个page的其他pages的TLB entries。
+> 他也可能无效除了和current PCID 其他PCIDs相关的 TLB entries以及paging-structure-
+> cache entries。
+
 * INVPCID may invalidate TLB entries for pages other than the one corresponding
 to the specified linear address. It may invalidate TLB entries and
 paging-structure-cache entries associated with PCIDs other than the specified
 PCID.
+
+> INVPCID 同上
+
 * MOV to CR0 may invalidate TLB entries even if CR0.PG is not changing. For
 example, this may occur if either CR0.CD or CR0.NW is modified.
+
+> MOV to CR0 可能在即使CR0.PG 没有被更改的情况下 无效TLB entries。例如，他可能
+> 发生在 CR0.CD 或者CR0.NW 被修改的情况下
+
 * MOV to CR3 may invalidate TLB entries for global pages. If CR4.PCIDE = 1 and
 bit 63 of the instruction’s source operand is 0, it may invalidate TLB entries
 and entries in the paging-structure caches associated with PCIDs other than the
 PCID it is establishing. It may invalidate entries if CR4.PCIDE = 1 and bit 63
 of the instruction’s source operand is 1.
+
+> MOV to CR3 可能会无效 global pages 的 TLB entries. 如果CR4.PCIDE =1,并且
+> 该指令源操作数的63 bit 是0, 它可能会无效不是他所建立的PCID相关的TLB entries
+> 和 paging-structure entries。他可能在CR4.PCIDE=1 和 指令源操作数的63 bit
+> 为1的情况下也会无效 entries.
+
 * MOV to CR4 may invalidate TLB entries when changing CR4.PSE or when changing
 CR4.SMEP from 1 to 0.
+
+> MOV to CR4 可能在改变CR4.PSE或者将CR4.SMEP 1 -> 0 的情况下，无效TLB entries
+
 * On a processor supporting Hyper-Threading Technology, invalidations performed
 on one logical processor may invalidate entries in the TLBs and
 paging-structure caches used by other logical processors.
 
+> 在支持超线程技术的处理器上，某个逻辑处理器无效了另一个逻辑处理器使用的
+> TLB和paging- structure caches
+
 (Other instructions and operations may invalidate entries in the TLBs and the
 paging-structure caches, but the instructions identified above are
 recommended.)
+
+> 其他的指令和操作数可能也会无效TLBs中的某些entries和 paging-structure caches,
+> 但是建议使用上面已经证实的指令(也就是上面明确说明的)。
 
 In addition to the instructions identified above, page faults invalidate
 entries in the TLBs and paging-structure caches. In particular, a page-fault
@@ -995,12 +1185,14 @@ paging-structure entry by executing INVLPG multiple times solely for the
 purpose of invalidating these multiple cached entries. (It may be necessary to
 do so to invalidate multiple TLB entries.)
 
-### 4.10.4.4 Delayed Invalidation Required invalidations may be delayed under
-some circumstances. Software developers should understand that, between the
-modification of a paging-structure entry and execution of the invalidation
-instruction recommended in Section 4.10.4.2, the processor may use translations
-based on either the old value or the new value of the paging- structure entry.
-The following items describe some of the potential consequences of delayed
+### 4.10.4.4 Delayed Invalidation 
+
+Required invalidations may be delayed under some circumstances. Software
+developers should understand that, between the modification of a
+paging-structure entry and execution of the invalidation instruction
+recommended in Section 4.10.4.2, the processor may use translations based on
+either the old value or the new value of the paging- structure entry. The
+following items describe some of the potential consequences of delayed
 invalidation:
 
 * If a paging-structure entry is modified to change the P flag from 1 to 0, an
@@ -1079,8 +1271,6 @@ the Intel-64 and IA-32 architectures:
    modifications to the paging-structure entries.
 4. Allow all logical processors to resume normal operation.
 
-
-
 Alternative, performance-optimized, TLB shootdown algorithms may be developed;
 however, software developers must take care to ensure that the following
 conditions are met:
@@ -1114,3 +1304,16 @@ that linear-address space to perform the necessary invalidations. All the
 affected logical processors must complete their invalidations before the
 linear-address range and the physical page frames previously associated with
 that range can be reallocated.
+
+
+# 其他链接
+[TLBs, Paging-Structure Caches, and Their Invalidation](http://kib.kiev.ua/x86docs/Intel/WhitePapers/317080-002.pdf)
+
+[KAISER: hiding the kernel from user space](https://lwn.net/Articles/738975/)
+
+[PCID is now a critical performance/security feature on x86](https://www.google.com/url?sa=t&rct=j&q=&esrc=s&source=web&cd=&ved=2ahUKEwi3os-44uqBAxVYBTQIHRYmD0MQFnoECC8QAQ&url=https%3A%2F%2Fgroups.google.com%2Fg%2Fmechanical-sympathy%2Fc%2FL9mHTbeQLNU&usg=AOvVaw2WBKn4zECDNZWvC6lb8jrX&opi=89978449)
+
+[\[PATCH 23/30\] x86, kaiser: use PCID feature to make user and kernel switches faster](https://www.mail-archive.com/linux-kernel@vger.kernel.org/msg1534623.html)
+
+<font size="4" color="red">
+</font> 
