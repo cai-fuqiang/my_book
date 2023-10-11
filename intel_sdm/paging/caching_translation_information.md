@@ -1475,14 +1475,19 @@ more than one logical processor, software must account for the fact that there
 may be entries in the TLBs and paging-structure caches of logical processors
 other than the one used to modify the paging-structure entry. The process of
 propagating the changes to a paging-structure entry is commonly referred to as
-“TLB shoot- down.” TLB shootdown can be done using memory-based semaphores
+"TLB shootdown." TLB shootdown can be done using memory-based semaphores
 and/or interprocessor interrupts (IPI). The following items describe a simple
 but inefficient example of a TLB shootdown algorithm for processors supporting
 the Intel-64 and IA-32 architectures:
 
 > 正如Section 4.10.4中提到的，软件修改paging-structure entry 可能需要无效从该
 > 修改的entry, 在其修改之前获取的TLBs和paging-structure caches中的 entires。
-> (真TM严谨)。在一个包含了多个逻辑处理器的系统上, 软件
+> (真TM严谨)。在一个包含了多个逻辑处理器的系统上, 软件必须考虑这样一个事实，
+> 即逻辑处理器中可能存在的TLBs和 paging-structure caches entries 不是
+> 用于修改paging-structure entry的那个。将更改 paging-structure entry 的传播
+> 过程通常称为"TLB shootdown". TLB shootdown 可以使用memory-based semaphores
+> 或者 IPI 来做。下面的条目描述了一个简单但是不太效率的 支持 Intel-64, IA-32 
+> 架构处理器的TLB  shootdown 算法的例子:
 
 1. Begin barrier: Stop all but one logical processor; that is, cause all but
    one to execute the HLT instruction or to enter a spin loop.
@@ -1492,40 +1497,77 @@ the Intel-64 and IA-32 architectures:
    modifications to the paging-structure entries.
 4. Allow all logical processors to resume normal operation.
 
+> 1. Begin barrier: 关闭所有除了一个逻辑处理器; 然后所有逻辑处理器（除了那一个)
+> 都执行 HLT 指令或者进入一个 spin loop
+> 2. 允许 active 逻辑处理 修改必要的 paging-structure entries
+> 3. 允许所有的逻辑处理器 执行invalidations , 该 invalidations 适用于修改 paging-structure 
+> entries
+> 4. 允许所有的逻辑处理器恢复正常执行操作。
+
 Alternative, performance-optimized, TLB shootdown algorithms may be developed;
 however, software developers must take care to ensure that the following
 conditions are met:
 
+> TLB shootdown 算法可以被开发成更高效的。但是软件开发者必须确保满足以下
+> 条件:
+
 * All logical processors that are using the paging structures that are being
 modified must participate and perform appropriate invalidations after the
 modifications are made.
+
+> 使用了该paging structure 的 所有逻辑处理器 都必须参与并在 modification 发生后
+> 执行适当的 invalidation
+
 * If the modifications to the paging-structure entries are made before the
 barrier or if there is no barrier, the operating system must ensure one of the
 following: (1) that the affected linear-address range is not used between the
 time of modification and the time of invalidation; or (2) that it is prepared
-to deal with the conse- quences of the affected linear-address range being used
+to deal with the consequences of the affected linear-address range being used
 during that period. For example, if the operating system does not allow pages
 being freed to be reallocated for another purpose until after the required
-invalida- tions, writes to those pages by errant software will not unexpectedly
+invalidations, writes to those pages by errant software will not unexpectedly
 modify memory that is in use.
+
+> 如果对 paging-structure entries 的修改在 barrier 之前执行，或者没有barrier,
+> 逻辑处理器必须保证如下条件之一:
+> 1. 在修改和执行invalidation 的时间段内， 受影响的线性地址区域不会被使用
+> 2. 他准备处理再此阶段使用受影响的线性地址区域的后果。
+>
+> 例如，操作喜用不允许释放的page 再次被另一个目标分配，直到需要的invalidation
+> 执行，errant 软件对这些页面的写入不会意外修改正在使用的内存。
+
 * Software must be prepared to deal with reads, instruction fetches, and prefetch
-requests to the affected linear- address range that are a result of speculative
+requests to the affected linear-address range that are a result of speculative
 execution that would never actually occur in the executed code path.
+
+> 软件必须准备处理对受影响的线性地址区域的读，instruction fetches和 prefetch 请求,
+> 这些请求是推测执行的结果，但是并不会出现在实际的代码执行路径中。
 
 When multiple logical processors are using the same linear-address space at the
 same time, they must coordinate before any request to modify the
-paging-structure entries that control that linear-address space. In these
-cases, the barrier in the TLB shootdown routine may not be required. For
-example, when freeing a range of linear addresses, some other mechanism can
-assure no logical processor is using that range before the request to free it
-is made. In this case, a logical processor freeing the range can clear the P
-flags in the PTEs associated with the range, free the physical page frames
-associated with the range, and then signal the other logical processors using
-that linear-address space to perform the necessary invalidations. All the
-affected logical processors must complete their invalidations before the
-linear-address range and the physical page frames previously associated with
-that range can be reallocated.
+paging-structure entries that control that linear-address space. In these cases,
+the barrier in the TLB shootdown routine may not be required. For example, when
+freeing a range of linear addresses, some other mechanism can assure no logical
+processor is using that range before the request to free it is made. In this
+case, a logical processor freeing the range can clear the P flags in the PTEs
+associated with the range, free the physical page frames associated with the
+range, and then signal the other logical processors using that linear-address
+space to perform the necessary invalidations. All the affected logical
+processors must complete their invalidations before the linear-address range and
+the physical page frames previously associated with that range can be
+reallocated.
 
+> coordinate [koʊˈɔːrdɪneɪt] : 协同
+>
+> 担当多个逻辑处理器在同一时间使用同一个线性地址区域，他们必须在
+> 任何对控制该线性地址区域的paging-structure entries 修改之前做好协同
+> 工作。在这种情况下，在TLB shootdown routine中可能不需要 barrier。
+> 例如, 当释放一段线性地址区域，某些其他的机制可能保证在free请求完成之前
+> 没有其他的处理器使用该区域.在这种情况下，逻辑处理器释放该区域可以通过clear
+> 和该区域相关的PTEs中的 P flag, 并且 释放和该区域相关的物理野旷，然后通知
+> 其他的使用该线性地址的其他逻辑处理器执行必要的invalidations。所有受影响
+> 的逻辑处理器必须在该线性地址区域和之前分配的和该区域相关的物理页框被重新分
+> 配之前完成。
 
 # 其他链接
 [TLBs, Paging-Structure Caches, and Their Invalidation](http://kib.kiev.ua/x86docs/Intel/WhitePapers/317080-002.pdf)
