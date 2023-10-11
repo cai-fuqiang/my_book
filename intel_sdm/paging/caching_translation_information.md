@@ -189,7 +189,9 @@ determined by the page size. Specifically:
      2 MBytes. Suppose that the restarted translation encounters a PDPTE that
      sets bit 7, indicating a 1-GByte page. In this case, the translation
      produced will have a page size of 2 MBytes (the smaller of the two sizes).
+     > <font color="red">
      > 以上和HLAT相关，先不看
+     > </font>
 
 ### 4.10.2.2 Caching Translations in TLBs
 
@@ -347,7 +349,7 @@ and the choice may be implementation-specific.
 >> NOTE:
 >>
 >> 这里是说，之前页面大小为4Kbyte, 可能有多个连续的页面都创建了TLB entry，
->> 这时如果将其修改为大页，那么对于该大页的某些地址的访问，就会有 mulitple 
+>> 这时如果将其修改为大页，那么对于该大页的某些地址的访问，就会有 multiple 
 >> hits。
 >>
 >> 举个例子:
@@ -529,7 +531,7 @@ cache depends on the paging mode:
     + If the processor creates a PDPTE-cache entry, the processor may retain it
     unmodified even if software subsequently modifies the corresponding PML5E,
     PML4E, or PDPTE in memory.
-> 同上不赘述
+>> 同上不赘述
 * PDE cache. The use of the PDE cache depends on the paging mode:
     + For 32-bit paging, each PDE-cache entry is referenced by a 10-bit value and
     is used for linear addresses for which bits 31:22 have that value.
@@ -568,7 +570,7 @@ cache depends on the paging mode:
     + If the processor creates a PDE-cache entry, the processor may retain it
     unmodified even if software subse- quently modifies the corresponding
     PML5E, PML4E, PDPTE, or PDE in memory.
-> 同上不赘述
+>> 同上不赘述
 
 Information from a paging-structure entry can be included in entries in the
 paging-structure caches for other paging-structure entries referenced by the
@@ -597,7 +599,9 @@ Entries that were cached during HLAT paging also include the restart flag (bit
 paging using such an entry, it immediately restarts (using ordinary paging) if
 this cached restart flag is 1.
 
+> <font color="red">
 > 上面两段和HLAT相关。先不关心。
+> </font>
 
 The paging-structure caches contain information only from paging-structure
 entries that reference other paging structures (and not those that map pages).
@@ -1049,26 +1053,52 @@ re-executed) if it would not be caused by the contents of the paging structures
 in memory (and if, therefore, it resulted from cached entries that were not
 invalidated after the paging structures were modified in memory).
 
+> 除了上面提到的这些指令，page faults 也会 invalidate TLBs 和 paging-structure
+> caches。尤其是，尝试使用某个线性地址访问造成PF, 将会无效该线性地址对应的 page
+> number和当前PCID相关的所有的TLBs。他也会无效该线性地址对应的 page number以及
+> 和当前PCID相关的 paging-structure cache。如果该PF不是由内存中的 paging
+> structure 的内容引起的(因此，它是由修改了内存中的paging structure后，没有
+> invaildate cache entries导致)，该无效操作可以确保 page-fault exception
+> 将不会再次发生。(如果造成 PF的指令再次执行)
+
 As noted in Section 4.10.2, some processors may choose to cache multiple
-smaller-page TLB entries for a transla- tion specified by the paging structures
+smaller-page TLB entries for a translation specified by the paging structures
 to use a page larger than 4 KBytes. There is no way for software to be aware
 that multiple translations for smaller pages have been used for a large page.
 The INVLPG instruction and page faults provide the same assurances that they
 provide when a single TLB entry is used: they invalidate all TLB entries
 corresponding to the translation specified by the paging structures.
 
+> 正如 Section 4.10.2中提到的，某些处理器可能对于使用超过4KByte page的
+> paging-structure 去缓存多个smaller-page TLB entries。INVLPG指令和 page
+> faults 提供了和single TLB entry 相同的保证: 他将会无效 该paging structure
+> 指定的所有translation 相关的TLB entries
+
 ### 4.10.4.2 Recommended Invalidation
+
+> recommend /ˌrekəˈmend/ : 推荐
 
 The following items provide some recommendations regarding when software should
 perform invalidations:
 
+> 以下items 提供了一些关于软件应在何时执行invalidation的建议：
+
 * If software modifies a paging-structure entry that maps a page (rather than
 referencing another paging structure), it should execute INVLPG for any linear
 address with a page number whose translation uses that paging-structure entry.1
-* (If the paging-structure entry may be used in the translation of different page
+
+(If the paging-structure entry may be used in the translation of different page
 numbers — see Section 4.10.3.3 — software should execute INVLPG for linear
 addresses with each of those page numbers; alternatively, it could use MOV to
 CR3 or MOV to CR4.)
+
+> 如果软件修改了 map page 的paging-structure entry(而不是指向另一个 paging 
+> structurea), 他应该执行 INVPG , 参数是使用该 paging-structure entry 进行
+> 翻译的page number对应的任意线性地址
+>
+> （如果该paging-structure entry 可能被不同的page numbers 用于translation --
+> 如Section 4.10.3.3 -- 如那间应该为每个page numbers 对应的线性地址执行 INVLPG
+> 指令; 或者是执行 MOV to CR3, MOV to CR4
 
 * If software modifies a paging-structure entry that references another paging
 structure, it may use one of the following approaches depending upon the types
@@ -1080,6 +1110,15 @@ and number of translations controlled by the modified entry:
     remains necessary to execute INVLPG at least once.
     + Execute MOV to CR3 if the modified entry controls no global pages.
     + Execute MOV to CR4 to modify CR4.PGE.
+
+> 如果软件修改了指向另一个paging structure 的paging-structure entry, 根据
+> 被修改entry控制的 translation的类型和数量，它可以使用以下方法之一:
+>   + 为每一个使用该entry的translation对应page number的线性地址执行 INVLPG指令。
+>   但是，如果没有page numbers 使用该entry进行translate (e.g., 因为modified entry
+>   指向的paging structure 中的所有条目 P flags都是0），仍然有必要执行一次 INVLPG
+>   + 如果modify entry 没有控制global pages，执行MOV to CR3
+>   + 执行 MOV to CR4 去修改 CR4.PGE
+
 * If CR4.PCIDE = 1 and software modifies a paging-structure entry that does not
 map a page or in which the G flag (bit 8) is 0, additional steps are required
 if the entry may be used for PCIDs other than the current one. Any one of the
@@ -1095,9 +1134,18 @@ following suffices:
     the entry; if no page numbers that would use the entry have translations,
     execute INVLPG at least once.
 
+> 如果 CR4.PCIDE = 1, 并且软件修改了没有映射page的 paging-structure entry 或者
+> 他的G flag(bit 8) 是0, 如果该entry可能使用了 PCIDs 不是当前的，还需要额外的步
+> 骤。下面任意一个可以满足:
+>   + 执行 MOV to CR4 修改 CR4.PGE，立即执行和或者在使用 affected PCIDs之前。例如，
+>   软件可以为使用了affected PCIDs的进程使用不同的(以前未使用的)PCIDs
+
 * If software using PAE paging modifies a PDPTE, it should reload CR3 with the
 register’s current value to ensure that the modified PDPTE is loaded into the
 corresponding PDPTE register (see Section 4.4.1).
+
+> 如果软件使用 PAE paging 并修改了 PDPTE, 应该 使用寄存器当前的 value 重新 load
+> CR3, 来保证 修改后的PDPTE 已经load到 对应的 PDPTE 寄存器中。
 
 * If the nature of the paging structures is such that a single entry may be used
 for multiple purposes (see Section 4.10.3.3), software should perform
@@ -1106,19 +1154,60 @@ serve as both a PDE and PTE, it may be necessary to execute INVLPG with two (or
 more) linear addresses, one that uses the entry as a PDE and one that uses it
 as a PTE. (Alternatively, software could use MOV to CR3 or MOV to CR4.)
 
+> 如果paging structures的性质是单个entry可能用于多个目标(Section 4.10.3.3), 
+> software 应该为所有目标执行 invalidate。例如，如果单个entry 可能同时用于
+> PDE和PTE, 他可能有必要执行 INVLPG，操作数分别有两个（或者更多）线性地址。
+> 一个是作为PDE使用的entry，一个是作为PTE（作为替代的，软件可以执行MOV to CR3
+> 或者MOV to CR4
+>
+>> 这个地方比较抽象, 我们来举个例子:
+>>
+>> 假设有一个 page directory table, page frame 为 PF_pd, 里面前两个entry
+>> E_a, E_b, 分指向page frame pf_a, pf_b, 其中 pf_a == PF_pd, 
+>>
+>> E_b其实可以作为PDE，也可以作为PTE使用，我们假设pf_b 中的第一个entry
+>> 为E_ba, 指向页面pf_ba
+>>
+>> 另外我们假设，线性地址LA 恰好是该 page directory table 映射的最低的地址,
+>> (LA % 1G = 0), 我们来看两个地址的映射。
+>>
+>> |线性地址|PDE|page frame of page table|PTE|page frame|
+>> |----|----|---|----|---|
+>> |LA|E_a|pf_a (实际上是PF_pd)|E_a|PF_pd|
+>> |LA+4K|E_a|pf_a(实际上是PF_pd)|E_b|pf_b|
+>> |LA+2M|E_b|pf_b|E_ba|pf_ba|
+>>
+>> 可以看到这里 E_b 既可以作为PDE使用也可以作为PTE使用。
+>> 所以如果修改了该entry，需要用INVLPG指令对线性地址LA+4K, 
+>> LA + 2M分别执行无效操作
+
 * As noted in Section 4.10.2, the TLBs may subsequently contain multiple
-translations for the address range if software modifies the paging structures
-so that the page size used for a 4-KByte range of linear addresses changes. A
-reference to a linear address in the address range may use any of these
-translations.<br/>
-Software wishing to prevent this uncertainty should not write to a
-paging-structure entry in a way that would change, for any linear address, both
-the page size and either the page frame, access rights, or other attributes. It
-can instead use the following algorithm: first clear the P flag in the relevant
-paging-structure entry (e.g., PDE); then invalidate any translations for the
-affected linear addresses (see above); and then modify the relevant
-paging-structure entry to set the P flag and establish modified translation(s)
-for the new page size.
+  translations for the address range if software modifies the paging structures
+  so that the page size used for a 4-KByte range of linear addresses changes. A
+  reference to a linear address in the address range may use any of these
+  translations.
+
+  Software wishing to prevent this uncertainty should not write to a
+  paging-structure entry in a way that would change, for any linear address, both
+  the page size and either the page frame, access rights, or other attributes. It
+  can instead use the following algorithm: first clear the P flag in the relevant
+  paging-structure entry (e.g., PDE); then invalidate any translations for the
+  affected linear addresses (see above); and then modify the relevant
+  paging-structure entry to set the P flag and establish modified translation(s)
+  for the new page size.
+> uncertainty : 不确定性
+>
+> 正如Section 4.10.2 中提到的, 如果软件修改了 paging structure 导致用于线性地址
+> 范围的4-Kbyte page size发生了改变，TLBs接下来可能包含multiple translations。
+> 该地址空间中的线性地址可能使用这些任意的translation。
+>
+> 希望防止这种不确定性的的软件不应该对任何线性地址的paging-structure entry做
+> 写入操作，包括page size ,page frame, access right 或者其他的属性。应该使用
+> 下面的算法:
+>  1. 清空相应paging-structure entry的P flag (e.g., PDE); 
+>  2. 然后无效受影响线性地址任何translation;
+>  3. 修改相应的paging-structure entry 来设置 P flag, 并且为新的page size建立
+>  修改后的translation
 
 Software should clear bit 63 of the source operand to a MOV to CR3 instruction
 that establishes a PCID that had been used earlier for a different
@@ -1126,45 +1215,109 @@ linear-address space (e.g., with a different value in bits 51:12 of CR3). This
 ensures invalidation of any information that may have been cached for the
 previous linear-address space.
 
+> 软件应该清空MOV to CR3 指令的源操作数的63 bit来建立不同于先前线性地址空间
+> 的PCID（例如CR3的52:12中具有不同值)。他保证了为之前线性地址空间缓存的任何信息
+> 都会被无效。
+
 This assumes that both linear-address spaces use the same global pages and that
 it is thus not necessary to invalidate any global TLB entries. If that is not
 the case, software should invalidate those entries by executing MOV to CR4 to
 modify CR4.PGE.
+
+> 这假设两个线性地址空间使用相同的global pages，因此没有必要是全局的 TLB entires
+> 无效。如果不是这样情况的话，软件应该通过修改CR4.PGE来使这些条目无效。
 
 ### 4.10.4.3 Optional Invalidation
 
 The following items describe cases in which software may choose not to
 invalidate and the potential consequences of that choice:
 
+> potential [pəˈtenʃl]: 潜在的;可能的 <br/>
+> consequences [ˈkɒnsɪkwənsɪz]: 后果，结果
+>
+> 下面的条目描述了软件可能选择不去invalidate 的情况，以及该选择后的潜在后果:
+
 * If a paging-structure entry is modified to change the P flag from 0 to 1, no
 invalidation is necessary. This is because no TLB entry or paging-structure
 cache entry is created with information from a paging-structure entry in which
-the P flag is 0.1
+the P flag is 0.<sup>1</sup>
+
+> 1. If it is also the case that no invalidation was performed the last time the
+>    P flag was changed from 1 to 0, the processor may use a TLB entry or
+>    paging-structure cache entry that was created when the P flag had earlier
+>    been 1.
+
+> 如果paging-structure entry 被修改将Pflag 0 -> 1, invlidation是没有必要的。
+> 这是因为没有TLB entry或者paging-structure cache entry 会在 该paging-structure
+> entry 的 P flags为0 的情况下创建。
+>
+> 1. 如果在上次执行Pflag 0 -> 1后，处理器可能会使用之前P flag 为1时创建的 TLB 
+> entry 或者 paging-structure cache entry。
+>
+>> NOTE
+>>
+>> 那为什么手册中还是说这种情况是 nonecessary的呢，因为感觉使用该TLB entry
+>> 的行为是软件发起的，硬件不会主动发起，所以软件只有在出问题的情况下，才会
+>> 在 LA 对应的paging-structure entry P = 0的情况下访问该 LA
+
 * If a paging-structure entry is modified to change the accessed flag from 0 to
 1, no invalidation is necessary (assuming that an invalidation was performed
 the last time the accessed flag was changed from 1 to 0). This is because no
 TLB entry or paging-structure cache entry is created with information from a
 paging-structure entry in which the accessed flag is 0.
+
+> 如果paging-structure entry 修改 accessed flag 0 -> 1, invalidation 是没有
+> 必要的(假设上次accessed flag 1 -> 0的时候，已经执行了 invalidate )。
+> 这是因为没有TLB entry或者paging-structure cache entry 会在 
+> paging-structure entry 的 accessed flag = 0 的情况下创建
+
 * If a paging-structure entry is modified to change the R/W flag from 0 to 1,
 failure to perform an invalidation may result in a “spurious” page-fault
 exception (e.g., in response to an attempted write access) but no other adverse
 behavior. Such an exception will occur at most once for each affected linear
 address (see Section 4.10.4.1).
+
+>
+> failure: 这里的 failure 不是失败的意思，而是 未能/忽略/忘记<br/>
+> adverse：不利的，相反的
+>
+> 如果 将 paging-structure entry  中R/W flag 0->1, 但是没有执行 invalidation
+> 可能会造成 "spurious" page-fault exception(e.g., 尝试相应 wirte access),
+> 但是不会造成其他不利的影响。像这样的异常对于每个某影响的线性地址只会发生一次
+> (Section 4.10.4.1)
+>
+>> 这里只会发生一次的原因是, page fault 会 invalidate。
+
 * If CR4.SMEP = 0 and a paging-structure entry is modified to change the U/S
 flag from 0 to 1, failure to perform an invalidation may result in a “spurious”
 page-fault exception (e.g., in response to an attempted user-mode access) but
 no other adverse behavior. Such an exception will occur at most once for each
 affected linear address (see Section 4.10.4.1).
+
+> <font color="red">
+> CR4.SMEP 未了解
+> </font>
+
 * If a paging-structure entry is modified to change the XD flag from 1 to 0,
 failure to perform an invalidation may result in a “spurious” page-fault
 exception (e.g., in response to an attempted instruction fetch) but no other
 adverse behavior. Such an exception will occur at most once for each affected
 linear address (see Section 4.10.4.1).
+
+> <font color="red">XD 未了解</font>
+
 * If a paging-structure entry is modified to change the accessed flag from 1 to
-0, failure to perform an invali- dation may result in the processor not setting
+0, failure to perform an invalidation may result in the processor not setting
 that bit in response to a subsequent access to a linear address whose
 translation uses the entry. Software cannot interpret the bit being clear as an
 indication that such an access has not occurred.
+
+> interpret : 解释;说明;
+> 
+> 如果paging-structure entry 修改 accessed flag 1->0, 没有执行invalidation的话，
+> 将会导致，处理器在接下来的 translation中使用该entry则不会设置该bit。软件
+> 层面不能将清除该位解释为写入操作没有发生。
+
 * If software modifies a paging-structure entry that identifies the final
 physical address for a linear address (either a PTE or a paging-structure entry
 in which the PS flag is 1) to change the dirty flag from 1 to 0, failure to
@@ -1172,11 +1325,21 @@ perform an invalidation may result in the processor not setting that bit in
 response to a subsequent write to a linear address whose translation uses the
 entry. Software cannot interpret the bit being clear as an indication that such
 a write has not occurred.
+
+>> 这个是dirty flag，也是同上，如果将dirty flag 1 -> 0 之后，没有invalidate, 软件
+>> 层面接下来就不好判断如果dirty flag是clear状态下，这段时间有没有发生写入操作
+
 * The read of a paging-structure entry in translating an address being used to
 fetch an instruction may appear to execute before an earlier write to that
 paging-structure entry if there is no serializing instruction between the write
 and the instruction fetch. Note that the invalidating instructions identified
 in Section 4.10.4.1 are all serializing instructions.
+
+> 在 translating 地址过程中读取 paging-structure entry 发生在 fetch a instruction,
+> 而这个过程可能在更早的对于该 paging-structure entry写入操作之前执行, 如果这里
+> 在写入操作和instruction fetch 之间没有 serializing instruction。注意 Section 
+> 4.10.4.1中提到的 invalidation instructions 都是 serializing instruction
+
 * Section 4.10.3.3 describes situations in which a single paging-structure entry
 may contain information cached in multiple entries in the paging-structure
 caches. Because all entries in these caches are invalidated by any execution of
@@ -1185,39 +1348,66 @@ paging-structure entry by executing INVLPG multiple times solely for the
 purpose of invalidating these multiple cached entries. (It may be necessary to
 do so to invalidate multiple TLB entries.)
 
+> 4.10.3.3 提到的 单个paging-structure entry 可能在多个paging-structure caches中都
+> 有保存了信息。因为这些cache中的所有的entries 都可以被任意执行的INVLPG invalidate
+> 掉，所以没有必要在修改这样的paging-structure entry 后，仅仅为了无效这些 multiple 
+> cache entries, 去单独执行多次 INVLPG 指令.（但是可能有必要为 mulitple TLB 
+> entries 做这样的事情)
+
 ### 4.10.4.4 Delayed Invalidation 
 
 Required invalidations may be delayed under some circumstances. Software
 developers should understand that, between the modification of a
 paging-structure entry and execution of the invalidation instruction
 recommended in Section 4.10.4.2, the processor may use translations based on
-either the old value or the new value of the paging- structure entry. The
+either the old value or the new value of the paging-structure entry. The
 following items describe some of the potential consequences of delayed
 invalidation:
+
+> circumstances [ˈsɜːkəmstənsɪz]: 环境;条件;情况
+>
+> 在某些情况下需要 invalidation delay 执行。软件工程师应该理解 在修改
+> paging-structure entry后和执行 Section 4.10.4.2中提到的invalidation
+> instruction 之间，处理器可能基于 paging-structure entry中的old value
+> 还是 new value。 下面的一些 items 描述了 delayed invalidation 的潜在
+> 后果。
 
 * If a paging-structure entry is modified to change the P flag from 1 to 0, an
 access to a linear address whose translation is controlled by this entry may or
 may not cause a page-fault exception.
 
+> 如果paging-structure entry 将 P 1->0, 访问该entry控制的translation的线性地址
+> 可能会也可能不会造成 page-fault exception
+
 * If a paging-structure entry is modified to change the R/W flag from 0 to 1,
 write accesses to linear addresses whose translation is controlled by this
 entry may or may not cause a page-fault exception.
+
+>> R/W flag 0->1 ,也是上述情况
 
 * If a paging-structure entry is modified to change the U/S flag from 0 to 1,
 user-mode accesses to linear addresses whose translation is controlled by this
 entry may or may not cause a page-fault exception.
 
+>> U/S flag 0->1, user-mode 访问也是上述情况
+
 * If a paging-structure entry is modified to change the XD flag from 1 to 0,
 instruction fetches from linear addresses whose translation is controlled by
 this entry may or may not cause a page-fault exception.
+
+>> XD flag 1->0, instruction fetches也是这种情况。
 
 As noted in Section 9.1.1, an x87 instruction or an SSE instruction that
 accesses data larger than a quadword may be implemented using multiple memory
 accesses. If such an instruction stores to memory and invalidation has been
 delayed, some of the accesses may complete (writing to memory) while another
-causes a page-fault excep- tion.1 In this case, the effects of the completed
+causes a page-fault exception.1 In this case, the effects of the completed
 accesses may be visible to software even though the overall instruc- tion
 caused a fault.
+
+> <font color="red">
+> x87 / SSE 相关, 先不看。
+> </font>
 
 In some cases, the consequences of delayed invalidation may not affect software
 adversely. For example, when freeing a portion of the linear-address space (by
@@ -1228,13 +1418,28 @@ speculative execution (or errant software), there may be accesses to the freed
 portion of the linear-address space before the invalidations occur. In this
 case, the following can happen:
 
+> errant [ˈerənt]: 犯错的，行为不当的
+>
+> 在某些情况下，delayed invalidation 可能不会对软件不利。例如，当释放一段线性
+> 地址空间是(通过让paging-structure entry 标记为 "not present"), 如果软件
+> 没有对该线性地址区域重新分配或者与之相关的memory, 使用 INVLPG 指令 
+> invalidation 可以被 delayed。但是，因为投机执行(或者犯错的软件), 他们也可能
+> 在 invldation 发挥僧之前会访问 线性地址空间的freed 的部分, 在这种情况下，
+> 会发生:
+
 * Reads can occur to the freed portion of the linear-address space. Therefore,
 invalidation should not be delayed for an address range that has read side
 effects.
 
+> 对线性地址空间的释放的部分读取操作可以发生。因此，对于具有读取副作用的地址
+> 范围的 invalidation 不应该 delay 
+
 * The processor may retain entries in the TLBs and paging-structure caches for an
 extended period of time. Software should not assume that the processor will not
 use entries associated with a linear address simply because time has passed.
+
+> 处理器可能将TLBs和paging-structure cache的 entries保留一段延长的时间。软件
+> 不应该简单因为已经过去一段时间而假设处理器不会使用该 线性地址相关的entries
 
 * As noted in Section 4.10.3.1, the processor may create an entry in a
 paging-structure cache even if there are no translations for any linear address
@@ -1243,6 +1448,12 @@ entries in a page table, the processor may subsequently create a PDE-cache
 entry for the PDE that references that page table (assuming that the PDE itself
 is marked “present”).
 
+> 如Section 4.10.3.1中提到的，处理器即使使用该entry的任何线性地址不会有
+> translation 的情况下也可能在paging-structure cache 中为其创建entry。因此，
+> 如果软件 将一个page table中的所有entries都标记成了"not present", 处理器
+> 也可能为该指向 那个page table 的PDE创建PDE-cache entry(假设PDE本身被标记
+> 成"present")
+
 * If software attempts to write to the freed portion of the linear-address space,
 the processor might not generate a page fault. (Such an attempt would likely be
 the result of a software error.) For that reason, the page frames previously
@@ -1250,8 +1461,14 @@ associated with the freed portion of the linear-address space should not be
 reallocated for another purpose until the appropriate invalidations have been
 performed.
 
-## 4.10.5 Propagation of Paging-Structure Changes to Multiple Processors As
-noted in Section 4.10.4, software that modifies a paging-structure entry may
+> 如果软件尝试去写线性地址空间已经释放的部分，处理器可能不会造成page fault.
+> (这样尝试更像是造成了软件上的错误）。基于该原因，和已经释放的线性地址空间
+> 的之前关联的page frame 在正确的invalidation执行之前，不应该重新分配给
+> 另一个目标
+
+## 4.10.5 Propagation of Paging-Structure Changes to Multiple Processors 
+
+As noted in Section 4.10.4, software that modifies a paging-structure entry may
 need to invalidate entries in the TLBs and paging-structure caches that were
 derived from the modified entry before it was modified. In a system containing
 more than one logical processor, software must account for the fact that there
@@ -1262,6 +1479,10 @@ propagating the changes to a paging-structure entry is commonly referred to as
 and/or interprocessor interrupts (IPI). The following items describe a simple
 but inefficient example of a TLB shootdown algorithm for processors supporting
 the Intel-64 and IA-32 architectures:
+
+> 正如Section 4.10.4中提到的，软件修改paging-structure entry 可能需要无效从该
+> 修改的entry, 在其修改之前获取的TLBs和paging-structure caches中的 entires。
+> (真TM严谨)。在一个包含了多个逻辑处理器的系统上, 软件
 
 1. Begin barrier: Stop all but one logical processor; that is, cause all but
    one to execute the HLT instruction or to enter a spin loop.
