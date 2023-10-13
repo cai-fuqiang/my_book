@@ -318,7 +318,12 @@ current VPID are invalidated even if EPT is not in use.<sup>5</sup>
 >    invalidate entries in the TLBs and paging-structure caches independent of
 >    VMX operation.
 
-> 
+> 在体系结构上<font color="red">(???)</font>无效 TLBs或者 paging-structure
+> caches中的条目独立于VMX operation (e.g., INVLPG, INVPCID)无效 linear mappings 
+> 和 combined mappings。他们只需要为 current VPID 做这样的操作。（但是对于
+> combined mappings, 会无效所有 EP4TAs相关)。对于当前 VPID Linear mapping
+> 即使在 EPT 被使用的使用也可能invaliate。对于当前VPID 的 Combined mapping  在EPT
+> 没有被使用的时候，也可能被 invalidate。
 
 * An EPT violation invalidates any guest-physical mappings (associated with the
 current EP4TA) that would be used to translate the guest-physical address that
@@ -327,14 +332,27 @@ a linear address, the EPT violation also invalidates any combined mappings for
 that linear address associated with the current PCID, the current VPID and the
 current EP4TA.
 
-* If the “enable VPID” VM-execution control is 0, VM entries and VM exits
+> EPT violation 会 invalidate 所有 guest-physical mappings ( 和当前EP4TA
+> 相关联的), 这些mapping用于翻译  造成本次 EPT violation 的GPA. 如果 
+> 该GPA 是某个 linear address(GVA) 的 translation 的结果（也就是GVA翻译
+> 成该GPA), EPT violation 也会无效对于该 liner address 并且和 当前PCID
+> 相关的 combined mappings。
+
+* If the "enable VPID" VM-execution control is 0, VM entries and VM exits
 invalidate linear mappings and combined mappings associated with VPID 0000H
 (for all PCIDs). Combined mappings for VPID 0000H are invalidated for all
 EP4TAs.
 
+> 如果 "enable VPID" VM-execution control 是0, VM entries 和 VM exits 会
+> invalidate 和 VPID 000H(对于所有PCIDs) 相关的 linear mappings 和 combined 
+> mappings. 对于VPID 000H 的 Combined mappings会无效全部的 EP4TAs。
+
 * Execution of the INVVPID instruction invalidates linear mappings and combined
 mappings. Invalidation is based on instruction operands, called the INVVPID
 type and the INVVPID descriptor. Four INVVPID types are currently defined:
+    > 执行 INVVPID 指令会无效linear mappings和 combined mappings. 该invalidation
+    > 指令操作数。被称为 INVVPID type 和 INVVPID descriptor。目前定义了四种INVVPID 
+    > type, 如下:
     + Individual-address. If the INVVPID type is 0, the logical processor
       invalidates linear mappings and combined mappings associated with the
       VPID specified in the INVVPID descriptor and that would be used to
@@ -343,6 +361,8 @@ type and the INVVPID descriptor. Four INVVPID types are currently defined:
       are invalidated for all PCIDs and, for combined mappings, all EP4TAs.
       (The instruction may also invalidate mappings associated with other VPIDs
       and for other linear addresses.)
+
+      > 
     + Single-context. If the INVVPID type is 1, the logical processor
       invalidates all linear mappings and combined mappings associated with the
       VPID specified in the INVVPID descriptor. Linear mappings and combined
