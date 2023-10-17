@@ -397,7 +397,7 @@ MSR都是64-bit unsigned integers)
  WRMSR to deadline顺序; 不需要 fencing)
 
 ## VMX-Preemption Timer
-该timer是给 VMX non-root operation 下用的，细节如下:
+该timer是给 VMX non-root operation 下用的. intel sdm中有三个地方讲解了
 
 如果设置了`active VMX-preemption timer`为1, `VMX-preemption timer` 就会在VMX
 non-root operation 中 count down(VM entry 时会load (详见intel sdm 26.7.4 ))。
@@ -425,6 +425,8 @@ VMX-preemption timer 运行在 c-states C0, C1, C2; 它也可以运行
 的其他的任意状态下 count down 到0, logical processor 会转换到C0 C-state
 并且产生一个 VM exit。如果timer 在wait-for-SIPI state 中count down to 0,
 将不会产生vm-exit。timer 也不会在 deeper than C2 的C-state 下 decrement。
+
+# 
 
 # PS
 ## CPUID 15H
