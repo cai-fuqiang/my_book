@@ -20,10 +20,19 @@ Date:   Sun Dec 10 02:21:36 2006 -0800
 ```
 https://lore.kernel.org/kvm/86802c440611070859g5bb3c8b0q6b05b4ef2782d682@mail.gmail.com/
 
-# Replace atomic allocations by preallocated objects
+# [PATCH 0/33] KVM: MMU: Cache shadow page tables
+https://lore.kernel.org/all/459D21DD.5090506@qumranet.com/
+## KVM: MMU: Implement simple reverse mapping
+commit cd4a4e5374110444dc38831af517e51ff5a053c3
+Author: Avi Kivity <avi@qumranet.com>
+Date:   Fri Jan 5 16:36:38 2007 -0800
+
+    [PATCH] KVM: MMU: Implement simple reverse mapping
+
+
+## Replace atomic allocations by preallocated objects
 commit 714b93da1a6d97307dfafb9915517879d8a66c0d
 Author: Avi Kivity <avi@qumranet.com>
 Date:   Fri Jan 5 16:36:53 2007 -0800
 
     [PATCH] KVM: MMU: Replace atomic allocations by preallocated objects
-
