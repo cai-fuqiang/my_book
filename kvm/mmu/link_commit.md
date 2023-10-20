@@ -21,7 +21,7 @@ Date:   Sun Dec 10 02:21:36 2006 -0800
 https://lore.kernel.org/kvm/86802c440611070859g5bb3c8b0q6b05b4ef2782d682@mail.gmail.com/
 
 # [PATCH 0/33] KVM: MMU: Cache shadow page tables
-https://lore.kernel.org/all/459D21DD.5090506@qumranet.com/
+https://lore.kernel.org/all/458D21DD.5090506@qumranet.com/
 ## KVM: MMU: Implement simple reverse mapping
 commit cd4a4e5374110444dc38831af517e51ff5a053c3
 Author: Avi Kivity <avi@qumranet.com>
@@ -36,3 +36,14 @@ Author: Avi Kivity <avi@qumranet.com>
 Date:   Fri Jan 5 16:36:53 2007 -0800
 
     [PATCH] KVM: MMU: Replace atomic allocations by preallocated objects
+
+
+
+# KVM MMU pdf
+https://events.static.linuxfound.org/slides/2011/linuxcon-japan/lcj2011_guangrong.pdf
+
+
+# CVE 
+https://lore.kernel.org/kvm/1580407316-11391-1-git-send-email-pbonzini@redhat.com/
+# patch
+https://github.com/torvalds/linux/commit/8c6de56a42e0c657955e12b882a81ef07d1d073e?diff=unified

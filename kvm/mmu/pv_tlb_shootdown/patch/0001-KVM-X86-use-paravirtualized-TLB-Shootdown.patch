@@ -1,0 +1,154 @@
+From 858a43aae23672d46fe802a41f4748f322965182 Mon Sep 17 00:00:00 2001
+From: Wanpeng Li <wanpeng.li@hotmail.com>
+Date: Tue, 12 Dec 2017 17:33:02 -0800
+Subject: [PATCH 1/3] KVM: X86: use paravirtualized TLB Shootdown
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Remote TLB flush does a busy wait which is fine in bare-metal
+scenario. But with-in the guest, the vcpus might have been pre-empted or
+blocked. In this scenario, the initator vcpu would end up busy-waiting
+for a long amount of time; it also consumes CPU unnecessarily to wake
+up the target of the shootdown.
+
+This patch set adds support for KVM's new paravirtualized TLB flush;
+remote TLB flush does not wait for vcpus that are sleeping, instead
+KVM will flush the TLB as soon as the vCPU starts running again.
+
+The improvement is clearly visible when the host is overcommitted; in this
+case, the PV TLB flush (in addition to avoiding the wait on the main CPU)
+prevents preempted vCPUs from stealing precious execution time from the
+running ones.
+
+Testing on a Xeon Gold 6142 2.6GHz 2 sockets, 32 cores, 64 threads,
+so 64 pCPUs, and each VM is 64 vCPUs.
+
+ebizzy -M
+              vanilla    optimized     boost
+1VM            46799       48670         4%
+2VM            23962       42691        78%
+3VM            16152       37539       132%
+
+Cc: Paolo Bonzini <pbonzini@redhat.com>
+Cc: Radim Krčmář <rkrcmar@redhat.com>
+Cc: Peter Zijlstra <peterz@infradead.org>
+Signed-off-by: Wanpeng Li <wanpeng.li@hotmail.com>
+Signed-off-by: Paolo Bonzini <pbonzini@redhat.com>
+Signed-off-by: Radim Krčmář <rkrcmar@redhat.com>
+---
+ Documentation/virtual/kvm/cpuid.txt  |  4 +++
+ arch/x86/include/uapi/asm/kvm_para.h |  2 ++
+ arch/x86/kernel/kvm.c                | 47 ++++++++++++++++++++++++++++
+ 3 files changed, 53 insertions(+)
+
+diff --git a/Documentation/virtual/kvm/cpuid.txt b/Documentation/virtual/kvm/cpuid.txt
+index 3c65feb83010..dcab6dc11e3b 100644
+--- a/Documentation/virtual/kvm/cpuid.txt
++++ b/Documentation/virtual/kvm/cpuid.txt
+@@ -54,6 +54,10 @@ KVM_FEATURE_PV_UNHALT              ||     7 || guest checks this feature bit
+                                    ||       || before enabling paravirtualized
+                                    ||       || spinlock support.
+ ------------------------------------------------------------------------------
++KVM_FEATURE_PV_TLB_FLUSH           ||     9 || guest checks this feature bit
++                                   ||       || before enabling paravirtualized
++                                   ||       || tlb flush.
++------------------------------------------------------------------------------
+ KVM_FEATURE_CLOCKSOURCE_STABLE_BIT ||    24 || host will warn if no guest-side
+                                    ||       || per-cpu warps are expected in
+                                    ||       || kvmclock.
+diff --git a/arch/x86/include/uapi/asm/kvm_para.h b/arch/x86/include/uapi/asm/kvm_para.h
+index 15685bd22faa..7a2ade4aa235 100644
+--- a/arch/x86/include/uapi/asm/kvm_para.h
++++ b/arch/x86/include/uapi/asm/kvm_para.h
+@@ -25,6 +25,7 @@
+ #define KVM_FEATURE_STEAL_TIME		5
+ #define KVM_FEATURE_PV_EOI		6
+ #define KVM_FEATURE_PV_UNHALT		7
++#define KVM_FEATURE_PV_TLB_FLUSH	9
+ 
+ /* The last 8 bits are used to indicate how to interpret the flags field
+  * in pvclock structure. If no bits are set, all flags are ignored.
+@@ -52,6 +53,7 @@ struct kvm_steal_time {
+ };
+ 
+ #define KVM_VCPU_PREEMPTED          (1 << 0)
++#define KVM_VCPU_FLUSH_TLB          (1 << 1)
+ 
+ #define KVM_CLOCK_PAIRING_WALLCLOCK 0
+ struct kvm_clock_pairing {
+diff --git a/arch/x86/kernel/kvm.c b/arch/x86/kernel/kvm.c
+index 6610b92fc6a5..4e37d1a851a6 100644
+--- a/arch/x86/kernel/kvm.c
++++ b/arch/x86/kernel/kvm.c
+@@ -498,6 +498,34 @@ static void __init kvm_apf_trap_init(void)
+ 	update_intr_gate(X86_TRAP_PF, async_page_fault);
+ }
+ 
++static DEFINE_PER_CPU(cpumask_var_t, __pv_tlb_mask);
++
++static void kvm_flush_tlb_others(const struct cpumask *cpumask,
++			const struct flush_tlb_info *info)
++{
++	u8 state;
++	int cpu;
++	struct kvm_steal_time *src;
++	struct cpumask *flushmask = this_cpu_cpumask_var_ptr(__pv_tlb_mask);
++
++	cpumask_copy(flushmask, cpumask);
++	/*
++	 * We have to call flush only on online vCPUs. And
++	 * queue flush_on_enter for pre-empted vCPUs
++	 */
++	for_each_cpu(cpu, flushmask) {
++		src = &per_cpu(steal_time, cpu);
++		state = READ_ONCE(src->preempted);
++		if ((state & KVM_VCPU_PREEMPTED)) {
++			if (try_cmpxchg(&src->preempted, &state,
++					state | KVM_VCPU_FLUSH_TLB))
++				__cpumask_clear_cpu(cpu, flushmask);
++		}
++	}
++
++	native_flush_tlb_others(flushmask, info);
++}
++
+ static void __init kvm_guest_init(void)
+ {
+ 	int i;
+@@ -517,6 +545,9 @@ static void __init kvm_guest_init(void)
+ 		pv_time_ops.steal_clock = kvm_steal_clock;
+ 	}
+ 
++	if (kvm_para_has_feature(KVM_FEATURE_PV_TLB_FLUSH))
++		pv_mmu_ops.flush_tlb_others = kvm_flush_tlb_others;
++
+ 	if (kvm_para_has_feature(KVM_FEATURE_PV_EOI))
+ 		apic_set_eoi_write(kvm_guest_apic_eoi_write);
+ 
+@@ -598,6 +629,22 @@ static __init int activate_jump_labels(void)
+ }
+ arch_initcall(activate_jump_labels);
+ 
++static __init int kvm_setup_pv_tlb_flush(void)
++{
++	int cpu;
++
++	if (kvm_para_has_feature(KVM_FEATURE_PV_TLB_FLUSH)) {
++		for_each_possible_cpu(cpu) {
++			zalloc_cpumask_var_node(per_cpu_ptr(&__pv_tlb_mask, cpu),
++				GFP_KERNEL, cpu_to_node(cpu));
++		}
++		pr_info("KVM setup pv remote TLB flush\n");
++	}
++
++	return 0;
++}
++arch_initcall(kvm_setup_pv_tlb_flush);
++
+ #ifdef CONFIG_PARAVIRT_SPINLOCKS
+ 
+ /* Kick a cpu by its apicid. Used to wake up a halted vcpu */
+-- 
+2.41.0
+

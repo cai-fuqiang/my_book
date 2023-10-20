@@ -1,0 +1,86 @@
+From f38a7b75267f1fb240a8178cbcb16d66dd37aac8 Mon Sep 17 00:00:00 2001
+From: Wanpeng Li <wanpeng.li@hotmail.com>
+Date: Tue, 12 Dec 2017 17:33:04 -0800
+Subject: [PATCH 3/3] KVM: X86: support paravirtualized help for TLB shootdowns
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+When running on a virtual machine, IPIs are expensive when the target
+CPU is sleeping.  Thus, it is nice to be able to avoid them for TLB
+shootdowns.  KVM can just do the flush via INVVPID on the guest's behalf
+the next time the CPU is scheduled.
+
+Cc: Paolo Bonzini <pbonzini@redhat.com>
+Cc: Radim Krčmář <rkrcmar@redhat.com>
+Cc: Peter Zijlstra <peterz@infradead.org>
+Signed-off-by: Wanpeng Li <wanpeng.li@hotmail.com>
+[Use "&" to test the bit instead of "==". - Paolo]
+Signed-off-by: Paolo Bonzini <pbonzini@redhat.com>
+Signed-off-by: Radim Krčmář <rkrcmar@redhat.com>
+---
+ arch/x86/kvm/cpuid.c |  3 ++-
+ arch/x86/kvm/x86.c   | 19 ++++++++++++-------
+ 2 files changed, 14 insertions(+), 8 deletions(-)
+
+diff --git a/arch/x86/kvm/cpuid.c b/arch/x86/kvm/cpuid.c
+index 3db9e1cd4f63..a0e6c975f3a8 100644
+--- a/arch/x86/kvm/cpuid.c
++++ b/arch/x86/kvm/cpuid.c
+@@ -602,7 +602,8 @@ static inline int __do_cpuid_ent(struct kvm_cpuid_entry2 *entry, u32 function,
+ 			     (1 << KVM_FEATURE_ASYNC_PF) |
+ 			     (1 << KVM_FEATURE_PV_EOI) |
+ 			     (1 << KVM_FEATURE_CLOCKSOURCE_STABLE_BIT) |
+-			     (1 << KVM_FEATURE_PV_UNHALT);
++			     (1 << KVM_FEATURE_PV_UNHALT) |
++			     (1 << KVM_FEATURE_PV_TLB_FLUSH);
+ 
+ 		if (sched_info_on())
+ 			entry->eax |= (1 << KVM_FEATURE_STEAL_TIME);
+diff --git a/arch/x86/kvm/x86.c b/arch/x86/kvm/x86.c
+index 1e6d9f2d1f0b..35d0b3de697b 100644
+--- a/arch/x86/kvm/x86.c
++++ b/arch/x86/kvm/x86.c
+@@ -2122,6 +2122,12 @@ static void kvmclock_reset(struct kvm_vcpu *vcpu)
+ 	vcpu->arch.pv_time_enabled = false;
+ }
+ 
++static void kvm_vcpu_flush_tlb(struct kvm_vcpu *vcpu, bool invalidate_gpa)
++{
++	++vcpu->stat.tlb_flush;
++	kvm_x86_ops->tlb_flush(vcpu, invalidate_gpa);
++}
++
+ static void record_steal_time(struct kvm_vcpu *vcpu)
+ {
+ 	if (!(vcpu->arch.st.msr_val & KVM_MSR_ENABLED))
+@@ -2131,7 +2137,12 @@ static void record_steal_time(struct kvm_vcpu *vcpu)
+ 		&vcpu->arch.st.steal, sizeof(struct kvm_steal_time))))
+ 		return;
+ 
+-	vcpu->arch.st.steal.preempted = 0;
++	/*
++	 * Doing a TLB flush here, on the guest's behalf, can avoid
++	 * expensive IPIs.
++	 */
++	if (xchg(&vcpu->arch.st.steal.preempted, 0) & KVM_VCPU_FLUSH_TLB)
++		kvm_vcpu_flush_tlb(vcpu, false);
+ 
+ 	if (vcpu->arch.st.steal.version & 1)
+ 		vcpu->arch.st.steal.version += 1;  /* first time write, random junk */
+@@ -6781,12 +6792,6 @@ static void vcpu_scan_ioapic(struct kvm_vcpu *vcpu)
+ 	kvm_x86_ops->load_eoi_exitmap(vcpu, eoi_exit_bitmap);
+ }
+ 
+-static void kvm_vcpu_flush_tlb(struct kvm_vcpu *vcpu, bool invalidate_gpa)
+-{
+-	++vcpu->stat.tlb_flush;
+-	kvm_x86_ops->tlb_flush(vcpu, invalidate_gpa);
+-}
+-
+ void kvm_arch_mmu_notifier_invalidate_range(struct kvm *kvm,
+ 		unsigned long start, unsigned long end)
+ {
+-- 
+2.41.0
+
