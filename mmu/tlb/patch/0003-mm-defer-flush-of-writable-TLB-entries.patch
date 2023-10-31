@@ -1,0 +1,150 @@
+From d950c9477d51f0cefc2ed3cf76e695d46af0d9c1 Mon Sep 17 00:00:00 2001
+From: Mel Gorman <mgorman@suse.de>
+Date: Fri, 4 Sep 2015 15:47:35 -0700
+Subject: [PATCH 3/4] mm: defer flush of writable TLB entries
+
+If a PTE is unmapped and it's dirty then it was writable recently.  Due to
+deferred TLB flushing, it's best to assume a writable TLB cache entry
+exists.  With that assumption, the TLB must be flushed before any IO can
+start or the page is freed to avoid lost writes or data corruption.  This
+patch defers flushing of potentially writable TLBs as long as possible.
+
+> 如果PTE是未映射的并且它是脏的，那么它最近是可写的。由于延迟TLB刷新，
+> 最好假设存在可写TLB缓存项。在这种假设下，必须先刷新TLB，然后才能启动
+> 任何IO或释放页面，以避免写入丢失或数据损坏。此修补程序会尽可能长时间
+> 地推迟可能可写入的TLB的刷新。
+
+Signed-off-by: Mel Gorman <mgorman@suse.de>
+Reviewed-by: Rik van Riel <riel@redhat.com>
+Cc: Dave Hansen <dave.hansen@intel.com>
+Acked-by: Ingo Molnar <mingo@kernel.org>
+Cc: Linus Torvalds <torvalds@linux-foundation.org>
+Signed-off-by: Andrew Morton <akpm@linux-foundation.org>
+Signed-off-by: Linus Torvalds <torvalds@linux-foundation.org>
+---
+ include/linux/sched.h |  7 +++++++
+ mm/internal.h         |  4 ++++
+ mm/rmap.c             | 28 +++++++++++++++++++++-------
+ mm/vmscan.c           |  7 ++++++-
+ 4 files changed, 38 insertions(+), 8 deletions(-)
+
+diff --git a/include/linux/sched.h b/include/linux/sched.h
+index 3c602c20c717..a4ab9daa387c 100644
+--- a/include/linux/sched.h
++++ b/include/linux/sched.h
+@@ -1354,6 +1354,13 @@ struct tlbflush_unmap_batch {
+ 
+ 	/* True if any bit in cpumask is set */
+ 	bool flush_required;
++
++	/*
++	 * If true then the PTE was dirty when unmapped. The entry must be
++	 * flushed before IO is initiated or a stale TLB entry potentially
++	 * allows an update without redirtying the page.
++	 */
++	bool writable;
+ };
+ 
+ struct task_struct {
+diff --git a/mm/internal.h b/mm/internal.h
+index bd6372ac5f7f..1195dd2d6a2b 100644
+--- a/mm/internal.h
++++ b/mm/internal.h
+@@ -431,10 +431,14 @@ struct tlbflush_unmap_batch;
+ 
+ #ifdef CONFIG_ARCH_WANT_BATCHED_UNMAP_TLB_FLUSH
+ void try_to_unmap_flush(void);
++void try_to_unmap_flush_dirty(void);
+ #else
+ static inline void try_to_unmap_flush(void)
+ {
+ }
++static inline void try_to_unmap_flush_dirty(void)
++{
++}
+ 
+ #endif /* CONFIG_ARCH_WANT_BATCHED_UNMAP_TLB_FLUSH */
+ #endif	/* __MM_INTERNAL_H */
+diff --git a/mm/rmap.c b/mm/rmap.c
+index 326d5d89e45c..0db38e7d0a72 100644
+--- a/mm/rmap.c
++++ b/mm/rmap.c
+@@ -626,16 +626,34 @@ void try_to_unmap_flush(void)
+ 	}
+ 	cpumask_clear(&tlb_ubc->cpumask);
+ 	tlb_ubc->flush_required = false;
++	tlb_ubc->writable = false;
+ 	put_cpu();
+ }
+ 
++/* Flush iff there are potentially writable TLB entries that can race with IO */
++void try_to_unmap_flush_dirty(void)
++{
++	struct tlbflush_unmap_batch *tlb_ubc = &current->tlb_ubc;
++
++	if (tlb_ubc->writable)
++		try_to_unmap_flush();
++}
++
+ static void set_tlb_ubc_flush_pending(struct mm_struct *mm,
+-		struct page *page)
++		struct page *page, bool writable)
+ {
+ 	struct tlbflush_unmap_batch *tlb_ubc = &current->tlb_ubc;
+ 
+ 	cpumask_or(&tlb_ubc->cpumask, &tlb_ubc->cpumask, mm_cpumask(mm));
+ 	tlb_ubc->flush_required = true;
++
++	/*
++	 * If the PTE was dirty then it's best to assume it's writable. The
++	 * caller must use try_to_unmap_flush_dirty() or try_to_unmap_flush()
++	 * before the page is queued for IO.
++	 */
++	if (writable)
++		tlb_ubc->writable = true;
+ }
+ 
+ /*
+@@ -658,7 +676,7 @@ static bool should_defer_flush(struct mm_struct *mm, enum ttu_flags flags)
+ }
+ #else
+ static void set_tlb_ubc_flush_pending(struct mm_struct *mm,
+-		struct page *page)
++		struct page *page, bool writable)
+ {
+ }
+ 
+@@ -1315,11 +1333,7 @@ static int try_to_unmap_one(struct page *page, struct vm_area_struct *vma,
+ 		 */
+ 		pteval = ptep_get_and_clear(mm, address, pte);
+ 
+-		/* Potentially writable TLBs must be flushed before IO */
+-		if (pte_dirty(pteval))
+-			flush_tlb_page(vma, address);
+-		else
+-			set_tlb_ubc_flush_pending(mm, page);
++		set_tlb_ubc_flush_pending(mm, page, pte_dirty(pteval));
+ 	} else {
+ 		pteval = ptep_clear_flush(vma, address, pte);
+ 	}
+diff --git a/mm/vmscan.c b/mm/vmscan.c
+index 99ec00d6a5dd..b1139039122a 100644
+--- a/mm/vmscan.c
++++ b/mm/vmscan.c
+@@ -1098,7 +1098,12 @@ static unsigned long shrink_page_list(struct list_head *page_list,
+ 			if (!sc->may_writepage)
+ 				goto keep_locked;
+ 
+-			/* Page is dirty, try to write it out here */
++			/*
++			 * Page is dirty. Flush the TLB if a writable entry
++			 * potentially exists to avoid CPU writes after IO
++			 * starts and then write it out here.
++			 */
++			try_to_unmap_flush_dirty();
+ 			switch (pageout(page, mapping, sc)) {
+ 			case PAGE_KEEP:
+ 				goto keep_locked;
+-- 
+2.41.0
+

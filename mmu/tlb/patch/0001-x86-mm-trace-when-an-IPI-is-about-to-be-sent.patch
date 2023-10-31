@@ -1,0 +1,90 @@
+From 5b74283ab251b9db55cbbe31d19ca72482103290 Mon Sep 17 00:00:00 2001
+From: Mel Gorman <mgorman@suse.de>
+Date: Fri, 4 Sep 2015 15:47:29 -0700
+Subject: [PATCH 1/4] x86, mm: trace when an IPI is about to be sent
+
+When unmapping pages it is necessary to flush the TLB.  If that page was
+accessed by another CPU then an IPI is used to flush the remote CPU.  That
+is a lot of IPIs if kswapd is scanning and unmapping >100K pages per
+second.
+
+There already is a window between when a page is unmapped and when it is
+TLB flushed.  This series increases the window so multiple pages can be
+flushed using a single IPI.  This should be safe or the kernel is hosed
+already.
+
+Patch 1 simply made the rest of the series easier to write as ftrace
+        could identify all the senders of TLB flush IPIS.
+
+Patch 2 tracks what CPUs potentially map a PFN and then sends an IPI
+        to flush the entire TLB.
+
+Patch 3 tracks when there potentially are writable TLB entries that
+        need to be batched differently
+
+Patch 4 increases SWAP_CLUSTER_MAX to further batch flushes
+
+The performance impact is documented in the changelogs but in the optimistic
+case on a 4-socket machine the full series reduces interrupts from 900K
+interrupts/second to 60K interrupts/second.
+
+This patch (of 4):
+
+It is easy to trace when an IPI is received to flush a TLB but harder to
+detect what event sent it.  This patch makes it easy to identify the
+source of IPIs being transmitted for TLB flushes on x86.
+
+Signed-off-by: Mel Gorman <mgorman@suse.de>
+Reviewed-by: Rik van Riel <riel@redhat.com>
+Reviewed-by: Dave Hansen <dave.hansen@intel.com>
+Acked-by: Ingo Molnar <mingo@kernel.org>
+Cc: Linus Torvalds <torvalds@linux-foundation.org>
+Signed-off-by: Andrew Morton <akpm@linux-foundation.org>
+Signed-off-by: Linus Torvalds <torvalds@linux-foundation.org>
+---
+ arch/x86/mm/tlb.c          | 1 +
+ include/linux/mm_types.h   | 1 +
+ include/trace/events/tlb.h | 3 ++-
+ 3 files changed, 4 insertions(+), 1 deletion(-)
+
+diff --git a/arch/x86/mm/tlb.c b/arch/x86/mm/tlb.c
+index 90b924acd982..8ddb5d0d66fb 100644
+--- a/arch/x86/mm/tlb.c
++++ b/arch/x86/mm/tlb.c
+@@ -140,6 +140,7 @@ void native_flush_tlb_others(const struct cpumask *cpumask,
+ 	info.flush_end = end;
+ 
+ 	count_vm_tlb_event(NR_TLB_REMOTE_FLUSH);
++	trace_tlb_flush(TLB_REMOTE_SEND_IPI, end - start);
+ 	if (is_uv_system()) {
+ 		unsigned int cpu;
+ 
+diff --git a/include/linux/mm_types.h b/include/linux/mm_types.h
+index 26a30c3566f0..c8d0a73d64c4 100644
+--- a/include/linux/mm_types.h
++++ b/include/linux/mm_types.h
+@@ -554,6 +554,7 @@ enum tlb_flush_reason {
+ 	TLB_REMOTE_SHOOTDOWN,
+ 	TLB_LOCAL_SHOOTDOWN,
+ 	TLB_LOCAL_MM_SHOOTDOWN,
++	TLB_REMOTE_SEND_IPI,
+ 	NR_TLB_FLUSH_REASONS,
+ };
+ 
+diff --git a/include/trace/events/tlb.h b/include/trace/events/tlb.h
+index 4250f364a6ca..bc8815f45f3b 100644
+--- a/include/trace/events/tlb.h
++++ b/include/trace/events/tlb.h
+@@ -11,7 +11,8 @@
+ 	EM(  TLB_FLUSH_ON_TASK_SWITCH,	"flush on task switch" )	\
+ 	EM(  TLB_REMOTE_SHOOTDOWN,	"remote shootdown" )		\
+ 	EM(  TLB_LOCAL_SHOOTDOWN,	"local shootdown" )		\
+-	EMe( TLB_LOCAL_MM_SHOOTDOWN,	"local mm shootdown" )
++	EM(  TLB_LOCAL_MM_SHOOTDOWN,	"local mm shootdown" )		\
++	EMe( TLB_REMOTE_SEND_IPI,	"remote ipi send" )
+ 
+ /*
+  * First define the enums in TLB_FLUSH_REASON to be exported to userspace
+-- 
+2.41.0
+

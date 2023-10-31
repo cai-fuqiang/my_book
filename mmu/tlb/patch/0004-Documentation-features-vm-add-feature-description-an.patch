@@ -1,0 +1,64 @@
+From c7e1e3ccfbd153c890240a391f258efaedfa94d0 Mon Sep 17 00:00:00 2001
+From: Mel Gorman <mgorman@suse.de>
+Date: Fri, 4 Sep 2015 15:47:38 -0700
+Subject: [PATCH 4/4] Documentation/features/vm: add feature description and
+ arch support status for batched TLB flush after unmap
+
+Signed-off-by: Mel Gorman <mgorman@suse.de>
+Acked-by: Ingo Molnar <mingo@kernel.org>
+Signed-off-by: Andrew Morton <akpm@linux-foundation.org>
+Signed-off-by: Linus Torvalds <torvalds@linux-foundation.org>
+---
+ .../features/vm/TLB/arch-support.txt          | 40 +++++++++++++++++++
+ 1 file changed, 40 insertions(+)
+ create mode 100644 Documentation/features/vm/TLB/arch-support.txt
+
+diff --git a/Documentation/features/vm/TLB/arch-support.txt b/Documentation/features/vm/TLB/arch-support.txt
+new file mode 100644
+index 000000000000..261b92e2fb1a
+--- /dev/null
++++ b/Documentation/features/vm/TLB/arch-support.txt
+@@ -0,0 +1,40 @@
++#
++# Feature name:          batch-unmap-tlb-flush
++#         Kconfig:       ARCH_WANT_BATCHED_UNMAP_TLB_FLUSH
++#         description:   arch supports deferral of TLB flush until multiple pages are unmapped
++#
++    -----------------------
++    |         arch |status|
++    -----------------------
++    |       alpha: | TODO |
++    |         arc: | TODO |
++    |         arm: | TODO |
++    |       arm64: | TODO |
++    |       avr32: |  ..  |
++    |    blackfin: | TODO |
++    |         c6x: |  ..  |
++    |        cris: |  ..  |
++    |         frv: |  ..  |
++    |       h8300: |  ..  |
++    |     hexagon: | TODO |
++    |        ia64: | TODO |
++    |        m32r: | TODO |
++    |        m68k: |  ..  |
++    |       metag: | TODO |
++    |  microblaze: |  ..  |
++    |        mips: | TODO |
++    |     mn10300: | TODO |
++    |       nios2: |  ..  |
++    |    openrisc: |  ..  |
++    |      parisc: | TODO |
++    |     powerpc: | TODO |
++    |        s390: | TODO |
++    |       score: |  ..  |
++    |          sh: | TODO |
++    |       sparc: | TODO |
++    |        tile: | TODO |
++    |          um: |  ..  |
++    |   unicore32: |  ..  |
++    |         x86: |  ok  |
++    |      xtensa: | TODO |
++    -----------------------
+-- 
+2.41.0
+
