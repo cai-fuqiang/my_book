@@ -101,7 +101,7 @@ rmap_walk
 
 `try_to_unmap_one` 改动:
 ```diff
-@@ -1220,7 +1305,24 @@ static int g(struct page *page, struct vm_area_struct *vma,
+@@ -1220,7 +1305,24 @@ static int try_to_unmap_one(struct page *page, struct vm_area_struct *vma,
 
     /* Nuke the page table entry. */
     flush_cache_page(vma, address, page_to_pfn(page));
