@@ -1,3 +1,4 @@
+```diff
 From 10af6235e0d327d42e1bad974385197817923dc1 Mon Sep 17 00:00:00 2001
 From: Andy Lutomirski <luto@kernel.org>
 Date: Mon, 24 Jul 2017 21:41:38 -0700
@@ -20,11 +21,17 @@ systems with over 4096 CPUs.  To make matters worse, past attempts
 to use all 12 PCID bits have resulted in slowdowns instead of
 speedups.
 
+unorthodox : 非正统的
+monster: 怪物
+to make matters worse: 更糟糕的是
+
 This patch uses PCID differently.  We use a PCID to identify a
 recently-used mm on a per-cpu basis.  An mm has no fixed PCID
 binding at all; instead, we give it a fresh PCID each time it's
 loaded except in cases where we want to preserve the TLB, in which
 case we reuse a recent value.
+
+preserve : 保留,保存
 
 Here are some benchmark results, done on a Skylake laptop at 2.3 GHz
 (turbo off, intel_pstate requesting max performance) under KVM with
@@ -325,4 +332,4 @@ index 593d2f76a54c..ce104b962a17 100644
  static void flush_tlb_func_local(void *info, enum tlb_flush_reason reason)
 -- 
 2.41.0
-
+```

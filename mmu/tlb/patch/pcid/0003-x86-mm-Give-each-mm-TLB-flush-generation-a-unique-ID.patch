@@ -12,6 +12,8 @@ flush actions and will be used in subsequent patches to reliably
 determine whether all needed TLB flushes have occurred on a given
 CPU.
 
+> reliably: 可靠的
+
 This patch is split out for ease of review.  By itself, it has no
 real effect other than creating and updating the new variables.
 

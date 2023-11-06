@@ -1,3 +1,4 @@
+```diff
 From b0579ade7cd82391360e959cc844e50a160e8a96 Mon Sep 17 00:00:00 2001
 From: Andy Lutomirski <luto@kernel.org>
 Date: Thu, 29 Jun 2017 08:53:16 -0700
@@ -8,6 +9,10 @@ There are two kernel features that would benefit from tracking
 how up-to-date each CPU's TLB is in the case where IPIs aren't keeping
 it up to date in real time:
 
+> up to date : 最新的
+
+在IPI无法实时更新的情况下，跟踪每个CPU的TLB的最新程度将有两个内核功能受益： 
+
  - Lazy mm switching currently works by switching to init_mm when
    it would otherwise flush.  This is wasteful: there isn't fundamentally
    any need to update CR3 at all when going lazy or when returning from
@@ -15,19 +20,37 @@ it up to date in real time:
    we should just stop trying to keep the TLB coherent when we go lazy and,
    when unlazying, check whether we missed any flushes.
 
+   fundamentally : 从根本上讲
+
+   Lazy mm 切换当前通过切换到init_mm来工作，否则它会flush。这是浪费：当进入
+   懒惰模式或从懒惰模式返回时，根本不需要更新CR3，也根本不需要接收刷新IPI。
+   相反，当我们变得懒惰时，我们应该停止试图保持TLB的一致性，当我们unlazy时，
+   检查我们是否错过了任何刷新。 
+
  - PCID will let us keep recent user contexts alive in the TLB.  If we
    start doing this, we need a way to decide whether those contexts are
    up to date.
+
+   PCID将使我们能够在TLB中保持最近的用户上下文。如果我们开始这样做，我
+   们需要一种方法来去顶这些环境是否是最新的。    
 
 On some paravirt systems, remote TLBs can be flushed without IPIs.
 This won't update the target CPUs' tlb_gens, which may cause
 unnecessary local flushes later on.  We can address this if it becomes
 a problem by carefully updating the target CPU's tlb_gen directly.
 
+在某些半虚拟化的系统上, remote TLBs 可以在没有IPIs的情况下刷新. 他们不会
+更新 target CPU的 tlb_gens, 这可能导致之后会有不需要的local flush.如果它成
+为一个问题，我们可以通过仔细地直接更新目标CPU的tlb_gen来解决这个问题。
+
 By itself, this patch is a very minor optimization that avoids
 unnecessary flushes when multiple TLB flushes targetting the same CPU
 race.  The complexity in this patch would not be worth it on its own,
 but it will enable improved lazy TLB tracking and PCID.
+
+就其本身而言，此补丁是一个非常小的优化，可以避免在针对同一CPU竞争的多
+个TLB刷新时进行不必要的刷新。这个补丁的复杂性本身并不值得，但它将改进LAZY
+TLB跟踪和PCID。
 
 Signed-off-by: Andy Lutomirski <luto@kernel.org>
 Reviewed-by: Nadav Amit <nadav.amit@gmail.com>
@@ -266,4 +289,4 @@ index 14f4f8f66aa8..4e5a5ddb9e4d 100644
  	if ((end != TLB_FLUSH_ALL) &&
 -- 
 2.41.0
-
+```
