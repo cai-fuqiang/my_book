@@ -1,3 +1,4 @@
+```diff
 From bc0d5a89fbe3c83ac45438d7ba88309f4713615d Mon Sep 17 00:00:00 2001
 From: Andy Lutomirski <luto@kernel.org>
 Date: Thu, 29 Jun 2017 08:53:13 -0700
@@ -97,4 +98,4 @@ index b2485d69f7c2..1cc47838d1e8 100644
  	cpumask_clear(&batch->cpumask);
 -- 
 2.41.0
-
+```

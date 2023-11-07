@@ -29,7 +29,15 @@ Author: Linus Torvalds <torvalds@linuxfoundation.org>
 Date:   Fri Nov 23 15:37:06 2007 -0500
 
     Import 2.4.0-test5pre5
+
+commit 3d28ebceaffab40f30afa87e33331560148d7b8b
+Author: Andy Lutomirski <luto@kernel.org>
+Date:   Sun May 28 10:00:15 2017 -0700
+
+    x86/mm: Rework lazy TLB to track the actual loaded mm
 ```
+
+
 
 # PCID and improved laziness
 https://lore.kernel.org/all/cover.1498751203.git.luto@kernel.org/
