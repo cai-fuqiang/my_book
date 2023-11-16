@@ -83,7 +83,7 @@ struct kimage {
          * 跳转到第二个kernel之前, 可能有一些中间跳转代码,
          * 放到该page中, 改指针为第一个control_code page 的首地址
          */
-        struct page *control_code_page;     
+        struct page *control_code_page;     //跳转代码     
         struct page *swap_page;
         void *vmcoreinfo_data_copy; /* locates in the crash memory */
 
@@ -185,10 +185,353 @@ struct kexec_file_ops {
 
 ## 代码流程
 代码流程主要分为几个部分:
-<!--* reserve crash kernel memory-->
+* reserve crash kernel memory
 * kexec_file_load() syscall
 * panic->第二个kernel 引导流程
 * 第二个kernel 部分流程
+
+### reserve crash kernel memory
+我们以arm64为例
+> NOTE
+>
+> x86也类似,但是在改版kernel中arm64不支持类似于 crashkernel=1024M,high
+> 这样的参数,而x86支持, 后面我们会解析arm64 支持该功能的相关patch
+
+在`admin-guide/kernel-parameters.txt`中有对`crashkernel=` cmdline的解释:
+```
+crashkernel=size[KMG][@offset[KMG]]
+				[KNL] Using kexec, Linux can switch to a 'crash kernel'
+				upon panic. This parameter reserves the physical
+				memory region [offset, offset + size] for that kernel
+				image. If '@offset' is omitted, then a suitable offset
+				is selected automatically.
+				[KNL, x86_64] select a region under 4G first, and
+				fall back to reserve region above 4G when '@offset'
+				hasn't been specified.
+				See Documentation/admin-guide/kdump/kdump.rst for further details.
+
+crashkernel=range1:size1[,range2:size2,...][@offset]
+				[KNL] Same as above, but depends on the memory
+				in the running system. The syntax of range is
+				start-[end] where start and end are both
+				a memory unit (amount[KMG]). See also
+				Documentation/admin-guide/kdump/kdump.rst for an example.
+
+crashkernel=size[KMG],high
+                [KNL, x86_64] range could be above 4G. Allow kernel
+                to allocate physical memory region from top, so could
+                be above 4G if system have more than 4G ram installed.
+                Otherwise memory region will be allocated below 4G, if
+                available.
+                It will be ignored if crashkernel=X is specified.
+crashkernel=size[KMG],low
+                [KNL, x86_64] range under 4G. When crashkernel=X,high
+                is passed, kernel could allocate physical memory region
+                above 4G, that cause second kernel crash on system
+                that require some amount of low memory, e.g. swiotlb
+                requires at least 64M+32K low memory, also enough extra
+                low memory is needed to make sure DMA buffers for 32-bit
+                devices won't run out. Kernel would try to allocate at
+                at least 256M below 4G automatically.
+                This one let user to specify own low range under 4G
+                for second kernel instead.
+                0: to disable low allocation.
+                It will be ignored when crashkernel=X,high is not used
+                or memory reserved is below 4G.
+
+```
+
+其实还有一种:
+```
+crashkernel=auto
+```
+
+我们分别解释:
+* `crashkernel=size[KMG][@offset[KMG]` : 
+
+  在offset处选取size大小的memory用于crashkernel, 例如 `crashkernel=128M@1G`, 在1G左右处预留128M空间
+
+  offset可以不设置,对于x86/arm64 会在low memory找到一个合适的位置(根据memblock来找).
+  x86是4G, 某些arm64也是4G, 也就是在4G以下的物理内存地址空间中找一块
+* `crashkernel=range1:size1[,range2:size2,...][@offset]`
+
+  同上,只不过预留的内存大小可以根据系统内存大小制定,例如`crashkernel=128M:1G-2G, 256M,2G`, 指的是,
+  如果系统内存为1G-2G, 则预留128M内存空间,如果系统内存为2G,则预留256M内存空间
+
+* `crashkernel=size[KMG],high`:
+
+  允许kernel在大于4G的内存空间中预留内存, 如果crashkernel=X指定,则该配置被忽略
+
+* `crashkernel=size[KMG],low`:
+
+  在4G内存以下的内存空间预留内存, 当`crashkernel=X,high`被设置时,kernel可以在高于4G内存之上预留内存,
+  但是可能会导致第二个内核分配不到low memory crash, e.g. `swiotlb` 至少需要64M+32K的 low memory, 
+  某些DMA也需要地内存
+
+  > NOTE
+  >
+  > 目前RHEL 8.6 kernel的arm64架构不支持 `crashkernel=X,high` / `crashkernel=X, low`这样的配置
+
+* `crashkernel=auto`
+
+  该方法也是从低内存分配,类似于第二种参数, 也是根据不同的系统内存大小选择预留内存大小,
+  只不过, 该大小是内核中默认定义的,而非用户指定.
+
+那么我们来看下内核代码:(以arm64为例)
+#### reserve_crashkernel
+```cpp
+/*
+ * reserve_crashkernel() - reserves memory for crash kernel
+ *
+ * This function reserves memory area given in "crashkernel=" kernel command
+ * line parameter. The memory reserved is used by dump capture kernel when
+ * primary kernel is crashing.
+ */
+static void __init reserve_crashkernel(void)
+{
+        unsigned long long crash_base, crash_size;
+        int ret;
+        //===================(1)===============
+        ret = parse_crashkernel(boot_command_line, memblock_phys_mem_size(),
+                                &crash_size, &crash_base);
+        /* no crashkernel= or invalid value specified */
+        if (ret || !crash_size)
+                return;
+
+        crash_size = PAGE_ALIGN(crash_size);
+        //===================(2)==============
+        if (crash_base == 0) {
+                /* Current arm64 boot protocol requires 2MB alignment */
+                crash_base = memblock_find_in_range(0, ARCH_LOW_ADDRESS_LIMIT,
+                                crash_size, SZ_2M);
+                if (crash_base == 0) {
+                        pr_warn("cannot allocate crashkernel (size:0x%llx)\n",
+                                crash_size);
+                        return;
+                }
+        } else {
+                //===================(3)==============
+                /* User specifies base address explicitly. */
+                if (!memblock_is_region_memory(crash_base, crash_size)) {
+                        pr_warn("cannot reserve crashkernel: region is not memory\n");
+                        return;
+                }
+
+                if (memblock_is_region_reserved(crash_base, crash_size)) {
+                        pr_warn("cannot reserve crashkernel: region overlaps reserved memory\n");
+                        return;
+                }
+
+                if (!IS_ALIGNED(crash_base, SZ_2M)) {
+                        pr_warn("cannot reserve crashkernel: base address is not 2MB aligned\n");
+                        return;
+                }
+        }
+        //===================(4)==============
+        memblock_reserve(crash_base, crash_size);
+
+        pr_info("crashkernel reserved: 0x%016llx - 0x%016llx (%lld MB)\n",
+                crash_base, crash_base + crash_size, crash_size >> 20);
+
+        crashk_res.start = crash_base;
+        crashk_res.end = crash_base + crash_size - 1;
+}
+```
+1. 解析`crashkernel= `cmdline 参数 (通过该函数获取 `crash_size`, `crash_base`, 可能根据参数不同,
+   还要根据系统内存`memblock_phys_mem_size()` 决定`crash_size`
+2. 如果`crash_base`为`0`, 则说明需要在low memory中, 找到一块合适的空间, 可以看到
+   `memblock_find_in_range()` 传递的参数为`ARCH_LOW_ADDRESS_LIMIT`
+3. 如果`crash_base`不为0, 则说明指定了起始位置, 需要看下该range 是否在memory memblock内, 如果
+   没有, 或者在 之前被预留了 (在 reserved memblock内) ,则报错. 并且保证是 2M对齐的
+4. 预留该部分内存
+
+我们详细看下`parse_crashkernel()`函数
+
+#### parse_crashkernel
+```cpp
+/*
+ * That function is the entry point for command line parsing and should be
+ * called from the arch-specific code.
+ */
+int __init parse_crashkernel(char *cmdline,
+                             unsigned long long system_ram,
+                             unsigned long long *crash_size,
+                             unsigned long long *crash_base)
+{
+        //========(1)============
+        return __parse_crashkernel(cmdline, system_ram, crash_size, crash_base,
+                                        "crashkernel=", NULL);
+}
+
+static int __init __parse_crashkernel(char *cmdline,
+                             unsigned long long system_ram,
+                             unsigned long long *crash_size,
+                             unsigned long long *crash_base,
+                             const char *name,
+                             const char *suffix)
+{
+        char    *first_colon, *first_space;
+        char    *ck_cmdline;
+
+        BUG_ON(!crash_size || !crash_base);
+        *crash_size = 0;
+        *crash_base = 0;
+        //=========(2)============
+        ck_cmdline = get_last_crashkernel(cmdline, name, suffix);
+
+        if (!ck_cmdline)
+                return -EINVAL;
+
+        ck_cmdline += strlen(name);
+
+        if (suffix)
+                return parse_crashkernel_suffix(ck_cmdline, crash_size,
+                                suffix);
+        //=========(3)============
+        if (strncmp(ck_cmdline, "auto", 4) == 0) {
+#if defined(CONFIG_X86_64) || defined(CONFIG_S390)
+                ck_cmdline = "1G-4G:160M,4G-64G:192M,64G-1T:256M,1T-:512M";
+#elif defined(CONFIG_ARM64)
+                ck_cmdline = "2G-:448M";
+#elif defined(CONFIG_PPC64)
+                char *fadump_cmdline;
+
+                fadump_cmdline = get_last_crashkernel(cmdline, "fadump=", NULL);
+                fadump_cmdline = fadump_cmdline ?
+                                fadump_cmdline + strlen("fadump=") : NULL;
+                if (!fadump_cmdline || (strncmp(fadump_cmdline, "off", 3) == 0))
+                        ck_cmdline = "2G-4G:384M,4G-16G:512M,16G-64G:1G,64G-128G:2G,128G-:4G";
+                else
+                        ck_cmdline = "4G-16G:768M,16G-64G:1G,64G-128G:2G,128G-1T:4G,1T-2T:6G,2T-4T:12G,4T-8T:20G,8T-16T:36G,16T-32T:64G,32T-64T:128G,64T-:180G";
+#endif
+                pr_info("Using crashkernel=auto, the size chosen is a best effort estimation.\n");
+        }
+
+        /*
+         * if the commandline contains a ':', then that's the extended
+         * syntax -- if not, it must be the classic syntax
+         */
+        first_colon = strchr(ck_cmdline, ':');
+        first_space = strchr(ck_cmdline, ' ');
+        //=========(4)============
+        if (strncmp(ck_cmdline, "auto", 4) == 0) {
+        if (first_colon && (!first_space || first_colon < first_space))
+                return parse_crashkernel_mem(ck_cmdline, system_ram,
+                                crash_size, crash_base);
+
+        //=========(5)============
+        if (strncmp(ck_cmdline, "auto", 4) == 0) {
+        return parse_crashkernel_simple(ck_cmdline, crash_size, crash_base);
+}
+```
+1. 该函数有6个参数,其中最后一个是subfix参数, 该参数和`crashkernel=128M,high`这样的配置有关,
+   我们暂时不看
+2. 该函数会从cmdline中提取`crashkernel=`的字符串的首地址, 但是返回最后一个, 例如这样配置:
+   ```
+   crashkernel=auto crashkernel=128M
+   ```
+   最终生效的配置为`crashkernel=128M`
+3. 如果为`crashkernel=auto`, 则会根据物理内存大小`system_ram`, 由kernel自己来判断该预留
+   多大的crashkernel内存空间 对于arm64而言, 只要`>2G`就预留448M 空间
+4. 处理`crashkernel=128M:1G-2G, 256M:2G`的情况
+5. 处理其他情况
+
+这里我们只看下`parse_crashkernel_mem`相关代码
+```cpp
+static int __init parse_crashkernel_mem(char *cmdline,
+                                        unsigned long long system_ram,
+                                        unsigned long long *crash_size,
+                                        unsigned long long *crash_base)
+{
+        char *cur = cmdline, *tmp;
+        unsigned long long total_mem = system_ram;
+
+        /*
+         * Firmware sometimes reserves some memory regions for it's own use.
+         * so we get less than actual system memory size.
+         * Workaround this by round up the total size to 128M which is
+         * enough for most test cases.
+         */
+        total_mem = roundup(total_mem, SZ_128M);
+
+        /* for each entry of the comma-separated list */
+        do {
+                unsigned long long start, end = ULLONG_MAX, size;
+
+                /* get the start of the range */
+                //获取start
+                start = memparse(cur, &tmp);
+                if (cur == tmp) {
+                        pr_warn("crashkernel: Memory value expected\n");
+                        return -EINVAL;
+                }
+                cur = tmp;
+                //无论是1G-2G, 还是2G-, 都会有 - 字符,所以没有就报错
+                if (*cur != '-') {
+                        pr_warn("crashkernel: '-' expected\n");
+                        return -EINVAL;
+                }
+                cur++;
+                /* if no ':' is here, than we read the end */
+                if (*cur != ':') {
+                        //如果没有 : 则表示为1G-2G这种情况,需要提取end
+                        end = memparse(cur, &tmp);
+                        if (cur == tmp) {
+                                pr_warn("crashkernel: Memory value expected\n");
+                                return -EINVAL;
+                        }
+                        cur = tmp;
+                        //如果 end <= start,  也就是出现了2G-1G这样的配置, 说明配置的有问题
+                        if (end <= start) {
+                                pr_warn("crashkernel: end <= start\n");
+                                return -EINVAL;
+                        }
+                }
+                //无论是1G-2G:128M, 还是 1G-:128M 都会有 : , 没有就报错
+                if (*cur != ':') {
+                        pr_warn("crashkernel: ':' expected\n");
+                        return -EINVAL;
+                }
+                cur++;
+                // 获取size
+                size = memparse(cur, &tmp);
+                if (cur == tmp) {
+                        pr_warn("Memory value expected\n");
+                        return -EINVAL;
+                }
+                cur = tmp;
+                //如果这个大小比系统内存还要大, 则报错.
+                //例如系统内存1G, 现在要预留2G
+                if (size >= total_mem) {
+                        pr_warn("crashkernel: invalid size\n");
+                        return -EINVAL;
+                }
+                //看看系统内存是否满足这个区间,如果满足就退出循环
+                /* match ? */
+                if (total_mem >= start && total_mem < end) {
+                        *crash_size = size;
+                        break;
+                }
+        } while (*cur++ == ',');
+        //这种情况能够指定base
+        if (*crash_size > 0) {
+                while (*cur && *cur != ' ' && *cur != '@')
+                        cur++;
+                if (*cur == '@') {
+                        cur++;
+                        //获取base
+                        *crash_base = memparse(cur, &tmp);
+                        if (cur == tmp) {
+                                pr_warn("Memory value expected after '@'\n");
+                                return -EINVAL;
+                        }
+                }
+        } else
+                pr_info("crashkernel size resulted in zero bytes\n");
+
+        return 0;
+}
+```
 
 ### kexec_file_load - FIRST KERNEL
 ```
@@ -833,125 +1176,125 @@ static int create_dtb(struct kimage *image,
 }
 ```
 1. kernel在启动初,将fdt 的首地址赋值给了 `initial_boot_params`,
-堆栈为:
-```
-setup_arch
-  setup_machine_fdt
-    early_init_dt_scan
-      early_init_dt_verify
-```
+   堆栈为:
+   ```
+   setup_arch
+     setup_machine_fdt
+       early_init_dt_scan
+         early_init_dt_verify
+   ```
 
-> NOTE
->
-> 这里为什么要这样做呢?
-> 因为old kernel中有些dtb的path, crashkernel也需要获取,例如`/chosen/linux,uefi-*`,
-> 这些是 efi-stub 通过UEFI服务获取的, crash kernel 跳转的点,实际上是 stext, 不走
-> efi-stub, 所以需要第一个kernel获取的这些path
->
-> 当然, crashkernel fdt中除了第一个kernel的那些path, 还有一些其他的:
-> * /chosen/linux.elfcorehdr
-> * /chosen/linux, usable-memory-range   --- 因为UEFI的系统会通过UEFI服务报告可用内存,不知道
->   嵌入式设备 会不会用到此path
-> * kaslr-seed kaslr种子
+   > NOTE
+   >
+   > 这里为什么要这样做呢?
+   > 因为old kernel中有些dtb的path, crashkernel也需要获取,例如`/chosen/linux,uefi-*`,
+   > 这些是 efi-stub 通过UEFI服务获取的, crash kernel 跳转的点,实际上是 stext, 不走
+   > efi-stub, 所以需要第一个kernel获取的这些path
+   >
+   > 当然, crashkernel fdt中除了第一个kernel的那些path, 还有一些其他的:
+   > * /chosen/linux.elfcorehdr
+   > * /chosen/linux, usable-memory-range   --- 因为UEFI的系统会通过UEFI服务报告可用内存,不知道
+   >   嵌入式设备 会不会用到此path
+   > * kaslr-seed kaslr种子
 2. 初始化 dtb
-```cpp
-static int setup_dtb(struct kimage *image,
-                     unsigned long initrd_load_addr, unsigned long initrd_len,
-                     char *cmdline, void *dtb)
-{
-        int off, ret;
+   ```cpp
+   static int setup_dtb(struct kimage *image,
+                        unsigned long initrd_load_addr, unsigned long initrd_len,
+                        char *cmdline, void *dtb)
+   {
+           int off, ret;
+   
+           ret = fdt_path_offset(dtb, "/chosen");
+           if (ret < 0)
+                   goto out;
+   
+           off = ret;
+   
+           ret = fdt_delprop(dtb, off, FDT_PROP_KEXEC_ELFHDR);
+           if (ret && ret != -FDT_ERR_NOTFOUND)
+                   goto out;
+           ret = fdt_delprop(dtb, off, FDT_PROP_MEM_RANGE);
+           if (ret && ret != -FDT_ERR_NOTFOUND)
+                   goto out;
+   
+           if (image->type == KEXEC_TYPE_CRASH) {
+                   /* add linux,elfcorehdr */
+                   ret = fdt_appendprop_addrrange(dtb, 0, off,
+                                   FDT_PROP_KEXEC_ELFHDR,
+                                   image->arch.elf_headers_mem,
+                                   image->arch.elf_headers_sz);
+                   if (ret)
+                           return (ret == -FDT_ERR_NOSPACE ? -ENOMEM : -EINVAL);
+                   //=========(1)==============
+                   /* add linux,usable-memory-range */
+                   ret = fdt_appendprop_addrrange(dtb, 0, off,
+                                   FDT_PROP_MEM_RANGE,
+                                   crashk_res.start,
+                                   crashk_res.end - crashk_res.start + 1);
+                   if (ret)
+                           return (ret == -FDT_ERR_NOSPACE ? -ENOMEM : -EINVAL);
+           }
+   
+           /* add bootargs */
+           if (cmdline) {
+                   ret = fdt_setprop_string(dtb, off, FDT_PROP_BOOTARGS, cmdline);
+                   if (ret)
+                           goto out;
+           } else {
+                   ret = fdt_delprop(dtb, off, FDT_PROP_BOOTARGS);
+                   if (ret && (ret != -FDT_ERR_NOTFOUND))
+                           goto out;
+           }
+   
+           /* add initrd-* */
+           if (initrd_load_addr) {
+                   ret = fdt_setprop_u64(dtb, off, FDT_PROP_INITRD_START,
+                                         initrd_load_addr);
+                   if (ret)
+                           goto out;
+   
+                   ret = fdt_setprop_u64(dtb, off, FDT_PROP_INITRD_END,
+                                         initrd_load_addr + initrd_len);
+                   if (ret)
+                           goto out;
+           } else {
+                   ret = fdt_delprop(dtb, off, FDT_PROP_INITRD_START);
+                   if (ret && (ret != -FDT_ERR_NOTFOUND))
+                           goto out;
+   
+                   ret = fdt_delprop(dtb, off, FDT_PROP_INITRD_END);
+                   if (ret && (ret != -FDT_ERR_NOTFOUND))
+                           goto out;
+           }
+   
+           /* add kaslr-seed */
+           ret = fdt_delprop(dtb, off, FDT_PROP_KASLR_SEED);
+           if  (ret == -FDT_ERR_NOTFOUND)
+                   ret = 0;
+           else if (ret)
+                   goto out;
+   
+           if (rng_is_initialized()) {
+                   u64 seed = get_random_u64();
+                   ret = fdt_setprop_u64(dtb, off, FDT_PROP_KASLR_SEED, seed);
+                   if (ret)
+                           goto out;
+           } else {
+                   pr_notice("RNG is not initialised: omitting \"%s\" property\n",
+                                   FDT_PROP_KASLR_SEED);
+           }
+   
+   out:
+           if (ret)
+                   return (ret == -FDT_ERR_NOSPACE) ? -ENOMEM : -EINVAL;
+   
+           return 0;
+   }
+   ```
+   代码比较多, 但是流程很简单, 就是初始化 dtb中的各个path, 我们这边需要注意(1)
 
-        ret = fdt_path_offset(dtb, "/chosen");
-        if (ret < 0)
-                goto out;
-
-        off = ret;
-
-        ret = fdt_delprop(dtb, off, FDT_PROP_KEXEC_ELFHDR);
-        if (ret && ret != -FDT_ERR_NOTFOUND)
-                goto out;
-        ret = fdt_delprop(dtb, off, FDT_PROP_MEM_RANGE);
-        if (ret && ret != -FDT_ERR_NOTFOUND)
-                goto out;
-
-        if (image->type == KEXEC_TYPE_CRASH) {
-                /* add linux,elfcorehdr */
-                ret = fdt_appendprop_addrrange(dtb, 0, off,
-                                FDT_PROP_KEXEC_ELFHDR,
-                                image->arch.elf_headers_mem,
-                                image->arch.elf_headers_sz);
-                if (ret)
-                        return (ret == -FDT_ERR_NOSPACE ? -ENOMEM : -EINVAL);
-                //=========(1)==============
-                /* add linux,usable-memory-range */
-                ret = fdt_appendprop_addrrange(dtb, 0, off,
-                                FDT_PROP_MEM_RANGE,
-                                crashk_res.start,
-                                crashk_res.end - crashk_res.start + 1);
-                if (ret)
-                        return (ret == -FDT_ERR_NOSPACE ? -ENOMEM : -EINVAL);
-        }
-
-        /* add bootargs */
-        if (cmdline) {
-                ret = fdt_setprop_string(dtb, off, FDT_PROP_BOOTARGS, cmdline);
-                if (ret)
-                        goto out;
-        } else {
-                ret = fdt_delprop(dtb, off, FDT_PROP_BOOTARGS);
-                if (ret && (ret != -FDT_ERR_NOTFOUND))
-                        goto out;
-        }
-
-        /* add initrd-* */
-        if (initrd_load_addr) {
-                ret = fdt_setprop_u64(dtb, off, FDT_PROP_INITRD_START,
-                                      initrd_load_addr);
-                if (ret)
-                        goto out;
-
-                ret = fdt_setprop_u64(dtb, off, FDT_PROP_INITRD_END,
-                                      initrd_load_addr + initrd_len);
-                if (ret)
-                        goto out;
-        } else {
-                ret = fdt_delprop(dtb, off, FDT_PROP_INITRD_START);
-                if (ret && (ret != -FDT_ERR_NOTFOUND))
-                        goto out;
-
-                ret = fdt_delprop(dtb, off, FDT_PROP_INITRD_END);
-                if (ret && (ret != -FDT_ERR_NOTFOUND))
-                        goto out;
-        }
-
-        /* add kaslr-seed */
-        ret = fdt_delprop(dtb, off, FDT_PROP_KASLR_SEED);
-        if  (ret == -FDT_ERR_NOTFOUND)
-                ret = 0;
-        else if (ret)
-                goto out;
-
-        if (rng_is_initialized()) {
-                u64 seed = get_random_u64();
-                ret = fdt_setprop_u64(dtb, off, FDT_PROP_KASLR_SEED, seed);
-                if (ret)
-                        goto out;
-        } else {
-                pr_notice("RNG is not initialised: omitting \"%s\" property\n",
-                                FDT_PROP_KASLR_SEED);
-        }
-
-out:
-        if (ret)
-                return (ret == -FDT_ERR_NOSPACE) ? -ENOMEM : -EINVAL;
-
-        return 0;
-}
-```
-代码比较多, 但是流程很简单, 就是初始化 dtb中的各个path, 我们这边需要注意(1)
-
-`linux,usable-memory-range`向用户报告了 crash kernel 所能使用的memory range,
-区间为`[crashk_res.start, crashk_res.end]`
+   `linux,usable-memory-range`向用户报告了 crash kernel 所能使用的memory range,
+   区间为`[crashk_res.start, crashk_res.end]`
 
 ***
 
@@ -1809,6 +2152,7 @@ ENDPROC(__cpu_soft_restart)
       判断,但是据我目前调试,arm64不会走到, 后续可能还需要看下
    3. 跳转到new image(第二个kernel的_head处: `add x13, x18, #0x16 --- MZ 
       --- pe_header`)
+***
 
 至此, 分析完第一个内核跳转到第二个内核流程
 
@@ -1911,7 +2255,8 @@ void __init memblock_cap_memory_range(phys_addr_t base, phys_addr_t size)
 
    如果该条件为假, 则表示第一个kernel可能映射了这部分内存, 则将其 移除"memblock.memory"
 
+***
+
 所以综上所述, 第二个内核会根据fdt 中`/chosen/linux,usable-memory-range`决定自己
 可以分配的内存,而根据之前的分析, fdt的该字段会有第一个kernel初始化为预留内存的`base, size`
 --- `crashk_res.start, crashk_res.end - crashk_res.start`
-
