@@ -1,3 +1,4 @@
+```diff
 From 94b1b03b519b81c494900cb112aa00ed205cc2d9 Mon Sep 17 00:00:00 2001
 From: Andy Lutomirski <luto@kernel.org>
 Date: Thu, 29 Jun 2017 08:53:17 -0700
@@ -443,4 +444,4 @@ index 1d7a7213a310..0472790ec20b 100644
  			cpumask_set_cpu(cpu, mask);
 -- 
 2.41.0
-
+```
