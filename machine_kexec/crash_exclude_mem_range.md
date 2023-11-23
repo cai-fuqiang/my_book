@@ -280,19 +280,22 @@ int crash_exclude_mem_range(struct crash_mem *mem,
                         mem->nr_ranges--;
                         return 0;
                 }
-
+                //===============(3)================
                 if (p_start > start && p_end < end) {
                         /* Split original range */
                         mem->ranges[i].end = p_start - 1;
                         temp_range.start = p_end + 1;
                         temp_range.end = end;
                 } else if (p_start != start)
+                //===============(4)================
                         mem->ranges[i].end = p_start - 1;
                 else
+                //===============(5)================
                         mem->ranges[i].start = p_end + 1;
                 break;
         }
 
+        //===============(6)================
         /* If a split happened, add the split to array */
         if (!temp_range.end)
                 return 0;
@@ -304,6 +307,7 @@ int crash_exclude_mem_range(struct crash_mem *mem,
         /* Location where new range should go */
         j = i + 1;
         if (j < mem->nr_ranges) {
+                //===============(6.1)================
                 /* Move over all ranges one slot towards the end */
                 for (i = mem->nr_ranges - 1; i >= j; i--)
                         mem->ranges[i + 1] = mem->ranges[i];
@@ -315,7 +319,25 @@ int crash_exclude_mem_range(struct crash_mem *mem,
         return 0;
 }
 ```
-1. 这里主要是在处理 OTHER的情况
+1. 这里主要是在循环处理 `OTHER`的情况, 当然不是 `OTHERS`情况相当于循环一次
    1. (1.1)  这里做了一个循环去处理(跟我上面OTHERS分成了几种情况的组合一样,
       在循环中分别处理这几种情况)
-   2. (1.2)  这里
+   2. (1.2)  这里其实处理的有点问题, 从上面的距离分析可以看到, 需要循环处理
+      情况不止5.4 还有一些其他的情况(OTHERS中都需要循环处理)
+
+      我这里做了一些
+      [测试](https://github.com/cai-fuqiang/kernel_test/tree/master/crash_exclude_mem_range_test)
+      , 代码就是copy了这一段代码,在用户态做测试, 可以看到测试中的某些情况
+      会出现错误的结果
+2. 情况 1, 最终会导致 `mem->nr_ranges--`
+3. 情况 4, 最终会导致多出来一个 `temp_range`, 也就是会出现`mem->nr_ranges++`
+4. 情况 3, `mem->nr_ranges` 不变
+5. 情况 2, `mem->nr_ranges`不变
+6. 在处理情况4, 需要将 mem->ranges[i], 以及后面的数组成员,向后移动一格.
+
+
+
+# 再次分析patch
+如果将`nr_ranges` 初始化为 1, 如果kernel cmdline 为`crashkernel=256M,low`和
+`crashkernel=1G,high`这样的组合下, 如果遇到了两次 情况 3, 则会造成数组
+越界, 因为是通过 kmalloc申请的, 很有可能越界到下一个slab object, 情况很严重.
