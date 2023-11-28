@@ -1,0 +1,197 @@
+# slab order
+
+## calculate_order
+```cpp
+static inline int calculate_order(unsigned int size)
+{
+        unsigned int order;
+        unsigned int min_objects;
+        unsigned int max_objects;
+        unsigned int nr_cpus;
+
+        /*
+         * Attempt to find best configuration for a slab. This
+         * works by first attempting to generate a layout with
+         * the best configuration and backing off gradually.
+         *
+         * gradually [ˈɡrædʒuəli]: 逐步的
+         *
+         * 尝试为slab寻找更好的配置. 首先尝试生成最佳配置的layout(布局?)
+         * 然后逐步的后退.
+         *
+         * First we increase the acceptable waste in a slab. Then
+         * we reduce the minimum objects required in a slab.
+         *
+         * 首先我们增加slab中的可以接受的浪费比例. 然后我们减少
+         * 一个slab中所需的 mininum objects
+         */
+        //=================(1)===============
+        min_objects = slub_min_objects;
+        if (!min_objects) {
+                /*
+                 * Some architectures will only update present cpus when
+                 * onlining them, so don't trust the number if it's just 1. But
+                 * we also don't want to use nr_cpu_ids always, as on some other
+                 * architectures, there can be many possible cpus, but never
+                 * onlined. Here we compromise between trying to avoid too high
+                 * order on systems that appear larger than they are, and too
+                 * low order on systems that appear smaller than they are.
+                 */
+
+                 /*
+                  * compromise /ˈkɒmprəmaɪz/: 妥协;折中;和解;达成妥协(或和解);
+                  */
+
+                 /*
+                  * 某些架构只会更新 present cpus 当 onlining 他们时, 如果
+                  * 他们仅仅为1, 不要相信这个值. 但是我们也不想一直使用 
+                  * nr_cpu_ids, 因为在某些架构上, 可能有 很多 possible cpus,
+                  * 但是 从来不onlined. 在这里，我们在试图避免看起来比实际情况更大的
+                  * 系统上的出现order过高和看起来比实际实际情况更小的系统上出现 
+                  * order过低之间做出妥协。
+                  */
+                nr_cpus = num_present_cpus();
+                if (nr_cpus <= 1)
+                        nr_cpus = nr_cpu_ids;
+                min_objects = 4 * (fls(nr_cpus) + 1);
+        }
+        //=================(2)===============
+        max_objects = order_objects(slub_max_order, size);
+        min_objects = min(min_objects, max_objects);
+
+        while (min_objects > 1) {
+                unsigned int fraction;
+
+                fraction = 16;
+                while (fraction >= 4) {
+                        order = slab_order(size, min_objects,
+                                        slub_max_order, fraction);
+                        if (order <= slub_max_order)
+                                return order;
+                        fraction /= 2;
+                }
+                min_objects--;
+        }
+
+        /*
+         * We were unable to place multiple objects in a slab. Now
+         * lets see if we can place a single object there.
+         */
+        order = slab_order(size, 1, slub_max_order, 1);
+        if (order <= slub_max_order)
+                return order;
+
+        /*
+         * Doh this slab cannot be placed using slub_max_order.
+         */
+        order = slab_order(size, 1, MAX_ORDER, 1);
+        if (order < MAX_ORDER)
+                return order;
+        return -ENOSYS;
+}
+```
+1. 初始的最小的slub数量, 通过 kernel cmdline 定义
+   ```cpp
+   static int __init setup_slub_min_objects(char *str)
+   {
+           get_option(&str, (int *)&slub_min_objects);
+   
+           return 1;
+   }
+   
+   __setup("slub_min_objects=", setup_slub_min_objects);
+   ```
+2. slub 数量初始最大值
+   ```cpp
+   static int __init setup_slub_max_order(char *str)
+   {
+           get_option(&str, (int *)&slub_max_order);
+           slub_max_order = min(slub_max_order, (unsigned int)MAX_ORDER - 1);
+   
+           return 1;
+   }
+   
+   __setup("slub_max_order=", setup_slub_max_order);
+   ```
+
+## slab_order()
+```cpp
+/*
+ * Calculate the order of allocation given an slab object size.
+ *
+ * The order of allocation has significant impact on performance and other
+ * system components. Generally order 0 allocations should be preferred since
+ * order 0 does not cause fragmentation in the page allocator. Larger objects
+ * be problematic to put into order 0 slabs because there may be too much
+ * unused space left. We go to a higher order if more than 1/16th of the slab
+ * would be wasted.
+ *
+ * fragmentation [ˌfræɡmenˈteɪʃn]  : 碎片
+ * problematic : 难以处理的; 难题
+ *
+ * 分配的 order 已经显著的影响到性能和其他 system components. 一般来说, order 0
+ * allocations 应该性能更好, 因为 order 0 将不会导致在 page allocator 中产生碎片.
+ * 大点的object 是难以将他们放到 order 0 slab 因为 他可能会造成比较多的 unused space
+ * 剩余. 如果该slab 浪费的空间超过了1/16th, 我们将会使用更高的 order
+ *
+ * In order to reach satisfactory performance we must ensure that a minimum
+ * number of objects is in one slab. Otherwise we may generate too much
+ * activity on the partial lists which requires taking the list_lock. This is
+ * less a concern for large slabs though which are rarely used.
+ *
+ * satisfactory [ˌsætɪsˈfæktəri] : 令人满意的
+ * concern: 与...有关;涉及;影响; 对...担忧
+ *
+ * 为了达到令人满意的性能, 我们必须确定 一个 slab最少的 objects的数量. 否则,
+ * 我们可能会在 partial lists中生成太多 activity, 这需要获取 list_lock. 对于
+ * large slab 来说就不那么需要担心, 虽然他们很少被使用.
+ *
+ * slub_max_order specifies the order where we begin to stop considering the
+ * number of objects in a slab as critical. If we reach slub_max_order then
+ * we try to keep the page order as low as possible. So we accept more waste
+ * of space in favor of a small page order.
+ *
+ * in favor of : 赞成 ; 支持 ; 有利于 ; 以…为受款人
+ *
+ * slub_max_order指定了我们开始停止将slab 中 object 的数量视为关键因素 的order.
+ * 如果我们达到了 slub_max_order , 然后我们尝试尽量将page order 降低. 因此, 我们
+ * 接受更多的空间浪费, 以支持更小的 page older
+ *
+ * Higher order allocations also allow the placement of more objects in a
+ * slab and thereby reduce object handling overhead. If the user has
+ * requested a higher mininum order then we start with that one instead of
+ * the smallest order which will fit the object.
+ *
+ * 更高的 order allocations 也允许将更多的 objects 放置到一个 slab 中 借此
+ * 减少object handling overhead. 如果 user 已经请求了 更高的 mininum order,
+ * 那么我们从该order 开始, 而不是从 适合该object 更小的order.
+ */
+static inline unsigned int slab_order(unsigned int size,
+                unsigned int min_objects, unsigned int max_order,
+                unsigned int fract_leftover)
+{
+        unsigned int min_order = slub_min_order;
+        unsigned int order;
+
+        if (order_objects(min_order, size) > MAX_OBJS_PER_PAGE)
+                return get_order(size * MAX_OBJS_PER_PAGE) - 1;
+
+        for (order = max(min_order, (unsigned int)get_order(min_objects * size));
+                        order <= max_order; order++) {
+
+                unsigned int slab_size = (unsigned int)PAGE_SIZE << order;
+                unsigned int rem;
+                //剩余的内存空间
+                rem = slab_size % size;
+                /* slab_size / fract_leftover 表示能容忍的剩余的内存空间
+                 * waste space
+                 */
+                if (rem <= slab_size / fract_leftover)
+                        break;
+        }
+
+        return order;
+}
+```
+
+##
