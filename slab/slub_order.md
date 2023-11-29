@@ -485,7 +485,11 @@ __setup("slub_min_objects=", setup_slub_min_objects);
 ```
 `slub_min_objects` 默认为  `DEFAULT_MIN_OBJECTS` (8)
 
-## slub: Calculate min_objects based on number of processors
+这时, slub_min_objects是固定的, 但是后面工程师们发现在cpus
+个数比较多的情况下, 将 min_objects数量越大, 性能就越好. 
+我们看下面的patch
+
+## [slub: Calculate min_objects based on number of processors](https://marc.info/?l=linux-mm&m=120734955909709&w=2)
 
 COMMIT 
 ```
@@ -574,3 +578,357 @@ index 6572cef0c43c..e2e6ba7a5172 100644
 但是, 里面有将slub 和slab 做了对比.所以估计slub是按照slab改得.
 之后我们去对比下同时期的slab, 看看有没有说明
 
+> NOTE
+>
+> 在 commit 3286222fc609dea27bd16ac02c55d3f1c3190063
+>
+> mm, slub: better heuristic for number of cpus when calculating slab order
+>
+> 的commit message中有讲到, 我们下面会讲到
+
+## [mm/slub: let number of online CPUs determine the slub page order](https://lore.kernel.org/linux-mm/20201118082759.1413056-1-bharata@linux.ibm.com/)
+
+COMMIT message:
+```
+commit 045ab8c9487ba099eade6578621e2af4a0d5ba0c
+Author: Bharata B Rao <bharata@linux.ibm.com>
+Date:   Mon Dec 14 19:04:40 2020 -0800
+
+    mm/slub: let number of online CPUs determine the slub page order
+
+    The page order of the slab that gets chosen for a given slab cache depends
+    on the number of objects that can be fit in the slab while meeting other
+    requirements.  We start with a value of minimum objects based on
+    nr_cpu_ids that is driven by possible number of CPUs and hence could be
+    higher than the actual number of CPUs present in the system.  This leads
+    to calculate_order() chosing a page order that is on the higher side
+    leading to increased slab memory consumption on systems that have bigger
+    page sizes.
+
+    meet requirement: 满足要求
+    get chosen: 被选中
+
+    为给定的 slab  caches 选择 slab的page order 依赖于 objects 的number,
+    这个number 需要在满足其他的需求下, 又能放到这个slab中. 我们开始基于
+    nr_cpu_ids 的一个 mininum objects的值, nr_cpu_ids 是 CPUs的 possible
+    number ,因此可能比系统中实际的 present 的 CPUs的数量要高. 这导致
+    calculate_order 选择 一个较高的 page order, 将导致在较大 page size 的
+    系统上增加了 slab 的内存消耗
+
+    Hence rely on the number of online CPUs when determining the mininum
+    objects, thereby increasing the chances of chosing a lower conservative
+    page order for the slab.
+
+    conservative: 保守的, 守旧的
+
+    因为当确定 mininum objects时, 应基于 online CPUs的数量, 因此增加了为
+    slab 选择较低的保守的(???) page order的机会
+
+    Vlastimil said:
+      "Ideally, we would react to hotplug events and update existing caches
+       accordingly. But for that, recalculation of order for existing caches
+       would have to be made safe, while not affecting hot paths. We have
+       removed the sysfs interface with 32a6f409b693 ("mm, slub: remove
+       runtime allocation order changes") as it didn't seem easy and worth
+       the trouble.
+
+       idenlly: 理想的
+       react: 反应
+       accordingly: 相应的
+       worth: <v> 有...的价值
+
+       理想情况下, 我们对热插拔时间做出反应, 并且相应的更新现有的 caches.
+       但为此, 从新为现有的 cache计算order必须是安全的, 同时不影响 hot paths.
+       我们在 32a6f409b693 ("mm, slub: remove runtime allocation order changes") 
+       移除了 sysfs interface , 因为这似乎并不容易 并且也不值得麻烦.
+
+       In case somebody wants to start with a large order right from the
+       boot because they know they will hotplug lots of cpus later, they can
+       use slub_min_objects= boot param to override this heuristic. So in
+       case this change regresses somebody's performance, there's a way
+       around it and thus the risk is low IMHO"
+       
+       right from: 从, right是修饰语，用来表达某种强烈的思想
+       heuristic [hjuˈrɪstɪk]: 启发式的
+       in case: 如果,也许,万一
+       regresses [rɪˈɡresɪz] : 退步,倒退 (三单)
+
+       IMHO: in my humble option    依我拙见; 恕我直言
+       humble[ˈhʌmbl]: 谦逊的
+
+       如果有人想从启动出就开始使用一个大的 order, 因为他们知道他们接下来将hotplug
+       很多 cpu, 他们可以使用 slub_min_objects= boot param 来覆盖最初的值. 所以万一这
+       种变化让某些 性能出现倒退, 这是一种绕过他的方法,并且以我拙见 这样风险很低
+
+    Link: https://lkml.kernel.org/r/20201118082759.1413056-1-bharata@linux.ibm.com
+```
+作者认为, `nr_cpu_ids`表示possible cpu, 这样在page_size比较大的时候, 会造成slab内存消耗
+过大,所以提议使用 online cpus, 但是有hotplug情况, 并且在之前`32a6f409b693 ("mm, slub:
+remove runtime allocation order changes")`合入的情况下, 启动后,不能再调整slab order.
+所以 Vlastimil 建议 如果知道之后要hotplug, 可以通过设置kernel cmdline `slub_min_objects=`
+来设置 slub 的 `min_objects`
+
+我们来看下patch:
+```diff
+diff --git a/mm/slub.c b/mm/slub.c
+index 79afc8a38ebf..6326b98c2164 100644
+--- a/mm/slub.c
++++ b/mm/slub.c
+@@ -3431,7 +3431,7 @@ static inline int calculate_order(unsigned int size)
+         */
+        min_objects = slub_min_objects;
+        if (!min_objects)
+-               min_objects = 4 * (fls(nr_cpu_ids) + 1);
++               min_objects = 4 * (fls(num_online_cpus()) + 1);
+        max_objects = order_objects(slub_max_order, size);
+        min_objects = min(min_objects, max_objects);
+```
+
+但是关于cpu possible和 online 的讨论并没有停止,我们看下面的一个patch
+
+## [mm, slub: better heuristic for number of cpus when calculating slab order](https://lore.kernel.org/all/20210209214232.hlVJaEmRu%25akpm@linux-foundation.org/)
+
+我们还是先来看下 commit message:
+```
+commit 3286222fc609dea27bd16ac02c55d3f1c3190063
+Author: Vlastimil Babka <vbabka@suse.cz>
+Date:   Tue Feb 9 13:42:32 2021 -0800
+
+    mm, slub: better heuristic for number of cpus when calculating slab order
+
+    heuristic [hjuˈrɪstɪk]: 启发式的
+
+    When creating a new kmem cache, SLUB determines how large the slab pages
+    will based on number of inputs, including the number of CPUs in the
+    system.  Larger slab pages mean that more objects can be allocated/free
+    from per-cpu slabs before accessing shared structures, but also
+    potentially more memory can be wasted due to low slab usage and
+    fragmentation.  The rough idea of using number of CPUs is that larger
+    systems will be more likely to benefit from reduced contention, and also
+    should have enough memory to spare.
+
+    fragmentation [ˌfræɡmenˈteɪʃn] : 碎片
+    potentially [pə'tenʃəli]: 潜在的,可能的
+    rough [rʌf]: 粗糙的, 大致的, 粗暴的, 粗略的
+    spare [sper] : 剩余的, 空闲的
+
+    当创建了一个新的 kmem cache, SLUB 需要基于 inputs的数量确定 slab page 多大, 
+    (inputs)包括 系统中 CPUs的个数.更大的slab pages 意味着 更多的 在访问 shared
+    structures之前, 可以从 per-cpu的slabs中 allocated/free 更多objects, 但是
+    可能也存在 因为较少的 slab在被使用而存在更多的内存被他浪费, 以及更多的碎片
+    这样的情况. 使用CPUs的数量的粗略的想法是: 较大的系统更有可能从减少 contention
+    中受益, 并且也应该有足够的空闲内存.
+
+    Number of CPUs used to be determined as nr_cpu_ids, which is number of
+    possible cpus, but on some systems many will never be onlined, thus
+    commit 045ab8c9487b ("mm/slub: let number of online CPUs determine the
+    slub page order") changed it to nr_online_cpus().  However, for kmem
+    caches created early before CPUs are onlined, this may lead to
+    permamently low slab page sizes.
+
+    used to be: 过去是
+    permamently --> permanently: [ˈpɜːmənəntli]: 永久的
+
+    过去通过 nr_cpu_ids 确定 CPUs的数量, 这个是 possiable cpus的数量, 但是
+    在某些系统中, 许多(cpus) 将从来不会被onlined, 因此 045ab8c9487b ("mm/slub: 
+    let number of online CPUs determine the slub page order") 将其(nr_cpu_ids)
+    修改为 `nr_online_cpus()`. 但是, 对于在 CPUs online之前 创建的 kmem cache
+    来说, 这可能会永久导致 slab page size 较低.
+
+    Vincent reports a regression [1] of hackbench on arm64 systems:
+
+      "I'm facing significant performances regression on a large arm64
+       server system (224 CPUs). Regressions is also present on small arm64
+       system (8 CPUs) but in a far smaller order of magnitude
+
+       On 224 CPUs system : 9 iterations of hackbench -l 16000 -g 16
+       v5.11-rc4 : 9.135sec (+/- 0.45%)
+       v5.11-rc4 + revert this patch: 3.173sec (+/- 0.48%)
+       v5.10: 3.136sec (+/- 0.40%)"
+        
+       magnitude [ˈmæɡnɪtjuːd] : 巨大的
+
+       我在 large arm64 server system (224 CPUs) 系统上, 面临一个显著的
+       性能倒退. 该倒退也会在small arm64 system (8 CPUs) 中也存在, 但是
+       数量级要远小的多
+
+       > NOTE
+       >
+       > 045ab8c9487b 在 v5.11-rc1 tag中包含, 所以 Vincent 使用 v5.10 和 v5.11-rc4
+       > 版本做对比测试
+
+    Mel reports a regression [2] of hackbench on x86_64, with lockstat suggesting
+    page allocator contention:
+
+      "i.e. the patch incurs a 7% to 32% performance penalty. This bisected
+       cleanly yesterday when I was looking for the regression and then
+       found the thread.
+
+       penalty [ˈpenəlti]: 刑罚,惩罚
+       bisect  [baɪˈsekt]: 平分, 对半分
+
+       i.e. 该patch 带来了 7% ~ 32%的性能惩罚. 昨天当我们在寻找该回退时,
+       它被干净的一分为二, 然后我们就找到了这个thread(线索?)
+
+       Numerous caches change size. For example, kmalloc-512 goes from
+       order-0 (vanilla) to order-2 with the revert.
+
+       大量的caches 更改了大小. 例如, 在该revert下(这个revert不太清楚是啥, 
+       可以看[2]),  kmalloc-512 从 order-0 (vanilla (alse see [2])) 变为 
+       order-2.
+
+       So mostly this is down to the number of times SLUB calls into the
+       page allocator which only caches order-0 pages on a per-cpu basis"
+       
+       be down to : 因为, 可归因为
+
+       因此, 这主要是由于 SLUB 调用到 page allocator 的次数, 他只在 per-cpu
+       的基础上 缓存了 order-0 pages (也就是每个cpu都缓存了一个 order-0 pages)
+
+    Clearly num_online_cpus() doesn't work too early in bootup.  We could
+    change the order dynamically in a memory hotplug callback, but runtime
+    order changing for existing kmem caches has been already shown as
+    dangerous, and removed in 32a6f409b693 ("mm, slub: remove runtime
+    allocation order changes").
+
+    显然的, num_online_cpus() 在bootup 时 不会工作的太早. 我们可以在 memory
+    hotplug callback中动态的调整order, 但是对于已经存在的 kmem cache 进行 
+    runtime order change 已经被视为 dangerous, 并且在  
+    32a6f409b693 ("mm, slub: remove runtime allocation order changes")移除.
+
+    It could be resurrected in a safe manner with some effort, but to fix
+    the regression we need something simpler.
+
+    resurrect: 使...复活;起死回生; 重新使用;恢复使用
+
+    他可以通过一些努力以安全的方式 resurrect, 但是fix 该 regresses, 我们需要
+    一些更简单的东西
+
+    We could use num_present_cpus() that should be the number of physically
+    present CPUs even before they are onlined.  That would work for PowerPC
+    [3], which triggered the original commit, but that still doesn't work on
+    arm64 [4] as explained in [5].
+
+    我们可以使用 num_present_cpus(), 他应该为物理上的存在的 CPUs数量, 甚至
+    在他们 online之前. 他可以在 PowerPC[3] 上使用, 这 trigger 了原来的commit, 
+    但是他仍然不能在 arm64[4]上使用 , 正如在 [5] 中解释的那样
+
+    So this patch tries to determine the best available value without
+    specific arch knowledge.
+
+    所以该patch 尝试在没有知道特定架构的基础上, 确定最好的 available value
+
+     - num_present_cpus() if the number is larger than 1, as that means the
+       arch is likely setting it properly
+
+       如果 num_present_cpus() > 1, 这意味着 arch 很可能正确的设置了它.
+
+     - nr_cpu_ids otherwise
+       
+       其他情况使用 nr_cpu_ids
+
+    This should fix the reported regressions while also keeping the effect
+    of 045ab8c9487b for PowerPC systems.  It's possible there are
+    configurations where num_present_cpus() is 1 during boot while
+    nr_cpu_ids is at the same time bloated, so these (if they exist) would
+    keep the large orders based on nr_cpu_ids as was before 045ab8c9487b.
+
+    bloate[ˈbloʊtɪd] : 膨胀; 臃肿    
+
+    这应该 fix reported regression, 同时也保持了 045ab8c9487b 对于 PowerPC system
+    带来的收益. 可能存在一些配置, 其中 num_present_cpus() 在启动初是1, 而
+    nr_cpu_ids 同时也很膨胀(也就是比实际online的CPUs number大很多), 因此这些
+    配置(如果存在)将像 045ab8c9487b 之前一样, 保持基于 nr_cpu_ids 的 较大的 orders.
+
+    [1] https://lore.kernel.org/linux-mm/CAKfTPtA_JgMf_+zdFbcb_V9rM7JBWNPjAz9irgwFj7Rou=xzZg@mail.gmail.com/
+    [2] https://lore.kernel.org/linux-mm/20210128134512.GF3592@techsingularity.net/
+    [3] https://lore.kernel.org/linux-mm/20210123051607.GC2587010@in.ibm.com/
+    [4] https://lore.kernel.org/linux-mm/CAKfTPtAjyVmS5VYvU6DBxg4-JEo5bdmWbngf-03YsY18cmWv_g@mail.gmail.com/
+    [5] https://lore.kernel.org/linux-mm/20210126230305.GD30941@willie-the-truck/
+```
+
+emmm, 上一章节提到的commit 想法是好的, 但是很多架构 cpu online的行为,可能发生在
+某些slub已经创建之后(`kmem_cache_create()`), 这样获取的 online cpu 数量就是1了,
+导致很多slub 的order 分配的是1, 在cpu个数比较多的大型系统上, 造成了严重的性能倒退...
+
+里面有些链接没有分析, 例如Mel 报告的[2], 里面列出了一些性能测试结果,之后可以分析下.
+
+那这里说下,为什么cpu越多, 使用`min_objects`越大越好, 作者这里只是简单的提了下:
+因为cpu越多,假设系统中分配的slub的数量就比较多, 为了避免去频繁走伙伴系统路径,
+所以最好将order设置的大一些.
+
+关于解决方法, 作者则采用了中庸之道. 如果在slub create时,发现 `num_present_cpus()`
+返回的不是1, 那么极有可能该值已经初始化好了, 将用该值作为cpu的数量去计算`min_objects`,
+如果不是1, 那就使用 `nr_cpu_ids`, 这就相当于没有和`045ab8c9487b`, 并且不允许动态
+调整 slub order, 正如`045ab8c9487b`中提到的, 实际运行的cpu数量 (online) 可能一直
+会低于 `nr_cpu_ids`...
+
+很郁闷, 是不是, 相当于在某些架构上回退了`045ab8c9487b`, 但是迄今为止(2023-11-19),
+仍然还是这样的算法.
+
+我们还是先来看下patch
+```diff
+diff --git a/mm/slub.c b/mm/slub.c
+index 7ecbbbe5bc0c..b22a4b101c84 100644
+--- a/mm/slub.c
++++ b/mm/slub.c
+@@ -3423,6 +3423,7 @@ static inline int calculate_order(unsigned int size)
+        unsigned int order;
+        unsigned int min_objects;
+        unsigned int max_objects;
++       unsigned int nr_cpus;
+
+        /*
+         * Attempt to find best configuration for a slab. This
+@@ -3433,8 +3434,21 @@ static inline int calculate_order(unsigned int size)
+         * we reduce the minimum objects required in a slab.
+         */
+        min_objects = slub_min_objects;
+-       if (!min_objects)
+-               min_objects = 4 * (fls(num_online_cpus()) + 1);
++       if (!min_objects) {
++               /*
++                * Some architectures will only update present cpus when
++                * onlining them, so don't trust the number if it's just 1. But
++                * we also don't want to use nr_cpu_ids always, as on some other
++                * architectures, there can be many possible cpus, but never
++                * onlined. Here we compromise between trying to avoid too high
++                * order on systems that appear larger than they are, and too
++                * low order on systems that appear smaller than they are.
++                */
+                 /*
+                  * compromise /ˈkɒmprəmaɪz/: 妥协;折中;和解;达成妥协(或和解);
+                  */
+
+                 /*
+                  * 某些架构只会更新 present cpus 当 onlining 他们时, 如果
+                  * 他们仅仅为1, 不要相信这个值. 但是我们也不想一直使用 
+                  * nr_cpu_ids, 因为在某些架构上, 可能有 很多 possible cpus,
+                  * 但是 从来不onlined. 在这里，我们在试图避免看起来比实际情况更大的
+                  * 系统上的出现order过高和看起来比实际实际情况更小的系统上出现 
+                  * order过低之间做出妥协。
+                  */
++               nr_cpus = num_present_cpus();
++               if (nr_cpus <= 1)
++                       nr_cpus = nr_cpu_ids;
++               min_objects = 4 * (fls(nr_cpus) + 1);
++       }
+        max_objects = order_objects(slub_max_order, size);
+        min_objects = min(min_objects, max_objects);
+```
+
+patch 就不多说. 和 commit message中描述的一样
+
+
+# 总结
+slub order的值大多是基于性能考虑(时间复杂度,空间复杂度):
+
+一方面, slub order变小,有利于伙伴系统产生较少的碎片.同时, 也不会出现过多的内存浪费
+
+而另一方面, slub order变大,可能有利于 slub 产生较少的无法使用的 memory. 并且
+减少对伙伴系统的调用. 而cpu越多, 调用次数可能就越多, 所以 大佬们基于cpu数量
+计算 `min_objects`, 再根据 `min_objects`以及容忍浪费的内存比例 综合选择出一个
+合适的order.
+
+我们这篇笔记只是从代码改动的角度,走读了 slub order 代码流程变动的历史, 
+但是未从性能影响的细节去分析(之后可能会去测试, 分析)
