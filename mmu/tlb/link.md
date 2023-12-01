@@ -128,3 +128,5 @@ introduce before smp_invalidate_interrupt() long comment
     ...
 commit 3814ee6865ea6d63e594eeeb17ce8bed86951766 (tag: 2.3.43pre2)
 ```
+
+# _PAGE_GLOBAL
