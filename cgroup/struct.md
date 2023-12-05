@@ -1,5 +1,5 @@
 # 简介
-我们这里看下cgroup 框架
+我们这里看下cgroup struct
 
 # ORG patch
 > NOTE
@@ -227,9 +227,20 @@ struct cg_cgroup_link {
 和 `cgroup` 之间是多对多的关系, `css_set` 中的每个subsystem 可以挂在不同
 的cgroup层级上, 而每个`cgroup`层级中的subsystem ,也可能有多个`css_set`
 在使用.
+
+一个 `cg_cgroup_link`对象, 能够表示唯一的`(cgroup, css_set)`关系, 
+该数据结构用于方便查询, 例如, 可以通过`cgroup` 查询其层级下
+所有的`css_set`
+
+> NOTE
+>
+> 可以看到其数据结构中, 只有`css_set`指针, 没有`cgroup`指针, 这也就
+> 说明, 目前cgroup框架中,只有通过`cgroup` 查询`css_set`的需求,但是
+> 没有通过`css_set`查询所有的`cgroup`的需求
+
 * **cont_link_list**: 链接在 `cgroup->css_set`
 * **cg_link_list** : 链接在 `css_set->cg_links`
-* **cg**: ????
+* **cg**: 指向`css_set`
 
 ### cftype 
 ```cpp
