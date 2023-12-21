@@ -121,6 +121,118 @@ zap_page_range {
 其目的就是为了记录在`zap_page_range()`过程中, 需要释放的所有
 的page, 然后集中在 flush tlb 后面释放.
 
+## 合入该patch之前的调用流程
+有点好奇合入该patch之前的调用流程是什么样的:
+我们简单看下:
+```diff
+ void zap_page_range(struct mm_struct *mm, unsigned long address, unsigned long size)
+ {
++       mmu_gather_t *tlb;
+        pgd_t * dir;
+-       unsigned long end = address + size;
++       unsigned long start = address, end = address + size;
+        int freed = 0;
+        dir = pgd_offset(mm, address);
+@@ -373,11 +376,18 @@ void zap_page_range(struct mm_struct *mm, unsigned long address, unsigned long s
+        if (address >= end)
+                BUG();
+        spin_lock(&mm->page_table_lock);
++       flush_cache_range(mm, address, end);
++       tlb = tlb_gather_mmu(mm);
++
+        do {
+-               freed += zap_pmd_range(mm, dir, address, end - address);
++               freed += zap_pmd_range(tlb, dir, address, end - address);
+                address = (address + PGDIR_SIZE) & PGDIR_MASK;
+                dir++;
+        } while (address && (address < end));
++
++       /* this will flush any remaining tlb entries */
++       tlb_finish_mmu(tlb, start, end);
+```
+在原来的zap_page_range的流程中,并没有 flush tlb + 释放物理页面的动作,
+那很可能是在 while 中的子函数做的, 我们需要在看下 zap_pte_range(),
+和该函数的调用者
+
+
+```diff
+-static inline int zap_pte_range(struct mm_struct *mm, pmd_t * pmd, unsigned long address, unsigned long size)
++static inline int zap_pte_range(mmu_gather_t *tlb, pmd_t * pmd, unsigned long address, unsigned long size)
+ {
+-       pte_t * pte;
+-       int freed;
++       unsigned long offset;
++       pte_t * ptep;
++       int freed = 0;
+
+        if (pmd_none(*pmd))
+                return 0;
+@@ -305,27 +306,29 @@ static inline int zap_pte_range(struct mm_struct *mm, pmd_t * pmd, unsigned long
+                pmd_clear(pmd);
+                return 0;
+        }
+-       pte = pte_offset(pmd, address);
+-       address &= ~PMD_MASK;
+-       if (address + size > PMD_SIZE)
+-               size = PMD_SIZE - address;
+-       size >>= PAGE_SHIFT;
+-       freed = 0;
+-       for (;;) {
+-               pte_t page;
+-               if (!size)
+-                       break;
+-               page = ptep_get_and_clear(pte);
+-               pte++;
+-               size--;
+-               if (pte_none(page))
++       ptep = pte_offset(pmd, address);
++       offset = address & ~PMD_MASK;
++       if (offset + size > PMD_SIZE)
++               size = PMD_SIZE - offset;
++       size &= PAGE_MASK;
++       for (offset=0; offset < size; ptep++, offset += PAGE_SIZE) {
++               pte_t pte = *ptep;
++               if (pte_none(pte))
+                        continue;
+                //free_pte()的代码不再展开,里面也没有flush tlb的动作
+-               freed += free_pte(page);
++               if (pte_present(pte)) {
++                       freed ++;
++                       /* This will eventually call __free_pte on the pte. */
++                       tlb_remove_page(tlb, ptep, address + offset);
++               } else {
++                       swap_free(pte_to_swp_entry(pte));
++                       pte_clear(ptep);
++               }
+        }
++
+        return freed;
+ }
+@@ -357,8 +359,9 @@ static inline int zap_pmd_range(struct mm_struct *mm, pgd_t * dir, unsigned long
+  */
+```
+
+让人吃惊的是, 子函数中只有free pte, 没有flush tlb, 
+那也就是说,要么没有flush tlb, 要么flush tlb的动作在
+free pte 之后.
+
+我们以madvise (dont need) 流程为例:
+```cpp
+diff --git a/mm/filemap.c b/mm/filemap.c
+index d9624c4cc35..d498b4a7132 100644
+--- a/mm/filemap.c
++++ b/mm/filemap.c
+@@ -2223,9 +2223,7 @@ static long madvise_dontneed(struct vm_area_struct * vma,
+        if (vma->vm_flags & VM_LOCKED)
+                return -EINVAL;
+
+-       flush_cache_range(vma->vm_mm, start, end);
+        zap_page_range(vma->vm_mm, start, end - start);
+-       flush_tlb_range(vma->vm_mm, start, end);
+        return 0;
+ }
+```
+可以发现 flush_cache_range在 zap_page_range之后, 这样其实会有我们前面提到的问题.
 
 ## 相关数据结构
 ```cpp
@@ -351,93 +463,8 @@ zap_page_range {
     释放物理页
 }
 ```
+完美解决.
 
-## 合入该patch之前的调用流程
-有点好奇合入该patch之前的调用流程是什么样的:
-我们简单看下:
-```diff
- void zap_page_range(struct mm_struct *mm, unsigned long address, unsigned long size)
- {
-+       mmu_gather_t *tlb;
-        pgd_t * dir;
--       unsigned long end = address + size;
-+       unsigned long start = address, end = address + size;
-        int freed = 0;
-
-        dir = pgd_offset(mm, address);
-@@ -373,11 +376,18 @@ void zap_page_range(struct mm_struct *mm, unsigned long address, unsigned long s
-        if (address >= end)
-                BUG();
-        spin_lock(&mm->page_table_lock);
-+       flush_cache_range(mm, address, end);
-+       tlb = tlb_gather_mmu(mm);
-+
-        do {
--               freed += zap_pmd_range(mm, dir, address, end - address);
-+               freed += zap_pmd_range(tlb, dir, address, end - address);
-                address = (address + PGDIR_SIZE) & PGDIR_MASK;
-                dir++;
-        } while (address && (address < end));
-+
-+       /* this will flush any remaining tlb entries */
-+       tlb_finish_mmu(tlb, start, end);
-```
-
-```diff
--static inline int zap_pte_range(struct mm_struct *mm, pmd_t * pmd, unsigned long address, unsigned long size)
-+static inline int zap_pte_range(mmu_gather_t *tlb, pmd_t * pmd, unsigned long address, unsigned long size)
- {
--       pte_t * pte;
--       int freed;
-+       unsigned long offset;
-+       pte_t * ptep;
-+       int freed = 0;
-
-        if (pmd_none(*pmd))
-                return 0;
-@@ -305,27 +306,29 @@ static inline int zap_pte_range(struct mm_struct *mm, pmd_t * pmd, unsigned long
-                pmd_clear(pmd);
-                return 0;
-        }
--       pte = pte_offset(pmd, address);
--       address &= ~PMD_MASK;
--       if (address + size > PMD_SIZE)
--               size = PMD_SIZE - address;
--       size >>= PAGE_SHIFT;
--       freed = 0;
--       for (;;) {
--               pte_t page;
--               if (!size)
--                       break;
--               page = ptep_get_and_clear(pte);
--               pte++;
--               size--;
--               if (pte_none(page))
-+       ptep = pte_offset(pmd, address);
-+       offset = address & ~PMD_MASK;
-+       if (offset + size > PMD_SIZE)
-+               size = PMD_SIZE - offset;
-+       size &= PAGE_MASK;
-+       for (offset=0; offset < size; ptep++, offset += PAGE_SIZE) {
-+               pte_t pte = *ptep;
-+               if (pte_none(pte))
-                        continue;
--               freed += free_pte(page);
-+               if (pte_present(pte)) {
-+                       freed ++;
-+                       /* This will eventually call __free_pte on the pte. */
-+                       tlb_remove_page(tlb, ptep, address + offset);
-+               } else {
-+                       swap_free(pte_to_swp_entry(pte));
-+                       pte_clear(ptep);
-+               }
-        }
-+
-        return freed;
- }
-@@ -357,8 +359,9 @@ static inline int zap_pmd_range(struct mm_struct *mm, pgd_t * dir, unsigned long
-  */
-```
 
 # 参考链接
 1. [ARM64内核源码解读：mmu-gather操作](https://zhuanlan.zhihu.com/p/527074218)
