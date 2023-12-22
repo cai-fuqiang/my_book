@@ -6,6 +6,8 @@ Subject: [PATCH] mm: fix MADV_[FREE|DONTNEED] TLB flush miss problem
 Nadav reported parallel MADV_DONTNEED on same range has a stale TLB
 problem and Mel fixed it[1] and found same problem on MADV_FREE[2].
 
+Nadav reported 了
+
 Quote from Mel Gorman:
  "The race in question is CPU 0 running madv_free and updating some PTEs
   while CPU 1 is also running madv_free and looking at the same PTEs.

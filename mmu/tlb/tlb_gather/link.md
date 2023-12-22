@@ -51,3 +51,11 @@ Date:   Thu Aug 23 21:08:31 2018 +0100
 ```
 
 
+# early
+```
+commit 7c9d187e950db8c6fbccc9e260b2ed6779845f6d
+Author: Linus Torvalds <torvalds@penguin.transmeta.com>
+Date:   Wed May 15 03:13:39 2002 -0700
+
+    First cut at proper TLB shootdown for page directory entries.
+```
