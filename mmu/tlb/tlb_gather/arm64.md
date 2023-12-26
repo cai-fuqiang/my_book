@@ -249,7 +249,9 @@ static inline void tlb_flush(struct mmu_gather *tlb)
   TLBI 
      ASIDE1IS       TLB invalidate by ASID, EL1, Inner Shareable.
   ```
-  表示无效所有el1和该asid相关的tlb
+  表示无效所有el1和该asid相关的tlb, 另外,也是很重要的一点, 是使用了 IS
+  后缀的指令, 表示是 broadcast flush
+
 * partial flush
   ```cpp
   #define flush_tlb_range(vma,start,end)  __cpu_flush_user_tlb_range(start,end,vma)
@@ -334,11 +336,295 @@ static inline void tlb_flush(struct mmu_gather *tlb)
 
      但是, 这里使用这样的循环, 不会有问题, 顶多是执行一些重复的指令.
 
-## 需要补充下 free_pgtables() 流程 !!!!
+## free_pgtables
+在 `unmap_regions`和 `exit_mmap`中, 也会使用 mmu-gather, 但是其还会调用
+`free_pgtables`函数, 我们以`unmap_region`为例:
+```cpp
+/*
+ * Get rid of page table information in the indicated region.
+ *
+ * Called with the mm semaphore held.
+ */
+static void unmap_region(struct mm_struct *mm,
+                struct vm_area_struct *vma, struct vm_area_struct *prev,
+                unsigned long start, unsigned long end)
+{
+        struct vm_area_struct *next = prev ? prev->vm_next : mm->mmap;
+        struct mmu_gather tlb;
+
+        lru_add_drain();
+        //==(2)==
+        tlb_gather_mmu(&tlb, mm, start, end);
+        update_hiwater_rss(mm);
+        //==(1)==
+        unmap_vmas(&tlb, vma, start, end);
+        free_pgtables(&tlb, vma, prev ? prev->vm_end : FIRST_USER_ADDRESS,
+                                 next ? next->vm_start : USER_PGTABLES_CEILING);
+        //==(2)==
+        tlb_finish_mmu(&tlb, start, end);
+}
 ```
-!!!!!!!
-遗留问题
-!!!!!!!
+1. `unmap_vmas`
+   ```cpp
+   /**
+    * unmap_vmas - unmap a range of memory covered by a list of vma's
+    * @tlb: address of the caller's struct mmu_gather
+    * @vma: the starting vma
+    * @start_addr: virtual address at which to start unmapping
+    * @end_addr: virtual address at which to end unmapping
+    *
+    * Unmap all pages in the vma list.
+    *
+    * Only addresses between `start' and `end' will be unmapped.
+    *
+    * The VMA list must be sorted in ascending virtual address order.
+    *
+    * unmap_vmas() assumes that the caller will flush the whole unmapped address
+    * range after unmap_vmas() returns.  So the only responsibility here is to
+    * ensure that any thus-far unmapped pages are flushed before unmap_vmas()
+    * drops the lock and schedules.
+    *
+    * unmap_vmas 假设 caller 将会 flush 整个的 unmapped address range 在 
+    * unmap_vmas() 返回时. 所以这里要负责的是保证到目前为止的 unmapped pages 
+    * 都会在 释放锁和 调度之前被flush
+    */
+   void unmap_vmas(struct mmu_gather *tlb,
+                   struct vm_area_struct *vma, unsigned long start_addr,
+                   unsigned long end_addr)
+   {
+           struct mmu_notifier_range range;
+   
+           mmu_notifier_range_init(&range, MMU_NOTIFY_UNMAP, 0, vma, vma->vm_mm,
+                                   start_addr, end_addr);
+           mmu_notifier_invalidate_range_start(&range);
+           for ( ; vma && vma->vm_start < end_addr; vma = vma->vm_next)
+                   /*
+                    * unmap_single_vma
+                    *   unmap_page_range
+                    *     tlb_start_vma
+                    *     while()
+                    *       zap_p4d_range
+                    *     tlb_end_vma
+                    */
+                   unmap_single_vma(tlb, vma, start_addr, end_addr, NULL);
+           mmu_notifier_invalidate_range_end(&range);
+   }
+   ```
+   我们先暂时不看注释中说的, 在该流程中也会调用类似于 `zap_page_range`的流程
+2. 而在 `unmap_vmas`和 `free_pgtables`前后, 会用 mmu-gather wrap, 我们来看下
+   当前版本, `free_pgtables` 会不会使用mmu-gather
+
+`free_pgtables` 代码流程
+```
+
+free_pgtables
+  while(vma) {
+     free_pgd_range() {
+         while {
+            free_p4d_range() {
+                while {
+                   free_pud_range() {
+                      ...//see following
+                   }
+                }
+                pgd_clear()
+                p4d_free_tlb()
+            }
+         }
+     }
+  }
+
+free_pud_range {
+  while() {
+    free_pmd_range {
+      free_pte_range
+    }
+    pud_clear
+    pmd_free_tlb
+  }
+  p4d_clear
+  pud_free_tlb
+}
+```
+free_pgtables的作用是, 解除页表之间的映射(例如,在pmd中解除 page table映射
+(PT)), 由于页表也是具体的物理页面, 而且也会有TLB 映射(not last level), 所以
+也有刷新tlb, 释放物理页面的需求, 总之和映射的物理页面一样, page table 再此
+过程中也有以下三个需求:
+* 解除映射关系
+* 刷新tlb
+* 释放物理页面
+
+我们主要关注下,其是否会使用到mmu-gather, 做delay gather tlb flush 和 
+释放物理页面
+
+我们先来看下 free_pte_range
+```cpp
+/*
+ * Note: this doesn't free the actual pages themselves. That
+ * has been handled earlier when unmapping all the memory regions.
+ */
+static void free_pte_range(struct mmu_gather *tlb, pmd_t *pmd,
+                           unsigned long addr)
+{
+        pgtable_t token = pmd_pgtable(*pmd);
+        //==(1)==
+        pmd_clear(pmd);
+        pte_free_tlb(tlb, token, addr);
+        tlb->mm->nr_ptes--;
+}
+#define pte_free_tlb(tlb, ptep, addr)   __pte_free_tlb(tlb, ptep, addr)
+static inline void __pte_free_tlb(struct mmu_gather *tlb, pgtable_t pte,
+        unsigned long addr)
+{
+        pgtable_page_dtor(pte);
+        //==(2)==
+        tlb_add_flush(tlb, addr);
+        //==(3)==
+        tlb_remove_page(tlb, pte);
+}
+```
+free_pte_range 需要干这样几件事:
+1. 解除映射关系 (pmd clear)
+2. 将addr 放到 mmu-gather中(delay flush tlb), 这里是要flush 什么呢, 实际上
+   是对应与x86 中的 paging-structure cache, 对应这里的是 pmd paging-structure
+   cache.
+   > NOTE
+   >
+   > 这里我们要注意,无论是x86还是arm64, 对于某个VA的invalidate tlb 的指令
+   > 操作数永远是VA, 而并非中间的一些页表的VA, 至于为什么, 我们在解读x86
+   > spec中提到过, 因为VA 是作为tlb cache 的search key
+3. 这里比较关键, 可以看到将pte所在的page(pgtable_t pte)传入了`tlb_remove_page`,
+   综合(2)来看, 在`free_pgtables`流程中,也会利用mmu-gather 将pagetable 相关
+   的页面 `delay flush tlb` 和 `free_pte()`
+
+那么我们再看下`free_pte_range`的调用者 -- `free_pmd_range`
+```cpp
+static inline void free_pmd_range(struct mmu_gather *tlb, pud_t *pud,
+                                unsigned long addr, unsigned long end,
+                                unsigned long floor, unsigned long ceiling)
+{
+        pmd_t *pmd;
+        unsigned long next;
+        unsigned long start;
+
+        start = addr;
+        pmd = pmd_offset(pud, addr);
+        do {
+                //获取下一个addr
+                next = pmd_addr_end(addr, end);
+                //如果pmd 已经是 none了
+                if (pmd_none_or_clear_bad(pmd))
+                        continue;
+                //调用free_pte_range处理page table(PT)
+                free_pte_range(tlb, pmd, addr);
+        } while (pmd++, addr = next, addr != end);
+
+        start &= PUD_MASK;
+        if (start < floor)
+                return;
+        if (ceiling) {
+                ceiling &= PUD_MASK;
+                if (!ceiling)
+                        return;
+        }
+        if (end - 1 > ceiling - 1)
+                return;
+
+        pmd = pmd_offset(pud, start);
+        //上面的流程,已经把 该 pmd 指向的所有的 PT 处理完了,接下来
+        //该pmd本身
+        //clear该pmd 所在的 pud entry
+        pud_clear(pud);
+        //将该 pmd的page 纳入 mmu-gather处理
+        pmd_free_tlb(tlb, pmd, start);
+}
+```
+# DON'T delay inermediate TLB
+commit message: 
+```
+commit 285994a62c80f1d72c6924282bcb59608098d5ec
+Author: Catalin Marinas <catalin.marinas@arm.com>
+Date:   Wed Mar 11 12:20:39 2015 +0000
+
+    arm64: Invalidate the TLB corresponding to intermediate page table levels
+
+    The ARM architecture allows the caching of intermediate page table
+    levels and page table freeing requires a sequence like:
+
+            pmd_clear()
+            TLB invalidation
+            pte page freeing
+
+    With commit 5e5f6dc10546 (arm64: mm: enable HAVE_RCU_TABLE_FREE logic),
+    the page table freeing batching was moved from tlb_remove_page() to
+    tlb_remove_table(). The former takes care of TLB invalidation as this is
+    also shared with pte clearing and page cache page freeing. The latter,
+    however, does not invalidate the TLBs for intermediate page table levels
+    as it probably relies on the architecture code to do it if required.
+    When the mm->mm_users < 2, tlb_remove_table() does not do any batching
+    and page table pages are freed before tlb_finish_mmu() which performs
+    the actual TLB invalidation.
+
+    This patch introduces __tlb_flush_pgtable() for arm64 and calls it from
+    the {pte,pmd,pud}_free_tlb() directly without relying on deferred page
+    table freeing.
+
+    Fixes: 5e5f6dc10546 arm64: mm: enable HAVE_RCU_TABLE_FREE logic
+```
+看起来是一个patch引入的, 在该patch中将不再delay flush , 我们来看下相关patch
+```diff
+diff --git a/arch/arm64/include/asm/tlb.h b/arch/arm64/include/asm/tlb.h
+index c028fe37456f..53d9c354219f 100644
+--- a/arch/arm64/include/asm/tlb.h
++++ b/arch/arm64/include/asm/tlb.h
+@@ -48,6 +48,7 @@ static inline void tlb_flush(struct mmu_gather *tlb)
+ static inline void __pte_free_tlb(struct mmu_gather *tlb, pgtable_t pte,
+                                  unsigned long addr)
+ {
++       __flush_tlb_pgtable(tlb->mm, addr);
+        pgtable_page_dtor(pte);
+        tlb_remove_entry(tlb, pte);
+ }
+@@ -56,6 +57,7 @@ static inline void __pte_free_tlb(struct mmu_gather *tlb, pgtable_t pte,
+ static inline void __pmd_free_tlb(struct mmu_gather *tlb, pmd_t *pmdp,
+                                  unsigned long addr)
+ {
++       __flush_tlb_pgtable(tlb->mm, addr);
+        tlb_remove_entry(tlb, virt_to_page(pmdp));
+ }
+ #endif
+@@ -64,6 +66,7 @@ static inline void __pmd_free_tlb(struct mmu_gather *tlb, pmd_t *pmdp,
+ static inline void __pud_free_tlb(struct mmu_gather *tlb, pud_t *pudp,
+                                  unsigned long addr)
+ {
++       __flush_tlb_pgtable(tlb->mm, addr);
+        tlb_remove_entry(tlb, virt_to_page(pudp));
+ }
+ #endif
+diff --git a/arch/arm64/include/asm/tlbflush.h b/arch/arm64/include/asm/tlbflush.h
+index 4abe9b945f77..c3bb05b98616 100644
+--- a/arch/arm64/include/asm/tlbflush.h
++++ b/arch/arm64/include/asm/tlbflush.h
+@@ -143,6 +143,19 @@ static inline void flush_tlb_kernel_range(unsigned long start, unsigned long end
+                flush_tlb_all();
+ }
+
++/*
++ * Used to invalidate the TLB (walk caches) corresponding to intermediate page
++ * table levels (pgd/pud/pmd).
++ */
++static inline void __flush_tlb_pgtable(struct mm_struct *mm,
++                                      unsigned long uaddr)
++{
++       unsigned long addr = uaddr >> 12 | ((unsigned long)ASID(mm) << 48);
++
++       dsb(ishst);
++       asm("tlbi       vae1is, %0" : : "r" (addr));
++       dsb(ish);
++}
+ /*
+  * On AArch64, the cache coherency is handled via the set_pte_at() function.
+  */
 ```
 
 # LAST LEVEL
@@ -663,6 +949,14 @@ Author: Will Deacon <will@kernel.org>
 Date:   Wed Aug 22 21:23:05 2018 +0100
 
     arm64: tlb: Use last-level invalidation in flush_tlb_kernel_range()
+
+...
+
+commit 7f08872774eb971693ba79eeb2d4db364c9f5bfb
+Author: Will Deacon <will.deacon@arm.com>
+Date:   Tue Aug 28 14:52:17 2018 +0100
+
+    arm64: tlb: Rewrite stale comment in asm/tlbflush.h
 ```
 
 [mail list](https://lore.kernel.org/all/1535645747-9823-1-git-send-email-will.deacon@arm.com/)
