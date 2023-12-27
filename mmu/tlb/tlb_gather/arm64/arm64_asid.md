@@ -471,4 +471,764 @@ void __new_context(struct mm_struct *mm)
 
 我们知道, tlbi 指令可以不带 IS 后缀, 需要关注下后续的patch 会不会引入.
 
+#  arm64 LAZY tlb
+redhat 向社区提交了一个组patch, 是为了avoid alway flush tlb broadcast.
 
+[MAIL LIST](https://lore.kernel.org/all/20200223192520.20808-1-aarcange@redhat.com/#r)
+
+我们先看下PATCH 0 的 commit message  :
+```
+Subject: [PATCH 0/3] arm64: tlb: skip tlbi broadcast v2
+Date: Sun, 23 Feb 2020 14:25:17 -0500	[thread overview]
+Message-ID: <20200223192520.20808-1-aarcange@redhat.com> (raw)
+
+Hello,
+
+This is introducing a nr_active_mm that allows to optimize away the
+tlbi broadcast also for multi threaded processes, it doesn't rely
+anymore on mm_users <= 1.
+
+引入 nr_active_mm, 该成员允许针对多线程优化掉tlbi broadcast, 它不再
+依赖 mm_users <= 1.
+
+This also optimizes away all TLB flushes (including local ones) when
+the process is not running in any cpu (including during exit_mmap with
+lazy tlb state).
+
+这同时也优化掉 all TLB flushs(包括 local) , 当这个进程不在任何 CPU上 
+running(包括在 具有 lazy tlb 状态的 exit_mmap期间)
+
+This optimization is generally only observable when there are parallel
+TLB flushes from different processes in multiple CPUs. One possible
+use case is an userland malloc libs freeing small objects with
+MADV_DONTNEED and causing a frequent tiny tlb flushes as demonstrated
+by the tcmalloc testsuite.
+
+这种优化通常 只在 多个CPU中 有来自不同进程并行进行TLB flush 才能观察到.
+一个可能的用例是 用户态 mallic libs使用 MADV_DONTNEED 释放小的 objects
+并且导致频繁的微小的tlb flush, 如tcmalloc 测试套件所示
+
+All memory intensive apps dealing a multitude of frequently freed
+small objects tend to opt-out of glibc and they opt-in jemalloc or
+tcmalloc, so this should facilitate the SMP/NUMA scalability of long
+lived apps with small objects running in different containers if
+they're issuing frequent MADV_DONTNEED tlb flushes while the other
+threads of the process are not running.
+
+intensive [ɪnˈtensɪv] : 密集的
+facilitate: 使...容易
+scalability: 可扩展性
+
+所有处理大量频繁释放 smallc objects的内存密集的apps 都会倾向于不使用 glibc
+而引入 jemalloc 或者 tcmalloc, 所以这应该有助于 有smaill objects 运行在不同
+containers的长期运行程序的SMP/NUMA 可扩展性, 如果他们频繁提交 MADV_DONTNEED
+tlb flushs, 当其他进程的线程不再running的时.
+
+I was suggested to implement the mm_cpumask the standard way in
+order to optimize multithreaded apps too and to avoid restricting the
+optimization to mm_users <= 1. So initially I had two bitmasks allocated
+as shown at the bottom of this cover letter, by setting
+ARCH_NR_MM_CPUMASK to 2 with the below patch applied... however I
+figured a single atomic per-mm achieves the exact same runtime behavior
+of the extra bitmap, so I just dropped the extra bitmap and I replaced
+it with nr_active_mm as an optimization.
+
+曾经有人建议我用标准的方式实现 mm_cpumask, 以优化多线程应用程序 并且避免
+将优化限制在 mm_users <= 1. 所以最初我 alloc 两个 bitmasks, 正如 cover letter
+底部展示的那样, 通过在应用下面补丁的情况下, 设置 ARCH_NR_MM_CPUMASK 为2...
+但是我认为 single atomic per-mm 可以达到和增加一个额外的 bitmap 完全相同的
+运行时行为, 所以我只是 dropped 了 extra bitmap 并且 我将其替换为 nr_active_mm
+作为优化.
+
+If the switch_mm atomic ops in the switch_mm fast path would be a
+concern (they're still faster than the cpumask_set_cpu/clear_cpu, with
+less than 256-512 CPUs), it's worth mentioning it'd be possible to
+remove all atomic ops from the switch_mm fast path by restricting this
+optimization to single threaded processes by checking mm_users <= 1
+and < 1 instead of nr_active_mm <= 1 and < 1 similarly to what the
+earlier version of this patchset was doing.
+
+如果 switch_mm fast patch 中的 switch_mm atomic ops 是一个问题(在cpu 少于
+256-512时, 他们仍然比 cpumask_set_cpu(), clear_cpu()快), 值得
+一提的是通过检查 mm_users <=1 和 < 1 而不是nr_active_mm <= 1和 <1, 将这种优化
+限制在单线程中, 可以在 switch_mm fast patch 中删除 所有的atomic ops, 这与
+该补丁集早期的版本类似
+```
+
+## [PATCH 1/3] : mm: use_mm: fix for arches checking mm_users to optimize TLB flushes
+COMMIT MESSAGE:
+```
+alpha, ia64, mips, powerpc, sh, sparc are relying on a check on
+mm->mm_users to know if they can skip some remote TLB flushes for
+single threaded processes.
+
+...这些架构依赖检查 mm->mm_users 来知道他们是否可以对单线程程序跳过
+一些 remote TLB flush
+
+Most callers of use_mm() tend to invoke mmget_not_zero() or
+get_task_mm() before use_mm() to ensure the mm will remain alive in
+between use_mm() and unuse_mm().
+
+大部分 use_mm() 的大部分的caller都倾向于在使用 use_mm()之前 调用 mmget_no_zero()
+和 get_task_mm() 来保证在 use_mm()和 unuse_mm()之间该mm 仍然是
+alive的
+
+Some callers however don't increase mm_users and they instead rely on
+serialization in __mmput() to ensure the mm will remain alive in
+between use_mm() and unuse_mm(). Not increasing mm_users during
+use_mm() is however unsafe for aforementioned arch TLB flushes
+optimizations. So either mmget()/mmput() should be added to the
+problematic callers of use_mm()/unuse_mm() or we can embed them in
+use_mm()/unuse_mm() which is more robust.
+
+aforementioned: 前面所述的,上述的
+embed [ɪmˈbed]:  把...嵌入
+robust [rəʊˈbʌst] : 强健的,坚固的
+
+某些调用者并没有 inc mm_users 而他们通过以来 __mmput中的序列化?? 来保证
+在 use_mm()和 unuse_mm()之前 mm 保持alive. 在 use_mm()期间不增加 mm_users
+对于上述 arch TLB flush 来说是不安全的. 所以将 mmget()/mmput() 添加到
+use_mm()/unuse_mm()有问题的调用者中,或者我们可以将他们嵌入到 use_mm()/unuse_mm()
+中, 这样更健壮.
+```
+
+patch内容:
+```diff
+ mm/mmu_context.c | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/mm/mmu_context.c b/mm/mmu_context.c
+index 3e612ae748e9..ced0e1218c0f 100644
+--- a/mm/mmu_context.c
++++ b/mm/mmu_context.c
+@@ -30,6 +30,7 @@ void use_mm(struct mm_struct *mm)
+ 		mmgrab(mm);
+ 		tsk->active_mm = mm;
+ 	}
++	mmget(mm);
+ 	tsk->mm = mm;
+ 	switch_mm(active_mm, mm, tsk);
+ 	task_unlock(tsk);
+@@ -57,6 +58,7 @@ void unuse_mm(struct mm_struct *mm)
+ 	task_lock(tsk);
+ 	sync_mm_rss(mm);
+ 	tsk->mm = NULL;
++	mmput(mm);
+ 	/* active_mm is still 'mm' */
+ 	enter_lazy_tlb(mm, tsk);
+ 	task_unlock(tsk);
+```
+
+## Patch 2 先不看
+```
+!!!!!!!!
+遗留问题
+!!!!!!!!
+```
+## [PATCH 3/3] arm64: tlb: skip tlbi broadcast
+commit message:
+```
+With multiple NUMA nodes and multiple sockets, the tlbi broadcast
+shall be delivered through the interconnects in turn increasing the
+CPU interconnect traffic and the latency of the tlbi broadcast
+instruction. To avoid the synchronous delivery of the tlbi broadcast
+before the tlbi instruction can be retired, the hardware would need to
+implement a replicated mm_cpumask bitflag for each ASID and every CPU
+would need to tell every other CPU which ASID is being loaded. Exactly
+what x86 does with mm_cpumask in software.
+
+shall : 应; 可以, 会
+interconnects: 相联系，相互联系，相互连接;
+traffic: 信息流量;交通; 运输; 
+replicated: 复制,再生,仿制的
+Exactly:确切的, 准确的,一点不错, 正是如此,完全正确
+
+在 multiple NUMA node和 multiple sockets的机器上, tlbi broadcast应通过
+interconnect, 从而增加了 CPU interconnect traffic 和 tlbi broadcast 指令
+的延迟. 为了避免在tlbi retired之前 同步delivery tlbi broadcast,  硬件将
+需要为每个ASID 实现类似于 mm_cpumask bitflags, 并且每一个CPU 应该需要告
+诉其他CPU, 该CPU load了哪个ASID. x86 在软件中对 mm_cpumask 的作用正是如此.
+
+Even within a single NUMA node the latency of the tlbi broadcast
+instruction increases almost linearly with the number of CPUs trying
+to send tlbi broadcasts at the same time.
+
+即使在 single NUMA node 中, tlbi broadcast 指令的延迟, 几乎随着要同时发送
+tlbi broadcast的CPUs数量线性增加.
+
+If a single thread of the process is running and it's also running in
+the CPU issuing the TLB flush, or if no thread of the process are
+running, we can achieve full SMP scalability in the arm64 TLB flushng
+by skipping the tlbi broadcasting.
+
+如果进程中的某个线程是running的, 并且它也在提交 TLB flush的CPU上运行, 或者是
+进程中没有线程是running 的, 通过跳过 tlbi broadcast, 我们可以在 arm64 TLB flushing
+中实现 full SMP scalability(???)
+
+After the local TLB flush this means the ASID context goes out of sync
+in all CPUs except the local one. This can be tracked on the per-mm
+cpumask: if the bit is set it means the ASID context is stale for that
+CPU. This results in an extra local ASID TLB flush only when threads
+are running in new CPUs after a TLB flush.
+
+在 local TLB flush 后,这意味着ASID context 在除了本地的CPU之外的所有CPU
+都不同步. 这可以在 per-mm cpumask 跟踪到:
+如果该bit被设置,意味着AISD context在该CPU上是stale. 只有当县城在TLB 刷新后,
+在新的CPU 上运行时, 才会导致额外的local ASID TLB 刷新.
+
+Skipping the tlbi instruction broadcasting is already implemented in
+local_flush_tlb_all(), this patch only extends it to flush_tlb_mm(),
+flush_tlb_range() and flush_tlb_page() too.
+
+skip tlbi instruction broadcast 已经在 local_flush_tlb_all()中实现, 该patch只是
+将其扩展到 flush_tlb_mm() flush_tlb_range() flush_tlb_page()中.
+
+The below benchmarks are measured on a non-NUMA 32 CPUs system (ARMv8
+Ampere), so it should be far from a worst case scenario: the
+enterprise kernel config allows multiple NUMA nodes with NR_CPUS set
+by default to 4096.
+
+enterprise : 事业;事业单位; 企业单位; 公司; 商号; 商行: (企业版)
+
+下面的benchmark 在 non-NUMA 32 CPUs system(ARMv8 Ampere) 中测试, 所以
+这远远达不到最坏的情况:
+  enterprise kernel 允许配置默认设置为4096 的NR_CPUs的mulitple NUMA node
+```
+
+所以, 根据作者描述, tlbi broadcast在多NUMA机器上会造成一些性能问题,而在
+单NUMA , 多个CPU 同时发出TLBI指令,也会造成性能问题. 目前硬件没有实现类似
+于根据 mm_cpumask 选择某些cpu broadcast 的逻辑, 需要软件去做.
+
+作者这边是这么想的:
+
+<!--
+假设A进程有线程a1, a2, B进程有线程b
+```
+CPU0                        CPU1
+running a1                  running a2
+modify pgtable
+flush_tlb {
+  flush_local
+  mask CPU1 in 
+
+}
+
+```
+-->
+
+我们来看下patch code
+
+> NOTE
+>
+> 该patch未合入社区, 所以找的主线分支日期相近的commit,来分析代码:
+> ```
+> commit 39f3b41aa7cae917f928ef9f31d09da28188e5ed (HEAD -> before_2020_2_23)
+> Author: Paolo Abeni <pabeni@redhat.com>
+> Date:   Fri Feb 21 19:42:13 2020 +0100
+> 
+>     net: genetlink: return the error code when attribute parsing fails.
+> ```
+
+## 数据结构变动
+```cpp
+diff --git a/arch/arm64/include/asm/mmu.h b/arch/arm64/include/asm/mmu.h
+index e4d862420bb4..9072fd7bc5f8 100644
+--- a/arch/arm64/include/asm/mmu.h
++++ b/arch/arm64/include/asm/mmu.h
+@@ -20,6 +20,7 @@ typedef struct {
+ 	atomic64_t	id;
+ 	void		*vdso;
+ 	unsigned long	flags;
++	atomic_t	nr_active_mm;
+ } mm_context_t;
+```
+
+在将x86 lazy tlb 时提到过, `mm_context_t` 是`mm_struct`中定义:
+```cpp
+struct mm_struct {
+    ...
+    mm_context_t context;
+    ...
+};
+```
+
+**nr_active_mm**: 表示当前mm_struct 目前正在CPU上RUNNING的数量
+
+我们来看下其该值的变动:
+* init:
+  ```diff
+  -#define init_new_context(tsk,mm)	({ atomic64_set(&(mm)->context.id, 0); 0; })
+  +#define init_new_context(tsk,mm)			\
+  +	({ atomic64_set(&(mm)->context.id, 0);		\
+  +	   atomic_set(&(mm)->context.nr_active_mm, 0);	\
+  +	   0; })
+  ```
+  初始化为0, 表示没有在任何CPU上RUNNING
+* dec/inc in `switch_mm`/`enter_lazy_tlb`
+
+  看这两个函数的流程需要理解`cpu_not_lazy_tlb` global vars, 以及进程切换的流程(`context_switch`)
+  我们下面分析
+
+## global vars
+
+新增`cpu_not_lazy_tlb`
+```cpp
+diff --git a/arch/arm64/mm/context.c b/arch/arm64/mm/context.c
+index 8ef73e89d514..3152b7f7da12 100644
+--- a/arch/arm64/mm/context.c
++++ b/arch/arm64/mm/context.c
+@@ -25,6 +25,7 @@ static unsigned long *asid_map;
+ static DEFINE_PER_CPU(atomic64_t, active_asids);
+ static DEFINE_PER_CPU(u64, reserved_asids);
+ static cpumask_t tlb_flush_pending;
++DEFINE_PER_CPU(bool, cpu_not_lazy_tlb);
+```
+可以看到是bool 类型的 per-cpu 变量. 表示当前CPU 的状态是:
+* **non lazy mode**: true
+* **lazy_mode**: false
+
+该值初始化为0, 表示在切换第一个进程之前是 non lazy mode, (idle switch to others)
+没毛病.
+
+## 代码改动
+我们先看下和进程切换相关的代码改动
+### context_switch
+* `enter_lazy_tlb`
+  ```diff
+  //==(1)==调用关系
+   static inline void
+   enter_lazy_tlb(struct mm_struct *mm, struct task_struct *tsk)
+   {
+  +        unsigned int cpu = smp_processor_id();
+           /*
+            * 这里判断如果当前cpu不是 lazy tlb(prev不是内核线程),
+            * 并且要切换的线程不是idle task, 则该cpu 则进如lazy 
+            * mode :
+            *   per_cpu(cpu_not_lazy_tlb, cpu) = false
+            */
+  +        if (per_cpu(cpu_not_lazy_tlb, cpu) &&
+  +            is_idle_task(tsk)) {
+  +                per_cpu(cpu_not_lazy_tlb, cpu) = false;
+  +                if (!system_uses_ttbr0_pan())
+  +                         cpu_set_reserved_ttbr0();
+  +                 //==(2)==
+  +                atomic_dec(&mm->context.nr_active_mm);
+  +        }
+  +        VM_WARN_ON(atomic_read(&mm->context.nr_active_mm) < 0);
+  ```
+  1. 之前我们讲过,当我们切换到内核线程时, 会执行 `enter_lazy_tlb`
+     ```cpp
+     context_switch()
+     {
+             ...
+             if (!next->mm) {                                // to kernel
+                     enter_lazy_tlb(prev->active_mm, next);
+                     
+                     next->active_mm = prev->active_mm;
+                     if (prev->mm)                           // from user
+                             mmgrab(prev->active_mm);
+                     else
+                             prev->active_mm = NULL;
+             } else {
+             ...
+     }
+     ```
+  2. 这里需要注意, 如果进入lazy mode, 则需要dec `nr_active_mmf`, 因为
+     当前线程切出去了, 运行的是内核线程, 该线程不会访问用户空间, 所以
+     不会使用用户空间 VA range 相关的tlb. 所以, 也就相当于NOT RUNNING on
+     this CPU
+     > NOTE
+     >
+     > 这里我们不关注PAN 的特性, 在没有PAN 的特性下, `enter_lazy_tlb`不会
+     > 切换ttbr0(可以认为用户态CR3)
+
+* `switch_mm`
+  ```diff
+  //==(1)==(调用关系)
+   switch_mm(struct mm_struct *prev, struct mm_struct *next,
+   	  struct task_struct *tsk)
+   {
+  -        if (prev != next)
+  -                __switch_mm(next);
+  +        unsigned int cpu = smp_processor_id();
+  +        //==(2)==
+  +        if (!per_cpu(cpu_not_lazy_tlb, cpu)) {
+  +                per_cpu(cpu_not_lazy_tlb, cpu) = true;
+  +                atomic_inc(&next->context.nr_active_mm);
+  +                __switch_mm(next, cpu);
+  +        //==(3)==
+  +        } else if (prev != next) {
+  +                atomic_inc(&next->context.nr_active_mm);
+  +                __switch_mm(next, cpu);
+  +                atomic_dec(&prev->context.nr_active_mm);
+  +        }
+  +        VM_WARN_ON(!atomic_read(&next->context.nr_active_mm));
+  +        VM_WARN_ON(atomic_read(&prev->context.nr_active_mm) < 0);
+  ```
+  1. 和上面的流程类似在`context_switch()`调度到非内核线程时会调用到`switch_mm`
+     ```cpp
+     context_switch()
+     {
+             ...
+             if (!next_mm) {
+                    ...
+             } else {
+                    ...
+                    switch_mm_irqs_off(prev->active_mm, next->mm, next);
+                    ...
+             }
+             ...
+     }
+     /*
+      * arm64 没有自定义 switch_mm_irq_off
+      * 
+      * 所以使用通用头文件: linux/mmu_context 的定义:
+      */
+     #ifndef switch_mm_irqs_off
+     # define switch_mm_irqs_off switch_mm
+     #endif
+     ```
+  2. 当判断switch之前的CPU 是lazy mode时, 需要做:
+     * 切换为 NOT lazy mode(因为即将切换为用户态线程)
+     * `inc(nr_active_mm)` 理由同上, 该用户线程即将运行, 并且因为是用户线程,
+       所以可能访问用户空间
+     * `__switch_mm()`: 切换进程
+  3. 同理, 如果switch 之前的CPU 不是 lazy mode, 说明为用户态线程, 需要做:
+     * `inc(next.nr_active_mm)`
+     * `__switch_mm()`
+     * `dec(prev.nr_active_mm)`
+
+     不再赘述原因.
+
+我们知道lazy tlb 实现的目的是, 发起tlb shootdown (broadcast flush)时, 如果
+其他cpu 没有运行当前发起 tlb shootdown 进程的其他线程, 则不刷, 等该CPU 
+switch到该进程的其他线程时, 再刷.
+
+所以我们接下来需要关注两点:
+* `switch_mm()` (切回发起进程的其他线程)中有关lazy tlb flush 的流程
+* `flush_tlb()`(发起tlb shootdown), 这个比较特殊, 因为arm64不能选择让哪些CPU刷,
+  哪些cpu不刷, 只能是要么全都刷,要么全都不刷,要么flush local.(当前也可以学习
+  x86, 直接发IPI, stop other cpu, 但是这样做舍本逐末了不是).
+
+为了连贯,我们先看进程切换流程:
+
+### lazy flush in switch_mm
+```diff
+/*
+ * 该patch增加了__switch_mm的参数:cpu, 原因是在switch_mm 中变动中, 增加了
+ * 获取当前cpu的流程,所以这里没有必要在获取一次了
+ */
+-static inline void __switch_mm(struct mm_struct *next)
++ static inline void __switch_mm(struct mm_struct *next, unsigned int cpu)
+{
+-       unsigned int cpu = smp_processor_id();
+        /*
+         * init_mm.pgd does not contain any user mappings and it is always
+         * active for kernel addresses in TTBR1. Just set the reserved TTBR0.
+         */
+        if (next == &init_mm) {
+                cpu_set_reserved_ttbr0();
+                return;
+        }
+
+        check_and_switch_context(next, cpu);
+}
+```
+
+`check_and_switch_context`:
+```diff
+void check_and_switch_context(struct mm_struct *mm, unsigned int cpu)
+{
+        unsigned long flags;
+        u64 asid, old_active_asid;
+
+        if (system_supports_cnp())
+                cpu_set_reserved_ttbr0();
+
+        asid = atomic64_read(&mm->context.id);
+
+        /*
+         * The memory ordering here is subtle.
+         * If our active_asids is non-zero and the ASID matches the current
+         * generation, then we update the active_asids entry with a relaxed
+         * cmpxchg. Racing with a concurrent rollover means that either:
+         *
+         * - We get a zero back from the cmpxchg and end up waiting on the
+         *   lock. Taking the lock synchronises with the rollover and so
+         *   we are forced to see the updated generation.
+         *
+         * - We get a valid ASID back from the cmpxchg, which means the
+         *   relaxed xchg in flush_context will treat us as reserved
+         *   because atomic RmWs are totally ordered for a given location.
+         */
+        old_active_asid = atomic64_read(&per_cpu(active_asids, cpu));
+        if (old_active_asid &&
+            !((asid ^ atomic64_read(&asid_generation)) >> asid_bits) &&
+            atomic64_cmpxchg_relaxed(&per_cpu(active_asids, cpu),
+                                     old_active_asid, asid))
+                goto switch_mm_fastpath;
+
+        raw_spin_lock_irqsave(&cpu_asid_lock, flags);
+        /* Check that our ASID belongs to the current generation. */
+        asid = atomic64_read(&mm->context.id);
+        if ((asid ^ atomic64_read(&asid_generation)) >> asid_bits) {
+                asid = new_context(mm);
+                atomic64_set(&mm->context.id, asid);
+        }
+
+        if (cpumask_test_and_clear_cpu(cpu, &tlb_flush_pending))
+                local_flush_tlb_all();
+
+        atomic64_set(&per_cpu(active_asids, cpu), asid);
+        raw_spin_unlock_irqrestore(&cpu_asid_lock, flags);
+
+switch_mm_fastpath:
++       /*
++        * Enforce CPU ordering between the atomic_inc(nr_active_mm)
++        * in switch_mm() and the below cpumask_test_cpu(mm_cpumask).
++        */
+        //这里增加了一个内存屏障,由于不了解arm64 memory model , 暂不分析
+        /*
+         * !!!!!!!!
+         * 遗留问题
+         * !!!!!!!!
+         */
++       smp_mb();
++       if (cpumask_test_cpu(cpu, mm_cpumask(mm))) {
++       	cpumask_clear_cpu(cpu, mm_cpumask(mm));
++       	local_flush_tlb_asid(asid);
++       }
+ 
+        arm64_apply_bp_hardening();
+
+        /*
+         * Defer TTBR0_EL1 setting for user threads to uaccess_enable() when
+         * emulating PAN.
+         */
+        if (!system_uses_ttbr0_pan())
+                cpu_switch_mm(mm->pgd, mm);
+}
+```
+该代码和ORG PATCH, 有一些差异, 我们先暂时忽略这些差异,只关注下`switch_mm_fastpath`,
+能走到该位置, 即说明已经选择好了asid (`mm->context.id`), 接下来要进行进程切换了,
+`mm_cpumask(mm)`实际记录的是stale tlb cpu, 如果有该CPU 的bit, 说明该cpu的该asid(mm)的
+tlb 是stale的, 需要在切回该内存空间时, invalidate 掉.
+```diff
++static inline void local_flush_tlb_asid(unsigned long asid)
++{
++	asid = __TLBI_VADDR(0, __ASID(asid));
++	dsb(nshst);
++	__tlbi(aside1, asid);
++	__tlbi_user(aside1, asid);
++	dsb(nsh);
++}
+```
+> NOTE
+>
+> 我们先不关注__tlbi(), __tlbi_user()看起来是使用了不同的asid
+
+可以看到是刷新整个asid的tlb.
+
+我们接下来看, 在flush tlb 发起时, 如何 skip tlbi broadcast
+
+### skip tlbi broadcast in tlb flush initiator
+上面提到过 arm64 的flush 方式有三种:
+* 全都刷: TLB_FLUSH_BROADCAST
+* 全都不刷: TLB_FLUSH_NO
+* 只刷本地: TLB_FLUSH_LOCAL
+```diff
++enum tlb_flush_types {
++	TLB_FLUSH_NO,
++	TLB_FLUSH_LOCAL,
++	TLB_FLUSH_BROADCAST,
++};
+```
+
+我们这里以比较复杂的 `__flush_tlb_range`为例:
+> NOTE
+> 
+> 作者修改了`__flush_tlb_range`, `flush_tlb_page`, `flush_tlb_mm`
+> 使其都会选择 skip tlbi broadcast, 使用 lazy tlb flush
+
+```diff
+@@ -198,6 +262,31 @@ static inline void __flush_tlb_range(struct vm_area_struct *vma,
+ 	start = __TLBI_VADDR(start, asid);
+ 	end = __TLBI_VADDR(end, asid);
+ 
++	flush = tlb_flush_check(mm, get_cpu());
++	switch (flush) {
++	case TLB_FLUSH_LOCAL:
++
++		dsb(nshst);
++		for (addr = start; addr < end; addr += stride) {
++			if (last_level) {
++				__tlbi(vale1, addr);
++				__tlbi_user(vale1, addr);
++			} else {
++				__tlbi(vae1, addr);
++				__tlbi_user(vae1, addr);
++			}
++		}
++		dsb(nsh);
++
++		/* fall through */
++	case TLB_FLUSH_NO:
++		put_cpu();
++		return;
++	case TLB_FLUSH_BROADCAST:
++		break;
++	}
++	put_cpu();
+```
+代码也比较简单, 先调用`tlb_flush_check`选择哪种 flush方式, 然后
+在执行相应的流程, 所以重点在 `tlb_flush_check`:
+```cpp
+enum tlb_flush_types tlb_flush_check(struct mm_struct *mm, unsigned int cpu)
+{
+    // nr_active_mm 如果 > 1, 则说明至少有一个另外的线程在其他cpu上运行,
+    // 所以只能选择broadcast
+    if (atomic_read(&mm->context.nr_active_mm) <= 1) {
+        /*
+         * is_local的为真的条件是同时满足:
+         *   1. 当前线程就是要flush tlb 的用户态线程
+         *      或者是,内核线程, 但是该内核线程的active_mm就是mm
+         *      (也就是mm的线程,调度到内核线程的. 也就是说, 该线程
+         *      内存空间就是用户态线程的内存空间)
+         *   2. 并且当前cpu 不处于 lazy mode(那也就是说不是内核线程)
+         *
+         * 所以综上所述, 就是该用户线程的上下文
+         */
+        bool is_local = current->active_mm == mm &&
+            per_cpu(cpu_not_lazy_tlb, cpu);
+        //获取stale cpu mask
+        cpumask_t *stale_cpumask = mm_cpumask(mm);
+        //获取其下一个非0的cpubit
+        unsigned int next_zero = cpumask_next_zero(-1, stale_cpumask);
+        /*
+         * local_is_clear: 
+         *   在这个路径中, 只要 context.nr_active_mm == 1, 则需要flush local,
+         *   但是我们需要关心, stale_cpumask 中该cpu是不是stale, 如果不是, 
+         *   则需要clear一下, 所以local_is_clear就是表示该cpu的 stale_cpumask
+         *   是clear的. 如果true ,就不需要清了
+         */
+        bool local_is_clear = false;
+        /*
+         * 看下这三个条件:
+         *   + next_zero < nr_cpu_ids : 说明有 stale的 cpu bits
+         *   + is_local: 说明 当前cpu运行的上下文是当前要flush的用户线程
+         *   + next_zero == cpu, 说明该cpu 的 tlb 已经是 不是 stale的了
+         *
+         *     但是
+         *      switch to current
+         *        inc nr_active_mm
+         *        clear this cpu stale_cpumask
+         *
+         *     这样来看, switch到这个线程后, 只要做完了 clear stale_cpumask,
+         *     那应该其发起 tlb_flush_check 就不会再有 该cpu的 stale_cpumask
+         *
+         *  综上来看, 我们只需要flush local, 不再需要处理 stale_cpumask
+         *  所以 local_is_clear = true,
+         */
+        if (next_zero < nr_cpu_ids &&
+            (is_local && next_zero == cpu)) { next_zero = cpumask_next_zero(next_zero, stale_cpumask);
+            local_is_clear = true;
+        }
+        /*
+         * 分情况来看:
+         * 1. if (next_zero >= nr_cpu_ids)
+         *    说明, 所有的cpu 都是 stale的, 包括当前的cpu, 所以local_is_clear = false,
+         *    这时, 我们不需要在设置一遍 stale_cpumask
+         * 2. 如果 if (next_zero < nr_cpu_ids && !local)
+         *    说明:
+         *    1). 有cpu 不是stale的, 索性将所有的stale_cpumask 在set一下
+         *    2). 当前cpu上运行的不是要flush的mm, 之后可能会切回mm所在的线程,
+         *        不如在这里flush local, 另外把stale_cpumask中该cpu的bit clear,
+         *        所以这里会设置 local_is_clear = false
+         * 3. if (next_zero < nr_cpu_ids && is_local && next_zero != cpu)
+         *    说明:
+         *    当前cpu 不是stale ,但是有另外一个/几个cpu是stale的, 所以索性将所有
+         *    stale_cpumask上, 并且设置 local_is_clear = false
+         * 4. if (next_zero < nr_cpu_ids && is_local && next_zero == cpu && 
+         *         next_next_zero < nr_cpu_ids)
+         *    说明:
+         *    当前cpu是stale的, 还有另外一个/几个cpu 是stale的, 所以索性将所有
+         *    stale_cpumask上, 并且设置 local_is_clear
+         */
+        /*
+         * 综上所述, 就是要将所有除了当前cpu的其他cpu stale_cpumask上, 并且
+         * 如果当前cpu设置了mask, 则clear
+         */
+        //如果没有 next zero, 说明其他的cpu 都是stale的, 不需要在标记,
+        //如果有, 索性 将所有的cpu都设置为上
+        if (next_zero < nr_cpu_ids) {
+            cpumask_setall(stale_cpumask);
+            local_is_clear = false;
+        }
+        
+        /*
+         * Enforce CPU ordering between the above
+         * cpumask_setall(mm_cpumask) and the below
+         * atomic_read(nr_active_mm).
+         */
+        smp_mb();
+        //这里会再次判断下, 尽量能skip braodcast 
+        if (likely(atomic_read(&mm->context.nr_active_mm)) <= 1) {
+            //is_local 如果能进来, 在这里一定返回 TLB_FLUSH_LOCAL
+        	if (is_local) {
+                //说明当前只有一个线程在运行, 所以这里只需要flush local
+        		if (!local_is_clear)
+        			cpumask_clear_cpu(cpu, stale_cpumask);
+        		return TLB_FLUSH_LOCAL;
+            }
+            /* 
+             * 执行到这里, 说明不是刷新的不是当前线程, 而该线程,可能在
+             * 其他的cpu 上运行, 所以需要判断下, 该线程还有没有在其他cpu上
+             * 运行:
+             *    * nr_active_mm !=0 : 有, TLB_FLUSH_BROADCAST
+             *    * nr_active_mm == 0: 没有, 不需要刷, 等调度回来再刷
+             */
+        	if (atomic_read(&mm->context.nr_active_mm) == 0)
+        		return TLB_FLUSH_NO;
+        }
+    }
+    /*
+     * 但是需要注意的是, TLB_FLUSH_BROADCAST, 并不会去修改其他cpu的
+     * stale_cpumask.
+     * 
+     * 一方面, 如果本次是partial flush, 则不能去修改stale, 因为可能
+     * 本次flush broadcast, 并不能flush 掉所有的stale tlb
+     *
+     * 另一方面,也是最重要的,
+     * 即使是full flush, 也可能有一些race的点, 我们下面会介绍到 所以我
+     * 们要做的是flush 发起者只能set stale_cpumask, 而clear动作只能
+     * 进行local flush的流程做
+     */
+    return TLB_FLUSH_BROADCAST;
+}
+```
+
+我们需要考虑下, 我们知道 broadcast是硬件保证的,没有问题, 那么这里, 我们
+需要关注下lazy tlb local flush 会不会漏掉
+```
+CPU 0                                   CPU 1
+tlb_flush_check {
+    if (nr_active_mm <= 1)
+    {
+                                        switch_mm {
+                                            atomic_inc(nr_active_mm)
+                                            cpumask_test_cpu() {
+        cpumask_setall()
+                                               cpumask_clear_cpu()
+                                               local_flush_tlb_asid()
+                                            }
+                                        }
+        if (nr_active_mm > 1) 
+           TLB_FLUSH_BROADCAST
+        else
+           TLB_FLUSH_LOCAL
+    }
+}
+```
+这里我们无论如何调整, 其实都不会有race的情况,
+这里有一个比较精妙的点, 就是作者在`cpumask_setall()`之后,
+又去判断了下`nr_active_mm`.
