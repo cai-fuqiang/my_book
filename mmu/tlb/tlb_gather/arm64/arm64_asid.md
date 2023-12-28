@@ -1217,11 +1217,11 @@ tlb_flush_check {
                                         switch_mm {
                                             atomic_inc(nr_active_mm)
                                             cpumask_test_cpu() {
-        cpumask_setall()
                                                cpumask_clear_cpu()
                                                local_flush_tlb_asid()
                                             }
                                         }
+        cpumask_setall()
         if (nr_active_mm > 1) 
            TLB_FLUSH_BROADCAST
         else
@@ -1230,5 +1230,6 @@ tlb_flush_check {
 }
 ```
 这里我们无论如何调整, 其实都不会有race的情况,
-这里有一个比较精妙的点, 就是作者在`cpumask_setall()`之后,
-又去判断了下`nr_active_mm`.
+这里有一个比较精妙的点, 就是作者在`cpumask_setall()`之后, 
+又去判断了下`nr_active_mm`, 这样做了,我们无论如何改变switch_mm
+和 tlb_flush_check子流程的顺序,都不会有问题
