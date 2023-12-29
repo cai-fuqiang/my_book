@@ -1,5 +1,6 @@
 # ORG patch
 
+## filesystem -- mount
 我们先来看下 `cgroup`的 `file_system_type`:
 ```cpp
 static struct file_system_type cgroup_fs_type = {
@@ -21,11 +22,7 @@ int __init cgroup_init(void)
 }
 ```
 
-`file_system_type.get_sb`会在mount流程中调用到, 我们来看下:
-
-## filesystem -- mount
-
-代码路径:
+`file_system_type.get_sb`会在下面的流程中调用到:
 ```
 sys_mount
   do_mount
@@ -716,8 +713,8 @@ static int cgroup_get_sb(struct file_system_type *fs_type,
                 mutex_unlock(&inode->i_mutex);
                 mutex_unlock(&cgroup_mutex);
         }
+        //
         //====(2)====
-        //将superblock 和 vfs_mount 绑定
         return simple_set_mnt(mnt, sb);
 
  drop_new_super:
@@ -727,28 +724,9 @@ static int cgroup_get_sb(struct file_system_type *fs_type,
         return ret;
 }
 ```
-1. 这里感觉有点问题: old `cg_cgroup_link` 貌似还没有释放, 但是, 还是可以通过,
-   oldcgroup -- `dummytop` 找到所有的`cg_cgroup_link`, 我们后续会看下
-   `cgroup_kill_sb()`会不会做特殊处理
-2. 我们来简单看下 `simple_set_mnt()`代码流程
-   ```cpp
-   int simple_set_mnt(struct vfsmount *mnt, struct super_block *sb)
-   {
-           mnt->mnt_sb = sb;
-           mnt->mnt_root = dget(sb->s_root);
-           return 0;
-   }
-   ```
-   可以看到, 初始化了 
-   * `mnt_sb` : 挂载点的superblock
-   * `mnt_root`: 挂载点的filesystem的 root dentry
-
 ***
 
-看完了mount的流程, 我们在来看下`cgroup_kill_sb`的代码流程, 以及
-
-## filesystem -- umount
-
+看完了mount的流程, 我们在来看下 `cgroup_ops`
 ## cgroup_ops
 ```cpp
 static struct super_operations cgroup_ops = {

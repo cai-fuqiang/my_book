@@ -257,7 +257,7 @@ __primary_switched:
          * kimage_vaddr = C_ADDR(_text) - TEXT_OFFSET
          *
          * kimage_vaddr - __PHYS_OFFSET 
-         *  = C_ADDR(_text) - TEXT_OFFSET - 
+         *  = C_ADDR(_text) - TEXT_OFFSET
          */
         ldr_l   x4, kimage_vaddr                // Save the offset between
         sub     x4, x4, x0                      // the kernel virtual and

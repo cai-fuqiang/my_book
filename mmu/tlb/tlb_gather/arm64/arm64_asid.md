@@ -1221,12 +1221,17 @@ tlb_flush_check {
                                                local_flush_tlb_asid()
                                             }
                                         }
+                                        return userspace {
+                                            use stale tlb
+                                        }
         cpumask_setall()
         if (nr_active_mm > 1) 
            TLB_FLUSH_BROADCAST
+                                            use unstale tlb
         else
            TLB_FLUSH_LOCAL
     }
+    TLB_FLUSH_BROADCAST
 }
 ```
 这里我们无论如何调整, 其实都不会有race的情况,

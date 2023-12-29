@@ -331,5 +331,3 @@ struct task_struct {
 };
 ```
 * **cgroups** : 指向当前task的 `css_set`
-
-
