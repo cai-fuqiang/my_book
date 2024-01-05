@@ -191,24 +191,39 @@ which is a drawback, but it also enables many optimizations that can improve
 performance. We discuss a few common and important optimizations, but a deep
 treatment of this topic is beyond the scope of this primer.
 
-> 
+> reason about : 推出;推理;推断
+>
+> 现在假设一个宽松的内存一致性模型，允许我们重新排序任何内存操作，除非它们之间存在
+> FENCE。 这种宽松的模型迫使程序员推断哪些操作需要排序，这是一个缺点，但它也实现了
+> 许多可以提高性能的优化。 我们讨论了一些常见且重要的优化，但对该主题的深入处理超出u
+> 了本入门的范围。
 
 **Non-FIFO, Coalescing Write Buﬀer**
 
+> coalesce [ˌkoʊəˈles] : 合并;结合;联合
+
 Recall that TSO enables the use of a FIFO write buﬀer, which improves
-performance by hid- ing some or all of the latency of committed stores.
-Although a FIFO write buﬀer improves performance, an even more optimized design
-would use a non-FIFO write buﬀer that permits coalescing of writes (i.e., two
-stores that are not consecutive in program order can write to the same entry in
-the write buﬀer). However, a non-FIFO coalescing write buﬀer normally violates
-TSO because TSO requires stores to appear in program order. Our example relaxed
+performance by hiding some or all of the latency of committed stores. Although
+a FIFO write buﬀer improves performance, an even more optimized design would
+use a non-FIFO write buﬀer that permits coalescing of writes (i.e., two stores
+that are not consecutive in program order can write to the same entry in the
+write buﬀer). However, a non-FIFO coalescing write buﬀer normally violates TSO
+because TSO requires stores to appear in program order. Our example relaxed
 model al- lows stores to coalesce in a non-FIFO write buﬀer, so long as the
 stores have not been separated by a FENCE.
+
+> violates [ˈvaɪəleɪts] : 违背
+>
+> 回想一下，TSO 支持使用 FIFO 写入缓冲区，这通过隐藏已提交存储的部分或全部延迟来提高性能。
+> 尽管 FIFO 写入缓冲区可提高性能，但更优化的设计将使用允许合并写入的非 FIFO 写入缓冲区
+> （即，程序顺序不连续的两个存储可以写入写入缓冲区中的同一条目）。 然而，非 FIFO 合并写入
+> 缓冲区通常会违反 TSO，因为 TSO 要求存储按程序顺序出现。 我们的示例宽松模型允许存储合并
+> 在非 FIFO 写入缓冲区中，只要存储未被 FENCE 分隔即可。
 
 **Simpler Support for Core Speculation**
 
 In systems with strong consistency models, a core may speculatively execute
-loads out of pro- gram order before they are ready to be committed. Recall how
+loads out of program order before they are ready to be committed. Recall how
 the MIPS R10000 core, which supports SC, used such speculation to gain better
 performance than a naive implementation that did not speculate. The catch,
 however, is that speculative cores that support SC typically have to include
@@ -218,13 +233,28 @@ the addresses of evicted cache blocks against a list of the addresses that the
 core has speculatively loaded but not yet committed (i.e., the contents of the
 core’s load queue). This mechanism adds to the cost and complexity of the
 hardware, it consumes additional power, and it represents another ﬁnite
-resource that may con- strain instruction level parallelism. In a system with a
+resource that may constrain instruction level parallelism. In a system with a
 relaxed memory consistency model, a core can execute loads out of program order
 without having to compare the addresses of these loads to the addresses of
 incoming coherence requests. These loads are not speculative with respect to
 the relaxed consistency model (although they may be speculative with respect
 to, say, a branch prediction or earlier stores by the same thread to the same
 address).
+
+> ```
+> the catch is that : 问题是
+> ```
+>
+> 在具有强一致性模型的系统中，核心可能会在准备好提交之前推测性地执行不符合程序
+> 顺序的load。回想一下支持 SC 的 MIPS R10000 内核如何使用这种推测来获得比不进行
+> 推测的简单实现更好的性能。然而，问题是支持 SC 的推测核心通常必须包含检查推测
+> 是否正确的机制，即使错误推测很少见 [15, 21]。R10000 通过将已逐出的缓存块的地址
+> 与核心已推测加载但尚未提交的地址列表（即核心加载队列的内容）进行比较来检查推测。
+> 这种机制增加了硬件的成本和复杂性，它消耗额外的功率，并且它代表了另一种可能限制
+> 指令级并行性的有限资源。在具有宽松存储器一致性模型的系统中，核心可以不按程序顺
+> 序执行加载，而无需将这些加载的地址与传入一致性请求的地址进行比较。 这些负载对
+> 于宽松的一致性模型而言不是推测性的（尽管它们可能对于分支预测或同一线程到同一
+> 地址的早期存储而言是推测性的）。
 
 **Coupling Consistency and Coherence**
 
