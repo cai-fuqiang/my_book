@@ -253,11 +253,18 @@ __primary_switched:
         str_l   x21, __fdt_pointer, x5          // Save FDT pointer
         /*
          * 保存新的kimage_addr的值
-         * 我们把编译地址A，记做: C_ADDR(A)
-         * kimage_vaddr = C_ADDR(_text) - TEXT_OFFSET
+         * 我们把编译地址A，记做: C_VADDR(A)
+         * kimage_vaddr = C_VADDR(_text) - TEXT_OFFSET
+         *   该值实际上表示 kernel image 加载的实际虚拟地址,
+         *   这里需要注意的是, 开启了kaslr后, kimage_vaddr的值会在 relocate_kernel 中
+         *   重新计算. 所以该值不一定是 C_VADDR(_text), 而是 RUNTIME_VADDR(_text)
          *
-         * kimage_vaddr - __PHYS_OFFSET 
-         *  = C_ADDR(_text) - TEXT_OFFSET
+         * 而x0 是 在未开启分页时传入的, 其指令为:
+         *  adrp    x0, __PHYS_OFFSET
+         * 前面分析过,该值就是表示 kernel image 加载的实际物理地址,
+         * 
+         * 所以这里, 计算的是, 实际虚拟地址 - 实际物理地址
+         *  
          */
         ldr_l   x4, kimage_vaddr                // Save the offset between
         sub     x4, x4, x0                      // the kernel virtual and
