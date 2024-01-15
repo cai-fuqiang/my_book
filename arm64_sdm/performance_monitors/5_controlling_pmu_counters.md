@@ -74,7 +74,6 @@ under the following conditions:
   (MDCR_EL2.HPMN-1)], when PMBSR_EL1.S is 1, and PMBLIMITR_EL1.E is 1,
   indicating an SPE buffer management event occurred, event counter n does
   not count if all the following are true:
-  > 
   + PMBLIMITR_EL1.PMFZ is 1.
   + PMCR_EL0.FZS is 1.
 * If EL2 is not implemented, n is in the range [0 .. (PMCR_EL0.N-1)], when
@@ -97,28 +96,66 @@ PMU event counters. Otherwise, the effect of FEAT_SPEv1p2 on PMU event
 counters applies in AArch32 state. See Profiling Buffer management on page
 D13-5463.
 
+> ```
+> !!!!!!!!
+> 遗留问题
+> !!!!!!!!
+> ```
+>
+> 这一章先不看, 和 profiling buffer相关
+
 When FEAT_PMUv3p7 is implemented, the PMU can be configured to freeze event
 counters when an unsigned overflow of a counter occurs. A counter is disabled
 under the following conditions:
+> 实现 FEAT_PMUv3p7 时，PMU 可配置为在发生无符号计数器溢出时 freeze event 
+> counters, 计数器在以下情况下被禁用：
+
 * If EL2 is implemented, MDCR_EL2.HPMN is not 0, and n is in the range [0 ..
   (MDCR_EL2.HPMN-1)], when PMOVSCLR_EL0[(MDCR_EL2.HPMN-1):0] is nonzero,
   indicating an unsigned overflow in one of the event counters in the range,
   event counter n does not count when PMCR_EL0.FZO is 1.
+  > 如果实现了 EL2，且 MDCR_EL2.HPMN 不为 0，且 n 的范围为 [0 … (MDCR_EL2.HPMN-1)]，
+  > 当 PMOVSCLR_EL0[(MDCR_EL2.HPMN-1):0] 为非零时，表示无符号溢出 在范围内的事件计
+  > 数器之一中，当 PMCR_EL0.FZO 为 1 时，事件计数器 n 不计数.
+  >
+  >> 这个是guest场景
 * If EL2 is implemented, MDCR_EL2.HPMN is less than PMCR_EL0.N and n is in
   the range [MDCR_EL2.HPMN .. (PMCR_EL0.N-1)], when
   PMOVSCLR_EL0[(PMCR_EL0.N-1):MDCR_EL2.HPMN] is nonzero, indicating an
   unsigned overflow in one of the event counters in the range, event counter
   n does not count when MDCR_EL2.HPMFZO is 1.
+  > 如果实现了 EL2, MDCR_EL2.HPMN < PMCR_EL0.N, 并且n在 [MDCR_EL2.HPMN .. 
+  > (PMCR_EL0.N -1)] 范围之内, 当 PMOVSCLR_EL0[(PMCR_EL0.N-1):MDCR_EL2.HPMN]
+  > 是 nonzero 时, 表示范围内的事件计数器之一发生无符号溢出，当 MDCR_EL2.HPMFZO 
+  > 为 1 时，事件计数器 n 不计数。
+  >
+  >> 这个判断的意思是
+  >> * 在GUEST中 (EL1), MDCR_EL2.HPMN == PMCR_EL0.N always.
+  >> * 而在 HOST(EL2), MDCR_EL2.HPMN < PMCR_EL0.N always. 
+  >>
+  >> 所以这里条件满足一定是在HOST场景中, 所以会去判断 second range 中的 event.
+  >> 并且会使用另一个bit控制 -- MDCR_EL2.HPMFZO
+
 
 * If EL2 is not implemented and n is in the range [0 .. (PMCR_EL0.N-1)], when
-PMOVSCLR_EL0[(PMCR_EL0.N-1):0] is nonzero, indicating an unsigned overflow in
-one of the event counters in the range, event counter n does not count when
-PMCR_EL0.FZO is 1. 
+  PMOVSCLR_EL0[(PMCR_EL0.N-1):0] is nonzero, indicating an unsigned overflow
+  in one of the event counters in the range, event counter n does not count
+  when PMCR_EL0.FZO is 1. 
+  > 如果未实现 EL2 并且 n 在 [0 … (PMCR_EL0.N-1)] 范围内，则当 PMOVSCLR_EL0
+  > [(PMCR_EL0.N-1):0] 为非零时，表明事件计数器之一发生无符号溢出 在该范围内，
+  > 当 PMCR_EL0.FZO 为 1 时，事件计数器 n 不计数。
 
-When the applicable PMCR_EL0.FZO or MDCR_EL2.HPMFZO bit is
-1, it is CONSTRAINED UNPREDICTABLE whether any event happening at or about the
-same time as the event that caused the overflow is counted. This includes other
-instances of the same event. 
+When the applicable PMCR_EL0.FZO or MDCR_EL2.HPMFZO bit is 1, it is CONSTRAINED
+UNPREDICTABLE whether any event happening at or about the same time as the
+event that caused the overflow is counted. This includes other instances of the
+same event. 
+> at or about the same time: 同时或者大约同时
+>
+> 当适用的 PMCR_EL0.FZO 或 MDCR_EL2.HPMFZO 位为 1 时，无论是否对与导致溢出的事件同
+> 时发生或大约同时发生的任何事件进行计数，都是受约束不可预测的。这包括同一事件的其
+> 他instances.
+>
+> > 不是很懂
 
 > Note 
 > 
@@ -132,18 +169,38 @@ instances of the same event.
 > events from different instructions. Multiple instances of an event might
 > occur simultaneously, thus an event counter unsigned overflow can yield a
 > nonzero value in the event counter.
+> > simultaneously /ˌsaɪməlˈteɪniəsli/ : 同时发生的;同时出现的,同步的
+> >
+> > 该 architecture 并未定义何时相对于引发事件的指令对 PMU 事件进行计数。由
+> > 指令引起的事件可以在指令被架构执行之前或之后被计数，并且事件可以针对未架构
+> > 执行的操作被计数。相对于程序的简单顺序执行，可以对事件进行speculatively, out-
+> > of-order 或两者兼而有之. 当发生溢出时，其他事件计数器也可能同时对事件进行计数，
+> > 包括来自不同指令的事件。事件的多个实例可能同时发生，因此事件计数器无符号溢出可
+> > 能会在事件计数器中产生非零值。
 > 
 > Arm recommends that such counting anomalies are minimized when software uses
 > the freeze on overflow feature.
+> > ```
+> > minimize /ˈmɪnɪmaɪz/: 把...降到最低
+> > anomalies [əˈnɒməliz]: 反常现象
+> > ```
+> > Arm 建议当软件使用溢出冻结功能时，尽量减少此类计数异常。
 > 
 > When the freeze on overflow feature is being used, software cannot assume
 > that the event counter stops counting at zero when an overflow occurs.
+> > 当使用溢出冻结功能时，软件不能假设发生溢出时事件计数器停止计数为零。
 
 If an event counter n overflows, where n is even and event counter n+1 is
 configured to count the CHAIN event, it is CONSTRAINED UNPREDICTABLE whether
 the CHAIN event observes the overflow event when the applicable PMCR_EL0.FZO
 or MDCR_EL2.HPMFZO bit is 1 and the corresponding PMCR_EL0.LP or MDCR_EL2.HLP
 bit is 0.
+
+> CHAIN event 先不看
+>
+> !!!!!!!!
+> 遗留问题
+> !!!!!!!!
 
 If a direct read of PMOVSCLR_EL0 returns a nonzero value for a subset of the
 overflow flags, which means an event counter n should not count, then a
@@ -152,11 +209,20 @@ PMOVSCLR_EL0 and before the PMOVSCLR_EL0 flags are cleared to zero, will
 return the same value for each read, because the event counter has stopped
 counting.
 
+> 如果直接读取 PMOVSCLR_EL0 返回溢出标志子集的非零值，这意味着事件计数器 n 不
+> 应计数，则直接读取 PMEVCNTR_EL0 的时机将在读取 PMOVSCLR_EL0 之后和清除 
+> PMOVSCLR_EL0 flag 为0 之前。每次读取都会返回相同的值，因为事件计数器已停止
+> 计数。
+
 > Note 
 >
 > Direct reads of System registers require explicit synchronization for
-> following direct reads of other System registers > to be ordered after the
+> following direct reads of other System registers to be ordered after the
 > first direct read.
+>
+> > 系统寄存器的直接读取需要 explicit synchronization ，以便在第一次直接读
+> > 取之后对其他系统寄存器进行直接读取。
+
 
 # D11.5.3 Prohibiting event and cycle counting
 
@@ -252,3 +318,10 @@ however. To avoid the leaking of information, the permitted inaccuracy is
 that transactions that are not prohibited can be uncounted. Where possible,
 prohibited transactions must not be counted, but if they are counted, then
 that counting must not degrade security.
+
+
+> 先不看 Secure State相关的.
+>
+> !!!!!!!!
+> 遗留问题
+> !!!!!!!!

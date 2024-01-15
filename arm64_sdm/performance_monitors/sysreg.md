@@ -2,7 +2,8 @@
 
 > From
 > 
-> D17t3.17 MDCR_EL2, Monitor Debug Configuration Register (EL2)
+> D17.3.17 MDCR_EL2, Monitor Debug Configuration Register (EL2)
+
 The MDCR_EL2 characteristics are:
 ## Purpose
 > Provides EL2 configuration options for self-hosted debug and the Performance
@@ -27,6 +28,33 @@ state.
 MDCR_EL2 is a 64-bit register.
 
 ![MDCR_EL2](pic/MDCR_EL2.png)
+
+## MTPME, bit [28]
+**When FEAT_MTPMU is implemented and EL3 is not implemented:**
+
+Multi-threaded PMU Enable. Enables use of the PMEVTYPER<n>_EL0.MT bits.
+* 0b0
+
+  FEAT_MTPMU is disabled. The Effective value of PMEVTYPER<n>_EL0.MT is zero.
+
+* 0b1
+
+  PMEVTYPER<n>_EL0.MT bits not affected by this field.
+
+If FEAT_MTPMU is disabled for any other PE in the system that has the same
+level 1 Affinity as the PE, it is IMPLEMENTATION DEFINED whether the PE behaves
+as if this field is 0.
+> 如果对系统中与该 PE 具有相同级别 1 亲和力的任何其他 PE 禁用 FEAT_MTPMU，则 PE
+> 是否表现得如同该字段为 0 一样，由实现定义。
+
+The reset behavior of this field is:
+
+* On a Cold reset, this field resets to 1.
+
+**Otherwise:**
+
+Reserved, RES0.
+
 ## HPME, bit [7]
 **When FEAT_PMUv3 is implemented:**
 
@@ -54,7 +82,44 @@ Security state. The reset behavior of this field is:
 **Otherwise:**
 
 Reserved, RES0.
+## HPMFZO, bit [29]
+**When FEAT_PMUv3p7 is implemented:**
 
+Hyp Performance Monitors Freeze-on-overflow. Stop event counters on overflow.
+> Hyp 性能监视器 Freeze-on-overflow。 溢出时停止事件计数器。
+
+**0b0**
+
+Do not freeze on overflow.
+
+**0b1**
+
+Event counters do not count when
+***
+PMOVSCLR_EL0[(PMCR_EL0.N-1):MDCR_EL2.HPMN] is nonzero.
+
+If MDCR_EL2.HPMN is less than PMCR_EL0.N, this field affects the operation of
+event counters in the range [MDCR_EL2.HPMN .. (PMCR_EL0.N-1)].
+> 如果 MDCR_EL2.HPMN < PMCR_EL0.N, 该字段影响 [MDCR_EL2.HPMN..(PMCR_EL0.N-1)]
+> 范围内的 event counters的行为
+
+This field does not affect the operation of other event counters and
+PMCCNTR_EL0.
+
+> 该字段不影响其他事件计数器和PMCCNTR_EL0 的行为.
+
+The operation of this field applies even when EL2 is disabled in the current
+Security state.
+
+> 即使在当前安全状态下 EL2 被禁用，该字段的操作也适用。
+
+The reset behavior of this field is:
+
+* On a Warm reset, this field resets to an architecturally UNKNOWN value.
+***
+**Otherwise:**
+
+Reserved, RES0.
 ## HPMN, bits [4:0]
 
 When FEAT_PMUv3 is implemented:
@@ -134,6 +199,49 @@ this field from EL1 and EL0 return the value of MDCR_EL2.HPMN.
 This field has an IMPLEMENTATION DEFINED value.
 
 Access to this field is RO.
+## FZO, bit [9]
+**When FEAT_PMUv3p7 is implemented:**
+
+Freeze-on-overflow. Stop event counters on overflow. 
+> Freeze-on-overflow. overflow时 stop event counters。 
+
+In the description of this field:
+* If EL2 is implemented and is using AArch64, PMN is MDCR_EL2.HPMN.
+* If EL2 is implemented and is using AArch32, PMN is HDCR.HPMN.
+* If EL2 is not implemented, PMN is PMCR_EL0.N.
+
+**0b0**
+
+Do not freeze on overflow.
+
+**0b1**
+
+Event counter PMEVCNTR<n>_EL0 does not count when PMOVSCLR_EL0[(PMN-1):0] is
+nonzero and n is in the range of affected event counters.
+
+> 当 PMOVSCLR_EL0[(PMN-1):0] 非零且 n 位于受影响事件计数器的范围内时，事件
+> 计数器 PMEVCNTR<n>_EL0 不计数。
+
+If PMN is not 0, this field affects the operation of event counters in the
+range [0 .. (PMN-1)].
+
+> 如果 PMN 不为 0，则该字段影响 [0 … (PMN-1)] 范围内事件计数器的行为.
+
+This field does not affect the operation of other event counters and
+PMCCNTR_EL0.
+
+> 该字段不影响其他事件计数器和PMCCNTR_EL0 的行为。
+
+The operation of this field applies even when EL2 is disabled in the current
+Security state.
+> 即使在当前安全状态下 EL2 被禁用，该字段的操作也适用。
+
+The reset behavior of this field is:
+* On a Warm reset, this field resets to an architecturally UNKNOWN value.
+
+**Otherwise:**
+
+Reserved, RES0.
 
 ## LP, bit [7]
 **When FEAT_PMUv3p5 is implemented:**
@@ -222,6 +330,7 @@ The PMEVCNTR<n>_EL0 characteristics are:
 Holds event counter n, which counts events, where n is 0 to 30.
 
 ## Field descriptions
+
 ![PMEVCNTR_EL0_field_desc](pic/PMEVCNTR_EL0_field_desc.png)
 
 # PMOVSCLR_EL0
@@ -321,3 +430,48 @@ enabled.
 
 ### P<n>, bit [n], for n = 30 to 0
 ![PMCCNTENSET_P](pic/PMCCNTENSET_P.png)
+
+# PMEVTYPER<n>_EL0
+
+> FROM D17.5.9 PMEVTYPER<n>_EL0, Performance Monitors Event Type Registers, n =
+> 0 - 30
+
+The PMEVTYPER<n>_EL0 characteristics are:
+
+## Purpose
+Configures event counter n, where n is 0 to 30.
+
+## Field descriptions
+
+### MT, bit [25]
+
+**When FEAT_MTPMU is implemented or an IMPLEMENTATION DEFINED multi-threaded
+PMU extension is implemented:**
+
+Multithreading.
+
+* 0b0
+
+  Count events only on controlling PE.
+* 0b1
+
+  Count events from any PE with the same affinity at level 1 and above as this PE.
+  > 
+
+From Armv8.6, the IMPLEMENTATION DEFINED multi-threaded PMU extension is not
+permitted, meaning if FEAT_MTPMU is not implemented, this field is RES0. See
+ID_AA64DFR0_EL1.MTPMU.
+> 从 Armv8.6 开始，不允许实现定义的多线程 PMU 扩展，这意味着如果未实现 
+> FEAT_MTPMU，则该字段为 RES0。 请参阅 ID_AA64DFR0_EL1.MTPMU。
+
+This field is ignored by the PE and treated as zero when FEAT_MTPMU is
+implemented and Disabled.
+> 当 FEAT_MTPMU 被实现并禁用时，该字段被 PE 忽略并被视为零。
+
+The reset behavior of this field is:
+
+* On a Warm reset, this field resets to an architecturally UNKNOWN value.
+
+**Otherwise:**
+
+Reserved, RES0.

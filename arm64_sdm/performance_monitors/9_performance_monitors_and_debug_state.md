@@ -1,4 +1,5 @@
 Events that count cycles are not counted in Debug state.
+> 在调试状态下不计算对周期进行计数的事件。
 
 Events Attributable to the operations issued by the debugger through the
 external debug interface are not counted in Debug state.
@@ -13,3 +14,5 @@ For each Unattributable event, it is IMPLEMENTATION DEFINED whether it is
 counted when the counting PE is in Debug state. If the event might be counted,
 then the rules in Filtering by Exception level and Security state on page
 D11-5260 apply for the current Security state in Debug state.
+
+> DebugState 先不看
