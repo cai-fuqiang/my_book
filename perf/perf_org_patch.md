@@ -475,7 +475,7 @@ DEFINE_PER_CPU(struct perf_cpu_context, perf_cpu_context);
 ```
 定义了一个per cpu的全局变量,用于描述 per task counter.
 
-## 系统调用
+## sys_perf_counter_open
 由于参数我们上面都提到了, 下面我们直接看代码:
 ```cpp
 /**
@@ -680,121 +680,460 @@ err_put_context:
 
 
 * perf_install_in_context
+  <details>
+  <summary>perf_install_in_context</summary>
+
+  ```cpp
+  /*
+   * Attach a performance counter to a context
+   *
+   * First we add the counter to the list with the hardware enable bit
+   * in counter->hw_config cleared.
+   *
+   * 首先, 我们将counter 增加到 counter->hw_config 中hardware enable bit
+   * cleard 的 list中.
+   *
+   * If the counter is attached to a task which is on a CPU we use a smp
+   * call to enable it in the task context. The task might have been
+   * scheduled away, but we check this in the smp call again.
+   *
+   * 如果 counter attach到一个在 其他(?) cpu上跑的task, 我们使用 
+   * smp call 来其 task context 中enable 它. 该task 可能已经被调度走了,
+   * 但是我们会在在此通过 smp call 检查它
+   */
+  static void
+  perf_install_in_context(struct perf_counter_context *ctx,
+                          struct perf_counter *counter,
+                          int cpu)
+  {
+          struct task_struct *task = ctx->task;
+  
+          counter->ctx = ctx;
+          //如果没有task, 说明肯定是 per cpu context
+          if (!task) {
+                  /*
+                   * Per cpu counters are installed via an smp call and
+                   * the install is always sucessful.
+                   */
+                  /*
+                   * Q: 这里为什么不去判断是否是当前cpu呢?
+                   * A: smp_call_function_single() 函数会判断, 并且如果
+                   *    是当前cpu, 就不会在执行 remote call
+                   *
+                   * ==(1)==
+                   */
+                  smp_call_function_single(cpu, __perf_install_in_context,
+                                           counter, 1);
+                  return;
+          }
+  
+          counter->task = task;
+  retry:
+          task_oncpu_function_call(task, __perf_install_in_context,
+                                   counter);
+  
+          spin_lock_irq(&ctx->lock);
+          /*
+           * If the context is active and the counter has not been added
+           * we need to retry the smp call.
+           *
+           * 这里提到如果 context 是 active, 并且 counter 还没有被add上,
+           * 我们需要再次调用smp call, 在结合__perf_install_in_context
+           * 函数后, 我们会详细介绍
+           */
+          if (ctx->nr_active && list_empty(&counter->list)) {
+                  spin_unlock_irq(&ctx->lock);
+                  goto retry;
+          }
+  
+          /*
+           * The lock prevents that this context is scheduled in so we
+           * can add the counter safely, if it the call above did not
+           * succeed.
+           *
+           * 走到这里说明 specific task没有在任何cpu上running 
+           */
+          if (list_empty(&counter->list)) {
+                  list_add_tail(&counter->list, &ctx->counters);
+                  ctx->nr_counters++;
+          }
+          spin_unlock_irq(&ctx->lock);
+  }
+  ```
+  1. `__perf_install_in_context`
+  
+     <details>
+     <summary>__perf_install_in_context</summary>
+  
+     ```cpp
+     /*
+      * Cross CPU call to install and enable a preformance counter
+      */
+     static void __perf_install_in_context(void *info)
+     {
+             struct perf_cpu_context *cpuctx = &__get_cpu_var(perf_cpu_context);
+             struct perf_counter *counter = info;
+             struct perf_counter_context *ctx = counter->ctx;
+             int cpu = smp_processor_id();
+     
+             /*
+              * If this is a task context, we need to check whether it is
+              * the current task context of this cpu. If not it has been
+              * scheduled out before the smp call arrived.
+              *
+              * 如果是一个 task context, 我们需要检查他是否是当前cpu的 current
+              * task context. 如果不是, 说明他已经在 smp call 到达之前, schedule 
+              * out 
+              */
+             if (ctx->task && cpuctx->task_ctx != ctx)
+                     return;
+     
+             spin_lock(&ctx->lock);
+     
+             /*
+              * Protect the list operation against NMI by disabling the
+              * counters on a global level. NOP for non NMI based counters.
+              *
+              * 这里需要保护list 操作不受 NMI 的影响. 所以在 global level 上
+              * disable了 counters.对于x86, PMI 是 NMI, 对于arm64不是, 所以
+              * 对于arm64 而言, 该操作是NOP
+              */
+             hw_perf_disable_all();
+             /*
+              * counter list , 链入 ctx->counters, 当然这里有两种情况.
+              *   + task ctx: this_task_struct->perf_counter_ctx
+              *   + cpu ctx: cpuctx->ctx
+              */
+             list_add_tail(&counter->list, &ctx->counters);
+             hw_perf_enable_all();
+     
+             ctx->nr_counters++;
+             /*
+              * 对于每个cpu 而言, 支持的 hw counter 是有限的, 所以这里需要
+              * 判断这些counters是否用完了.
+              */
+             if (cpuctx->active_oncpu < perf_max_counters) {
+                     hw_perf_counter_enable(counter);
+                     counter->active = 1;
+                     counter->oncpu = cpu;
+                     ctx->nr_active++;
+                     cpuctx->active_oncpu++;
+             }
+             /*
+              * 如果是 per cpu counter, 这个counter会永远占据一个counter,
+              * 所以每分配一个 per cpu counter, 就会给 per task counter 留的
+              * counter就会少一个.
+              */
+             if (!ctx->task && cpuctx->max_pertask)
+                     cpuctx->max_pertask--;
+     
+             spin_unlock(&ctx->lock);
+     }
+     ```
+     </details> <!--__perf_install_in_context-->
+  </details> <!--perf_install_in_context-->
+
+
+2. 我们来看关于specific task counter(not own task)几种情况(这里可能需要了解 sche_in ,
+   sche_out关于perf的处理流程.
+
+   <details>
+   <summary>perf_install_in_context</summary>
+
+   + 在整个流程中, specific task is always RUNNING
+     ```
+     initiator                                   another cpu
+                                                 specific task is sched in
+     perf_install_in_context
+     retry:
+       task_oncpu_function_call {
+         cpu = task_cpu(p)
+         smp_call_function_single {
+                                                 receive IPI
+                                                 __perf_install_in_context {
+                                                     list_add_tail(&counter->list, 
+                                                        &ctx->counters)
+                                                     MAY OR MAY NOT EXEC {
+                                                       ctx->nr_active++
+                                                     }
+                                                 }
+         }
+       }
+     
+       if (ctx->nr_active && 
+         list_empty(&counter->list)) {
+         //因为 list_add 操作肯定会执行,所以
+         //这里必然不会执行 goto retry.
+         NOT goto retry
+       }
+       ```
+   * 在执行到 smp_call func之前,已经sched out
+     ```
+     initiator                                   another cpu
+     perf_install_in_context
+     retry:
+       task_oncpu_function_call {
+         cpu = task_cpu(p)
+                                                 specific task is sched out
+         smp_call_function_single {
+                                                 receive IPI
+                                                 __perf_install_in_context {
+                                                   //DO NOTHING 
+                                                   if (ctx->task && cpuctx->task_ctx != ctx)
+                                                     return;
+                                                 }
+         }
+       }
+       if (ctx->nr_active && 
+          list_empty(&counter->list)) {
+         //在 sched out 流程中, 会把 
+         //ctx->nr_active减至0
+         //(对于per task ctx 而言)
+         NOT goto retry
+       }
+       if (list_empty(&counter->list)) {
+         //走到这里, 一定是per task ctx,
+         //并且 sched out 出去了
+         //所以将其加到 ctx->counters 队列中.
+         //在 sched in 的时候,会使能这些
+         //counters
+         list_add_tail(&counter->list, 
+            &ctx->counters);
+         ctx->nr_counters++;
+       }
+     ```
+
+   * 在 task_cpu()执行时, 还在另一个cpu上RUNNING, 但是在收到IPI 中断时, 已经
+     sched out, 并且在另一个cpu上RUNNING.
+     ```
+     initiator                             another cpu A                 another cpu B
+     perf_install_in_context
+     retry:
+       task_oncpu_function_call {
+         cpu = task_cpu(p)
+                                           specific task is 
+                                             sched out
+                                                                         speific task is 
+                                                                           sched in {
+                                                                           //在sched in 的流程
+                                                                           //中,会将ctx->nr_active
+                                                                           //累加上, 
+                                                                           //但是这里有一个问题,
+                                                                           //如果是在本次发起之前,
+                                                                           //没有添加过任何per task 
+                                                                           //counter, ctx->nr_counters
+                                                                           //仍然为0
+     
+                                                                         }
+     
+         smp_call_function_single {
+                                           __perf_install_in_context {
+                                             if (ctx->task && 
+                                               //在这个场景下,
+                                               //下面的条件满足
+                                               cpuctx->task_ctx != ctx)
+                                               return;
+         }
+       }
+       if (ctx->nr_active && 
+          list_empty(&counter->list)) {
+         //==(1)==
+         //在这种情况下, nr_active 是大于
+         //0的, 所以这时, 要goto retry
+     
+         goto retry
+       }
+     ```
+     > NOTE
+     >
+     > (1) 处, 实际上是假设, 在本次添加counters之前, 就已经
+     > 有了其他的 per task counter, 如果没有, 这里其实还是判断
+     > 不对, 会导致, 当前在本次sched in --- sched out 之间的
+     > 事件统计不到, 所以,这里感觉处理的不太对.
+     </details>
+
+## file operation
+
+### perf_fops
 ```cpp
-/*
- * Attach a performance counter to a context
- *
- * First we add the counter to the list with the hardware enable bit
- * in counter->hw_config cleared.
- *
- * 首先, 我们将counter 增加到 counter->hw_config 中hardware enable bit
- * cleard 的 list中.
- *
- * If the counter is attached to a task which is on a CPU we use a smp
- * call to enable it in the task context. The task might have been
- * scheduled away, but we check this in the smp call again.
- *
- * 如果 counter attach到一个在 其他(?) cpu上跑的task, 我们使用 
- * smp call 来其 task context 中enable 它. 该task 可能已经被调度走了,
- * 但是我们会在在此通过 smp call 检查它
- */
-static void
-perf_install_in_context(struct perf_counter_context *ctx,
-                        struct perf_counter *counter,
-                        int cpu)
-{
-        struct task_struct *task = ctx->task;
-
-        counter->ctx = ctx;
-        //如果没有task, 说明肯定是 per cpu context
-        if (!task) {
-                /*
-                 * Per cpu counters are installed via an smp call and
-                 * the install is always sucessful.
-                 */
-                /*
-                 * Q: 这里为什么不去判断是否是当前cpu呢?
-                 * A: smp_call_function_single() 函数会判断, 并且如果
-                 *    是当前cpu, 就不会在执行 remote call
-                 */
-                smp_call_function_single(cpu, __perf_install_in_context,
-                                         counter, 1);
-                return;
-        }
-
-        counter->task = task;
-retry:
-        task_oncpu_function_call(task, __perf_install_in_context,
-                                 counter);
-
-        spin_lock_irq(&ctx->lock);
-        /*
-         * If the context is active and the counter has not been added
-         * we need to retry the smp call.
-         */
-        if (ctx->nr_active && list_empty(&counter->list)) {
-                spin_unlock_irq(&ctx->lock);
-                goto retry;
-        }
-
-        /*
-         * The lock prevents that this context is scheduled in so we
-         * can add the counter safely, if it the call above did not
-         * succeed.
-         */
-        if (list_empty(&counter->list)) {
-                list_add_tail(&counter->list, &ctx->counters);
-                ctx->nr_counters++;
-        }
-        spin_unlock_irq(&ctx->lock);
-}
+static const struct file_operations perf_fops = {
+        .release                = perf_release,
+        .read                   = perf_read,
+        .poll                   = perf_poll,
+};
 ```
+这里我们先看下`perf_release`回调
 
-`__perf_install_in_context`
-
-
+#### perf_release
 ```cpp
 /*
- * Cross CPU call to install and enable a preformance counter
+ * Called when the last reference to the file is gone.
  */
-static void __perf_install_in_context(void *info)
+static int perf_release(struct inode *inode, struct file *file)
 {
-        struct perf_cpu_context *cpuctx = &__get_cpu_var(perf_cpu_context);
-        struct perf_counter *counter = info;
+        struct perf_counter *counter = file->private_data;
         struct perf_counter_context *ctx = counter->ctx;
-        int cpu = smp_processor_id();
 
-        /*
-         * If this is a task context, we need to check whether it is
-         * the current task context of this cpu. If not it has been
-         * scheduled out before the smp call arrived.
-         */
-        if (ctx->task && cpuctx->task_ctx != ctx)
-                return;
+        file->private_data = NULL;
 
-        spin_lock(&ctx->lock);
+        mutex_lock(&counter->mutex);
 
-        /*
-         * Protect the list operation against NMI by disabling the
-         * counters on a global level. NOP for non NMI based counters.
-         */
-        hw_perf_disable_all();
-        list_add_tail(&counter->list, &ctx->counters);
-        hw_perf_enable_all();
+        perf_remove_from_context(counter);
+        put_context(ctx);
 
-        ctx->nr_counters++;
+        mutex_unlock(&counter->mutex);
 
-        if (cpuctx->active_oncpu < perf_max_counters) {
-                hw_perf_counter_enable(counter);
-                counter->active = 1;
-                counter->oncpu = cpu;
-                ctx->nr_active++;
-                cpuctx->active_oncpu++;
-        }
+        kfree(counter);
 
-        if (!ctx->task && cpuctx->max_pertask)
-                cpuctx->max_pertask--;
-
-        spin_unlock(&ctx->lock);
+        return 0;
 }
 ```
+
+该函数流程比较简单, 我们下面主要分析下 `perf_remove_from_context`
+* perf_remove_from_context
+
+  <details>
+  <summary>perf_remove_from_context</summary>
+
+  ```cpp
+  static void perf_remove_from_context(struct perf_counter *counter)
+  {
+          struct perf_counter_context *ctx = counter->ctx;
+          struct task_struct *task = ctx->task;
+          
+          //如果是 per cpu counters
+          if (!task) {
+                  /*
+                   * Per cpu counters are removed via an smp call and
+                   * the removal is always sucessful.
+                   */
+                  smp_call_function_single(counter->cpu,
+                                           __perf_remove_from_context,
+                                           counter, 1);
+                  return;
+          }
+  
+  retry:
+          //如果是 task counters
+          //这里retry的目的, 仍然是为了解决当调用该函数时, 
+          task_oncpu_function_call(task, __perf_remove_from_context,
+                                   counter);
+  
+          spin_lock_irq(&ctx->lock);
+          /*
+           * If the context is active we need to retry the smp call.
+           * 
+           * 和 install的流程一样, 如果这次没有解绑成功,并且 nr_active > 0, 
+           * 这里表示调度到了其他的cpu上. 需要 retry下
+           */
+          if (ctx->nr_active && !list_empty(&counter->list)) {
+                  spin_unlock_irq(&ctx->lock);
+                  goto retry;
+          }
+  
+          /*
+           * The lock prevents that this context is scheduled in so we
+           * can remove the counter safely, if it the call above did not
+           * succeed.
+           */
+          if (!list_empty(&counter->list)) {
+                  ctx->nr_counters--;
+                  list_del_init(&counter->list);
+                  counter->task = NULL;
+          }
+          spin_unlock_irq(&ctx->lock);
+  }
+  ```
+  * `__perf_remove_from_context`
+    <details>
+    <summary>__perf_remove_from_context</summary>
+
+    ```cpp
+    /*
+     * Cross CPU call to remove a performance counter
+     *
+     * We disable the counter on the hardware level first. After that we
+     * remove it from the context list.
+     */
+    static void __perf_remove_from_context(void *info)
+    {
+            struct perf_cpu_context *cpuctx = &__get_cpu_var(perf_cpu_context);
+            struct perf_counter *counter = info;
+            struct perf_counter_context *ctx = counter->ctx;
+    
+            /*
+             * If this is a task context, we need to check whether it is
+             * the current task context of this cpu. If not it has been
+             * scheduled out before the smp call arrived.
+             *
+             * 同installed, 查看如果是 per task counter, 而该RUNNING 的task
+             * 又不是specific task
+             */
+            if (ctx->task && cpuctx->task_ctx != ctx)
+                    return;
+    
+            spin_lock(&ctx->lock);
+    
+            if (counter->active) {
+                    hw_perf_counter_disable(counter);
+                    counter->active = 0;
+                    ctx->nr_active--;
+                    cpuctx->active_oncpu--;
+                    counter->task = NULL;
+            }
+            ctx->nr_counters--;
+    
+            /*
+             * Protect the list operation against NMI by disabling the
+             * counters on a global level. NOP for non NMI based counters.
+             */
+            hw_perf_disable_all();
+            list_del_init(&counter->list);
+            hw_perf_enable_all();
+            /*
+             * 同 installed流程 , 如果是 per-cpu task, 需要将max_pertask设置
+             * 成 perf_max_counters, 另外需要注意的是, 这里为什么不
+             * cpuctx->max_pertask-- 呢?
+             *
+             * 主要是因为ctx->nr_counters 变小后, 可能会ctx->nr_counters < 
+             * perf_reserved_percpu, 所以需要重新比较下, 这两个大小.
+             */
+            if (!ctx->task) {
+                    /*
+                     * Allow more per task counters with respect to the
+                     * reservation:
+                     */
+                    cpuctx->max_pertask =
+                            min(perf_max_counters - ctx->nr_counters,
+                                perf_max_counters - perf_reserved_percpu);
+            }
+    
+            spin_unlock(&ctx->lock);
+    }
+    ```
+    </details>
+  </details>
+
+## perf_read
+```cpp
+static ssize_t
+perf_read(struct file *file, char __user *buf, size_t count, loff_t *ppos)
+{
+        struct perf_counter *counter = file->private_data;
+
+        switch (counter->record_type) {
+        case PERF_RECORD_SIMPLE:
+                return perf_read_hw(counter, buf, count);
+
+        case PERF_RECORD_IRQ:
+        case PERF_RECORD_GROUP:
+                return perf_read_irq_data(counter, buf, count,
+                                          file->f_flags & O_NONBLOCK);
+        }
+        return -EINVAL;
+}
+```
+
+可以读取两种类型的数据:
+* PERF_RECORD_SIMPLE : 仅读取 counter
+* PERF_RECORD_GROUP/PERF_RECORD_IRQ:
