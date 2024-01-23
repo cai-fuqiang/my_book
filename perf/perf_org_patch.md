@@ -1114,7 +1114,7 @@ static int perf_release(struct inode *inode, struct file *file)
     </details>
   </details>
 
-## perf_read
+#### perf_read
 ```cpp
 static ssize_t
 perf_read(struct file *file, char __user *buf, size_t count, loff_t *ppos)
@@ -1136,4 +1136,366 @@ perf_read(struct file *file, char __user *buf, size_t count, loff_t *ppos)
 
 可以读取两种类型的数据:
 * PERF_RECORD_SIMPLE : 仅读取 counter
+  ```cpp
+  /*
+   * Read the performance counter - simple non blocking version for now
+   */
+  static ssize_t
+  perf_read_hw(struct perf_counter *counter, char __user *buf, size_t count)
+  {
+          u64 cntval;
+  
+          if (count != sizeof(cntval))
+                  return -EINVAL;
+  
+          mutex_lock(&counter->mutex);
+          cntval = perf_read_counter(counter);
+          mutex_unlock(&counter->mutex);
+  
+          return put_user(cntval, (u64 __user *) buf) ? -EFAULT : sizeof(cntval);
+  }
+  ```
 * PERF_RECORD_GROUP/PERF_RECORD_IRQ:
+  ```cpp
+  static ssize_t
+  perf_read_irq_data(struct perf_counter  *counter,
+                     char __user          *buf,
+                     size_t               count,
+                     int                  nonblocking)
+  {
+          struct perf_data *irqdata, *usrdata;
+          DECLARE_WAITQUEUE(wait, current);
+          ssize_t res;
+  
+          irqdata = counter->irqdata;
+          usrdata = counter->usrdata;
+  
+          if (usrdata->len + irqdata->len >= count)
+                  goto read_pending;
+  
+          if (nonblocking)
+                  return -EAGAIN;
+  
+          spin_lock_irq(&counter->waitq.lock);
+          __add_wait_queue(&counter->waitq, &wait);
+          for (;;) {
+                  set_current_state(TASK_INTERRUPTIBLE);
+                  /*
+                   * count 是用户态传上来的, 这里一直会等到
+                   * 数据的量达到count
+                   */
+                  if (usrdata->len + irqdata->len >= count)
+                          break;
+  
+                  if (signal_pending(current))
+                          break;
+  
+                  spin_unlock_irq(&counter->waitq.lock);
+                  schedule();
+                  spin_lock_irq(&counter->waitq.lock);
+          }
+          __remove_wait_queue(&counter->waitq, &wait);
+          __set_current_state(TASK_RUNNING);
+          spin_unlock_irq(&counter->waitq.lock);
+          //这里表示被中断了 
+          if (usrdata->len + irqdata->len < count)
+                  return -ERESTARTSYS;
+  read_pending:
+          mutex_lock(&counter->mutex);
+  
+          /* Drain pending data first: */
+          //==(1)==
+          res = perf_copy_usrdata(usrdata, buf, count);
+          //res == count 表示buf已经读取满了
+          if (res < 0 || res == count)
+                  goto out;
+  
+          /* Switch irq buffer: */
+          //==(2)==
+          //这里表示没有读满, 还需要switch一下,接着读
+          usrdata = perf_switch_irq_data(counter);
+          if (perf_copy_usrdata(usrdata, buf + res, count - res) < 0) {
+                  if (!res)
+                          res = -EFAULT;
+          } else {
+                  res = count;
+          }
+  out:
+          mutex_unlock(&counter->mutex);
+  
+          return res;
+  }
+  ```
+  1. perf_copy_usrdata
+     ```cpp
+     static ssize_t
+     perf_copy_usrdata(struct perf_data *usrdata, char __user *buf, size_t count)
+     {
+             if (!usrdata->len)
+                     return 0;
+     
+             count = min(count, (size_t)usrdata->len);
+             //读取剩余的 usrdata
+             if (copy_to_user(buf, usrdata->data + usrdata->rd_idx, count))
+                     return -EFAULT;
+     
+             /* Adjust the counters */
+             //调整rd_idx
+             usrdata->len -= count;
+             //这里表示读取完了, rd_idx归0
+             if (!usrdata->len)
+                     usrdata->rd_idx = 0;
+             else
+                     usrdata->rd_idx += count;
+     
+             return count;
+     }
+     ```
+  2. perf_switch_irq_data
+     ```cpp
+     static struct perf_data *perf_switch_irq_data(struct perf_counter *counter)
+     {
+             struct perf_counter_context *ctx = counter->ctx;
+             struct perf_data *oldirqdata = counter->irqdata;
+             struct task_struct *task = ctx->task;
+             //如果是 perf cpu counter, 直接切换. 
+             if (!task) {
+                     smp_call_function_single(counter->cpu,
+                                              __perf_switch_irq_data,
+                                              counter, 1);
+                     return counter->usrdata;
+             }
+     
+     retry:
+             //per task counter
+             spin_lock_irq(&ctx->lock);
+             //如果不是active的.
+             if (!counter->active) {
+                     //在自旋锁的保护下,可以切换 irqdata, usrdata
+                     counter->irqdata = counter->usrdata;
+                     counter->usrdata = oldirqdata;
+                     spin_unlock_irq(&ctx->lock);
+                     return oldirqdata;
+             }
+             spin_unlock_irq(&ctx->lock);
+             //如果是active的情况, 则需要让其他的cpu做切换动作
+             task_oncpu_function_call(task, __perf_switch_irq_data, counter);
+             /* Might have failed, because task was scheduled out */
+             //这里表示没有切换,同上面一样, 可能是 task 已经被 schedule out出
+             //去了. 有两种情况:
+             //  + sched out , NOT RUNNING
+             //  + sched out , RUNNING ON ANOTHER CPU 
+             //两种情况都能从retry中处理.
+             if (counter->irqdata == oldirqdata)
+                     goto retry;
+     
+             return counter->usrdata;
+     }
+     ```
+     `__perf_switch_irq_data`
+     ```cpp
+     /*
+      * Cross CPU call to switch performance data pointers
+      */
+     static void __perf_switch_irq_data(void *info)
+     {
+             struct perf_cpu_context *cpuctx = &__get_cpu_var(perf_cpu_context);
+             struct perf_counter *counter = info;
+             struct perf_counter_context *ctx = counter->ctx;
+             struct perf_data *oldirqdata = counter->irqdata;
+     
+             /*
+              * If this is a task context, we need to check whether it is
+              * the current task context of this cpu. If not it has been
+              * scheduled out before the smp call arrived.
+              *
+              * 如果是 task context, 我们需要检查, 是否是当前的task context.
+              * 如果不是, 在smp call调用之前, 该task 可能被sched out出去了.
+              */
+             if (ctx->task) {
+                     if (cpuctx->task_ctx != ctx)
+                             return;
+                     spin_lock(&ctx->lock);
+             }
+             //直接切换. 
+             /* Change the pointer NMI safe */
+             atomic_long_set((atomic_long_t *)&counter->irqdata,
+                             (unsigned long) counter->usrdata);
+             counter->usrdata = oldirqdata;
+     
+             if (ctx->task)
+                     spin_unlock(&ctx->lock);
+     }
+     ```
+#### perf_poll
+```cpp
+static unsigned int perf_poll(struct file *file, poll_table *wait)
+{
+        struct perf_counter *counter = file->private_data;
+        unsigned int events = 0;
+        unsigned long flags;
+
+        poll_wait(file, &counter->waitq, wait);
+
+        spin_lock_irqsave(&counter->waitq.lock, flags);
+        if (counter->usrdata->len || counter->irqdata->len)
+                events |= POLLIN;
+        spin_unlock_irqrestore(&counter->waitq.lock, flags);
+
+        return events;
+}
+```
+
+> 暂时不看.
+
+## sched_in, sched_out
+sched_in, sched_out 要去切入切出当前进程的 per task counter, 流程如下:
+```diff
+ /***
+  * try_to_wake_up - wake up a thread
+  * @p: the to-be-woken-up thread
+@@ -2534,6 +2555,7 @@ prepare_task_switch(struct rq *rq, struct task_struct *prev,
+                    struct task_struct *next)
+ {
+        fire_sched_out_preempt_notifiers(prev, next);
++       perf_counter_task_sched_out(prev, cpu_of(rq));
+        prepare_lock_switch(rq, next);
+        prepare_arch_switch(next);
+ }
+@@ -2574,6 +2596,7 @@ static void finish_task_switch(struct rq *rq, struct task_struct *prev)
+         */
+        prev_state = prev->state;
+        finish_arch_switch(prev);
++       perf_counter_task_sched_in(current, cpu_of(rq));
+        finish_lock_switch(rq, prev);
+ #ifdef CONFIG_SMP
+        if (current->sched_class->post_schedule)
+@@ -4296,6 +4319,7 @@ void scheduler_tick(void)
+        rq->idle_at_tick = idle_cpu(cpu);
+        trigger_load_balance(rq, cpu);
+ #endif
++       perf_counter_task_tick(curr, cpu);
+ }
+```
+### sched in
+```cpp
+/*
+ * Called from scheduler to add the counters of the current task
+ * with interrupts disabled.
+ *
+ * We restore the counter value and then enable it.
+ *
+ * This does not protect us against NMI, but hw_perf_counter_enable()
+ * sets the enabled bit in the control field of counter _before_
+ * accessing the counter control register. If a NMI hits, then it will
+ * keep the counter running.
+ *
+ * 该流程不会保护我们阻止NMI, 但是 hw_perf_counter_enable() 设置 counter
+ * 中的 enabled bit, 在访问 counter control register 之前. 如果hits了一个
+ * NMI, 他仍然会保持counter running.
+ */
+void perf_counter_task_sched_in(struct task_struct *task, int cpu)
+{
+        struct perf_cpu_context *cpuctx = &per_cpu(perf_cpu_context, cpu);
+        struct perf_counter_context *ctx = &task->perf_counter_ctx;
+        struct perf_counter *counter;
+        //要调度进的task 没有perf task counter
+        if (likely(!ctx->nr_counters))
+                return;
+
+        spin_lock(&ctx->lock);
+        //遍历每一个 per task counter
+        list_for_each_entry(counter, &ctx->counters, list) {
+                //这里需要判断, 该task 的 per task counter 是否
+                //太多了, 如果太多了, 达到了 max_pertask 的限制,
+                //则break
+                if (ctx->nr_active == cpuctx->max_pertask)
+                        break;
+                if (counter->cpu != -1 && counter->cpu != cpu)
+                        continue;
+                //使能这个counter
+                hw_perf_counter_enable(counter);
+                counter->active = 1;
+                counter->oncpu = cpu;
+                ctx->nr_active++;
+                cpuctx->active_oncpu++;
+        }
+        spin_unlock(&ctx->lock);
+        cpuctx->task_ctx = ctx;
+}
+```
+
+### sched out
+```cpp
+/*
+ * Called from scheduler to remove the counters of the current task,
+ * with interrupts disabled.
+ *
+ * We stop each counter and update the counter value in counter->count.
+ *
+ * This does not protect us against NMI, but hw_perf_counter_disable()
+ * sets the disabled bit in the control field of counter _before_
+ * accessing the counter control register. If a NMI hits, then it will
+ * not restart the counter.
+ */
+void perf_counter_task_sched_out(struct task_struct *task, int cpu)
+{
+        struct perf_cpu_context *cpuctx = &per_cpu(perf_cpu_context, cpu);
+        struct perf_counter_context *ctx = &task->perf_counter_ctx;
+        struct perf_counter *counter;
+        //如果该cpuctx上原本没有 per task counter, 也就是调度出的task没有.
+        if (likely(!cpuctx->task_ctx))
+                return;
+
+        spin_lock(&ctx->lock);
+        //遍历每一个 per task counter
+        list_for_each_entry(counter, &ctx->counters, list) {
+                if (!ctx->nr_active)
+                        break;
+                //如果counter是active的
+                if (counter->active) {
+                        hw_perf_counter_disable(counter);
+                        counter->active = 0;
+                        counter->oncpu = -1;
+                        ctx->nr_active--;
+                        cpuctx->active_oncpu--;
+                }
+        }
+        spin_unlock(&ctx->lock);
+        cpuctx->task_ctx = NULL;
+}
+```
+
+### tick
+```cpp
+void perf_counter_task_tick(struct task_struct *curr, int cpu)
+{
+        struct perf_counter_context *ctx = &curr->perf_counter_ctx;
+        struct perf_counter *counter;
+
+        if (likely(!ctx->nr_counters))
+                return;
+
+        perf_counter_task_sched_out(curr, cpu);
+
+        spin_lock(&ctx->lock);
+
+        /*
+         * Rotate the first entry last:
+         */
+        hw_perf_disable_all();
+        list_for_each_entry(counter, &ctx->counters, list) {
+                list_del(&counter->list);
+                list_add_tail(&counter->list, &ctx->counters);
+                break;
+        }
+        hw_perf_enable_all();
+
+        spin_unlock(&ctx->lock);
+
+        perf_counter_task_sched_in(curr, cpu);
+}
+```
+
+> 先不看
+
