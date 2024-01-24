@@ -126,6 +126,41 @@ int hw_perf_counter_init(struct perf_counter *counter, s32 hw_event_type)
   
   const int max_intel_perfmon_events = ARRAY_SIZE(intel_perfmon_event_map);
   ```
+
+## COUNTER READ -- hw_perf_counter_read
+```cpp
+void hw_perf_counter_read(struct perf_counter *counter)
+{
+        struct hw_perf_counter *hwc = &counter->hw;
+        unsigned long addr = hwc->counter_base + hwc->idx;
+        s64 offs, val = -1LL;
+        s32 val32;
+        int err;
+
+        /* Careful: NMI might modify the counter offset */
+        do {
+                offs = hwc->prev_count;
+                err = rdmsrl_safe(addr, &val);
+                WARN_ON_ONCE(err);
+        } while (offs != hwc->prev_count);
+
+        val32 = (s32) val;
+        val =  (s64)hwc->irq_period + (s64)val32;
+        atomic64_counter_set(counter, hwc->prev_count + val);
+}
+```
+
+counter read的值, 应该 = hwc->prev_count + counter的变化
+= hw->prev_count + (counter - 原来counter的值)
+= hw->prev_count + (counter + irq_period)
+
+> NOTE
+>
+> 这里要注意的是 原来counter的值, 并不是上一次设置counter的值, 而是
+> 上一次应该设置的counter的值, 也就是根据采样周期设置的值, 是以那个为基准,
+> 因为在`__hw_perf_save_counter`中, 我们会看到, 会根据现有counter的值,对要设置
+> counter的值, 在 -irq_period上做微调.我们会在`__hw_perf_save_counter`进一步论述
+
 ## COUNTER ENABLE --  hw_perf_counter_enable
 ```cpp
 void hw_perf_counter_enable(struct perf_counter *counter)
@@ -261,10 +296,11 @@ static void __hw_perf_save_counter(struct perf_counter *counter,
          * Calculate the next raw counter value we'll write into
          * the counter at the next sched-in time:
          *
-         * (4)
          */
+        //==(3.1)==
         delta -= (s64)hwc->irq_period;
 
+        //==(4)==
         hwc->next_count = (s32)delta;
 }
 ```
@@ -295,32 +331,20 @@ static void __hw_perf_save_counter(struct perf_counter *counter,
 3. 如果 变化的值, 超越了 irq_period, 说明counters 的变化已经
    超过了采样周期,却没有触发PMI.
 
-   这里采用一个循环, 相当于把 delta 的值, 减少到 < irq_period, 
-   然后将减出去的值, 加到prev_count. 
-   
-   这里为什么呢, 我们需要结合之前`hw_perf_counter_read`,
-   这里之后需要将 delta 值做运算,写到next_count中, 而next_count 
-   是u32 , 因为其代表enable counter 要写入counter寄存器的值, 所以
-   这里我们需要写入一个不能大于 irq_period 的值.为什么? 
-   因为: 
+   但是如果超过的值是irq_period的倍数, 我们要减少到 < irq_period, 
+   为什么呢? 假如 irq_period 是 3, 现在delta是7, 那么我们要减少到1,
+   表示下次设置采样周期时, 要减少一个
 
-   这里需要让 变化后的 delta + irq_period 一定能刚好达到溢出条件.
-   否则相当于在当前counter 基础上, 有过了 irq_period 还是没有触发PMI, 
-   就不符合基本逻辑了.
+   我们来看 next_count表示, 下次 要设置的 counter的值.
 
-   我们再来看代码:
+   应该为:
+   ```
+   -irq_period = -(irq_period - delta) = delta - irq_period
+   ```
 
-   delta -=  hwc->irq_period
-   delta < hwc->irq_period 
+   所以, 在(3.1) 这个地方, 我们会将delta 调整到 < irq_period之后,
+   在 delta = delta - irq_period, 调整之后的 delta 其实就是 要写入
+   counter的值
 
-   delta' = delta - irq_period  此值肯定溢出
-   delta < hwc->irq_period 
-
-   那么此时 delta' + irq_period = delta - irq_period + irq_period 会不会溢出.
-   其实会.
-
-   就像 -1 + 2 = 1 溢出了 1 - 2 = -1 同样溢出.
-
-   但是不知道是什么数学原理.
-
-   再者, 溢出之后的值 会不会小于 irq_period, 其实会.(怎么证明呢?)
+   > irq_period' 表示调整之后的采样周期
+4. 将调整之后的 delta 写入 perv_count
