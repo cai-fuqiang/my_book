@@ -348,3 +348,333 @@ static void __hw_perf_save_counter(struct perf_counter *counter,
 
    > irq_period' 表示调整之后的采样周期
 4. 将调整之后的 delta 写入 perv_count
+
+## COUNTER - INTR/NMI handler
+由于特权级用户态进程可以通过指定`hw_event_type`中的 `PERF_COUNT_NMI`
+来指定使用NMI作为PMI, 否则使用interrupt
+
+我们来分别看下这两个handler
+
+* NMI
+  ```cpp
+  static int __kprobes
+  perf_counter_nmi_handler(struct notifier_block *self,
+                           unsigned long cmd, void *__args)
+  {
+          struct die_args *args = __args;
+          struct pt_regs *regs;
+  
+          if (likely(cmd != DIE_NMI_IPI))
+                  return NOTIFY_DONE;
+  
+          regs = args->regs;
+  
+          apic_write(APIC_LVTPC, APIC_DM_NMI);
+          __smp_perf_counter_interrupt(regs, 1);
+  
+          return NOTIFY_STOP;
+  }
+  ```
+
+* intr
+  ```cpp
+  void smp_perf_counter_interrupt(struct pt_regs *regs)
+  {
+          irq_enter();
+  #ifdef CONFIG_X86_64
+          add_pda(apic_perf_irqs, 1);
+  #else
+          per_cpu(irq_stat, smp_processor_id()).apic_perf_irqs++;
+  #endif
+          apic_write(APIC_LVTPC, LOCAL_PERF_VECTOR);
+          __smp_perf_counter_interrupt(regs, 0);
+  
+          irq_exit();
+  }
+  ```
+都调用到了`__smp_perf_counter_interrupt`
+
+```cpp
+/*
+ * This handler is triggered by the local APIC, so the APIC IRQ handling
+ * rules apply:
+ */
+static void __smp_perf_counter_interrupt(struct pt_regs *regs, int nmi)
+{
+        int bit, cpu = smp_processor_id();
+        struct cpu_hw_counters *cpuc;
+        u64 ack, status;
+
+        rdmsrl(MSR_CORE_PERF_GLOBAL_STATUS, status);
+        if (!status) {
+                ack_APIC_irq();
+                return;
+        }
+
+        /* Disable counters globally */
+        wrmsr(MSR_CORE_PERF_GLOBAL_CTRL, 0, 0);
+        ack_APIC_irq();
+
+        cpuc = &per_cpu(cpu_hw_counters, cpu);
+
+again:
+        ack = status;
+        for_each_bit(bit, (unsigned long *) &status, nr_hw_counters) {
+                struct perf_counter *counter = cpuc->counters[bit];
+
+                clear_bit(bit, (unsigned long *) &status);
+                if (!counter)
+                        continue;
+                //==(1)==
+                perf_save_and_restart(counter);
+
+                switch (counter->record_type) {
+                case PERF_RECORD_SIMPLE:
+                        continue;
+                case PERF_RECORD_IRQ:
+                        perf_store_irq_data(counter, instruction_pointer(regs));
+                        break;
+                case PERF_RECORD_GROUP:
+                        perf_store_irq_data(counter, counter->hw_event_type);
+                        perf_store_irq_data(counter,
+                                            atomic64_counter_read(counter));
+                        perf_handle_group(counter, &status, &ack);
+                        break;
+                }
+                /*
+                 * From NMI context we cannot call into the scheduler to
+                 * do a task wakeup - but we mark these counters as
+                 * wakeup_pending and initate a wakeup callback:
+                 */
+                if (nmi) {
+                        counter->wakeup_pending = 1;
+                        set_tsk_thread_flag(current, TIF_PERF_COUNTERS);
+                } else {
+                        wake_up(&counter->waitq);
+                }
+        }
+
+        wrmsr(MSR_CORE_PERF_GLOBAL_OVF_CTRL, ack, 0);
+
+        /*
+         * Repeat if there is more work to be done:
+         */
+        rdmsrl(MSR_CORE_PERF_GLOBAL_STATUS, status);
+        if (status)
+                goto again;
+
+        /*
+         * Do not reenable when global enable is off:
+         */
+        if (cpuc->enable_all)
+                __hw_perf_enable_all();
+}
+```
+* `perf_save_and_retstart`
+  ```cpp
+  static void perf_save_and_restart(struct perf_counter *counter)
+  {
+          struct hw_perf_counter *hwc = &counter->hw;
+          int idx = hwc->idx;
+          //restart 这个counter
+          //首先先disable, 避免save的时候, counter还在增加
+          wrmsr(hwc->config_base + idx,
+                hwc->config & ~ARCH_PERFMON_EVENTSEL0_ENABLE, 0);
+          //先save, 在enable 
+          if (hwc->config & ARCH_PERFMON_EVENTSEL0_ENABLE) {
+                  __hw_perf_save_counter(counter, hwc, idx);
+                  __hw_perf_counter_enable(hwc, idx);
+          }
+  }
+  ```
+
+> NOTE
+>
+> 该算法在
+>
+> ```
+> commit ee06094f8279e1312fc0a31591320cc7b6f0ab1e
+> Author: Ingo Molnar <mingo@elte.hu>
+> Date:   Sat Dec 13 09:00:03 2008 +0100
+> 
+>     perfcounters: restructure x86 counter math
+> ```
+>
+> 中更新.
+
+更新后的算法:
+```diff
++/*
++ * Propagate counter elapsed time into the generic counter.
++ * Can only be executed on the CPU where the counter is active.
++ * Returns the delta events processed.
++ */
++static void
++x86_perf_counter_update(struct perf_counter *counter,
++                       struct hw_perf_counter *hwc, int idx)
++{
++       u64 prev_raw_count, new_raw_count, delta;
++
++       WARN_ON_ONCE(counter->state != PERF_COUNTER_STATE_ACTIVE);
++       /*
++        * Careful: an NMI might modify the previous counter value.
++        *
++        * Our tactic to handle this is to first atomically read and
++        * exchange a new raw count - then add that new-prev delta
++        * count to the generic counter atomically:
++        */
++again:
+        //==(1)==
++       prev_raw_count = atomic64_read(&hwc->prev_count);
++       rdmsrl(hwc->counter_base + idx, new_raw_count);
++
++       if (atomic64_cmpxchg(&hwc->prev_count, prev_raw_count,
++                                       new_raw_count) != prev_raw_count)
++               goto again;
++
++       /*
++        * Now we have the new raw value and have updated the prev
++        * timestamp already. We can now calculate the elapsed delta
++        * (counter-)time and add that to the generic counter.
++        *
++        * Careful, not all hw sign-extends above the physical width
++        * of the count, so we do that by clipping the delta to 32 bits:
++        */
+        //==(2)==
++       delta = (u64)(u32)((s32)new_raw_count - (s32)prev_raw_count);
++       WARN_ON_ONCE((int)delta < 0);
++
+        //==(3)==
++       atomic64_add(delta, &counter->count);
+        //==(4)==
++       atomic64_sub(delta, &hwc->period_left);
++}
+```
+1. prev_count 表示上一次save的时候 count
+2. delta 表示prev_count, new_count之间的差值, 也就是在这两次save中间, 触发了多少个event.
+3. 将发生的事件数累加到`counter->count`上.
+4. `hwc->period_left`, 也就是 上次设置的counter的负值. 那就是上次设置的实际的采样周期.
+   (也就是再过多少个周期就触发overflow), 那么在这次收到PMI后, 我们做save, 去将delta减去,
+   表示, 实际上再过多少个周期触发overflow
+
+> NOTE
+>
+> 上面的所有计算都是无符号类型计算, 其实无符号带符号不影响等式, 而是影响不等式.
+
+```diff
++/*
++ * Set the next IRQ period, based on the hwc->period_left value.
++ * To be called with the counter disabled in hw:
++ */
++static void
++__hw_perf_counter_set_period(struct perf_counter *counter,
++                            struct hw_perf_counter *hwc, int idx)
+ {
+-       per_cpu(prev_next_count[idx], smp_processor_id()) = hwc->next_count;
++       s32 left = atomic64_read(&hwc->period_left);
++       s32 period = hwc->irq_period;
++
+        //==(1)==
++       WARN_ON_ONCE(period <= 0);
++
++       /*
++        * If we are way outside a reasoable range then just skip forward:
++        */
+        //==(2)==      
++       if (unlikely(left <= -period)) { 
++               left = period;
++               atomic64_set(&hwc->period_left, left);
++       }
+        //==(3)==
++       if (unlikely(left <= 0)) {
++               left += period;
++               atomic64_set(&hwc->period_left, left);
++       }
+
+-       wrmsr(hwc->counter_base + idx, hwc->next_count, 0);
++       WARN_ON_ONCE(left <= 0);
++
++       per_cpu(prev_left[idx], smp_processor_id()) = left;
++
++       /*
++        * The hw counter starts counting from this counter offset,
++        * mark it to be able to extra future deltas:
++        */
++       atomic64_set(&hwc->prev_count, (u64)(s64)-left);
++
++       wrmsr(hwc->counter_base + idx, -left, 0);
+ }
+```
+1. 在`__hw_perf_counter_init`中有说明
+   ```
+   /*
+    * Intel PMCs cannot be accessed sanely above 32 bit width,
+    * so we install an artificial 1<<31 period regardless of
+    * the generic counter period:
+    */
+   ```
+   提到, Intel PMCs 在超过32 宽度以上, 无法正常访问. 所以, 无论通用
+   计数器周期如何, 我们都会install一个  artificial(人工的) `1<<31`
+   的period
+   代码为:
+   ```cpp
+   if ((s64)hwc->irq_period <= 0 || hwc->irq_period > 0x7FFFFFFF)
+        hwc->irq_period = 0x7FFFFFFF;
+   ```
+   在无符号`[0x7fffffff, 0xffffffff]`之间都会设置成0x7fffffff
+
+   所以这里, (s32)period不可能小于0
+2. 根据1 , 可以得出,如果条件为真:
+   `left < 0 <= -period`,  小于0, 说明溢出, 而`|left|`表示:
+     + 如果left > 0 , 表示在恰好溢出值的基础上还差多少个event触发
+     + 如果left < 0, 表示在恰好溢出值的基础上多触发了多少个event
+ 
+   我们这里以, `left < 0` 举例
+
+   `|left|` 表示 这次我们在设置counter时, 考虑要补偿增加多少(增加多少,
+   就意味达到溢出时,少触发的event的数量). 我们记作A, 
+   而 不考虑上面补偿的情况下,本次要设置的counter值, 是`-period_left`
+   `period + |left| = period - left >=0` 不合理,相当于直接溢出了.
+   早期x86的做法是, 循环执行 `left = |left| - period`, 一直执行到
+   `left < period`
+   
+   例如 :left = -7, period = 2 会循环计算得到
+   ```
+   left = 5
+   left = 4
+   left = 3
+   left = 1
+   ```
+   现在的做法是, 直接让其 `left = 2`, 这样做实际上不会影响counter值的计算,
+   而是会影响采样频率.
+
+   可以这样解释:
+
+   之前的采样类似于这种
+   假设采样周期是4.
+   ```
+          这里出
+          现偏差
+   |----|-------|-|----|----|
+      4     7    1  4    4
+   ```
+   这里7 这个地方采样不精确了一次, 而总的采样不精确的次数是1次
+
+   现在的做法:
+   ```
+   |----|-------|----|----|
+     4     7       4   4 
+   ```
+   同样, 总的采样不精确的次数也是1次.
+
+   两者相比, 第一种会多采样一次.(不过我更倾向与第一种, 在同样的采样时间内, 
+   第一种获取到的正确的采样周期更多)
+3. 这个地方跟上面的解释差不多,但是会做下面的事情(这种实际上不是overflow的场景)
+
+   同样, 采样周期是4
+   ```
+   |----|---|-|----|----|
+      4   3  1  4    4
+   ```
+   这个处理没有什么问题, 由于不是overflow的场景, 3 这个地方并没有出现采样不精确的问题,
+   而随后的1,这个地方, 也会出发overflow, 整个流程没有采样不精确的情况.

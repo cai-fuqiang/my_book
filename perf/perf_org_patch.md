@@ -665,7 +665,7 @@ err_put_context:
   }
   ```
   </details>
-* hw_perf_counter_ini
+* hw_perf_counter_init
   ```cpp
   /*
    * Architecture provided APIs - weak aliases:
