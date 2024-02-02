@@ -1221,13 +1221,10 @@ tlb_flush_check {
                                                local_flush_tlb_asid()
                                             }
                                         }
-                                        return userspace {
-                                            use stale tlb
-                                        }
         cpumask_setall()
         if (nr_active_mm > 1) 
            TLB_FLUSH_BROADCAST
-                                            use unstale tlb
+                                        use unstale tlb
         else
            TLB_FLUSH_LOCAL
     }
