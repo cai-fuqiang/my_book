@@ -64,7 +64,11 @@ This is the same as the per-cpu stocks we use for charging memory to the
 shared atomic page_counters, and also the way the global vmstat counters
 are implemented.
 
-> 
+> stock: 库存，存货
+>
+> 这与 下面提到的per-cpu stock相同:
+>  * charge memory to shared atomic page_counters
+>  * global vmstat counters
 
 Vmstat has elaborate spilling thresholds that depend on the number of
 CPUs, amount of memory, and memory pressure - carefully balancing the
@@ -72,6 +76,8 @@ cost of counter updates with the amount of per-cpu error.  That's
 because the vmstat counters are system-wide, but also used for decisions
 inside the kernel (e.g.  NR_FREE_PAGES in the allocator).  Neither is
 true for the memory controller.
+
+> elaborate /ɪˈlæbərət /: 复杂的；详尽的；精心制作的
 
 Use the same static batch size we already use for page_counter updates
 during charging.  The per-cpu error in the stats will be 128k, which is
