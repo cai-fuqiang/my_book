@@ -93,7 +93,7 @@ Date:   Thu Jan 13 15:46:52 2011 -0800
        > whenever possible: 尽可能
        > fatal /ˈfeɪtl/: 致命的的
        > definitely /ˈdefɪnətli/:  肯定;当然;确实;明确地;清楚地;确切地;没问题
-       > faliures [ˈfiːzəbl] : 可行的,行的通的
+       > feasible [ˈfiːzəbl] : 可行的,行的通的
        > 
        > 尽可能的避免保留和最大限度的使用 hugepage. 对于具有 1 个database和 
        > 1 个database cache 且 1 个database cache 大小在启动时已知的 1 台machine来说，

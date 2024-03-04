@@ -1,0 +1,190 @@
+Hi baoquan,
+
+Exclusion of low 1M may not cause new region. Because when calling
+crash_exclude_mem_range(), the start parameter is 0 and the condition for
+splitting a new region is that the start, end parameters are both in a certain
+existing region in cmem and cannot be equal to existing region's start or end.
+Obviously, start (0) cannot meet this condition.
+
+
+Yes, you are right. Exclude the elf header region from crash kernel region may
+cause split a new region. And there seems to be another issue with this code
+path: Before calling crash_exclude_mem_range(), cmem->max_nr_ranges was not
+initialized.
+
+
+In my opinion, these change can absolutely avoid out of bounds occurence. But
+when we forget to modify max_nr_ranges due to a mistakes in the future, is it
+better to report it by returning an error through crash_exclude_mem_range().
+What do you think about it?
+
+Thanks
+fuqiang
+
+
+
+
+Hi baoquan, 
+
+I'm sorry, I would like to confirm if I misunderstood the meaning of your
+comment or not.  What you mean is that you have agreed to merge the patch, but
+before that, it needs to be explained in detail in the commit message. Is this
+understanding correct?
+
+If this patch can be merged, the issue of the uninitialized cmem->max_nr_ranges
+must be resolved before the patch is merged because this patch requires a
+initialized max_nr_ranges value. I am willing to take on the task of addressing
+those issues.
+
+Thanks
+fuqiang
+
+
+Hi Yuntao,
+
+I'm glad you've also noticed this issue. But I'm sorry, I want to solve this
+problem myself because this is my first time posting a patch in the community,
+and I cherish this opportunity very much.
+
+I have carefully reviewed your patch. There is some changes where my views differ
+from yours:
+diff --git a/arch/x86/kernel/crash.c b/arch/x86/kernel/crash.c
+index c92d88680dbf..3be46f4b441e 100644
+--- a/arch/x86/kernel/crash.c
++++ b/arch/x86/kernel/crash.c
+@@ -282,10 +282,6 @@ int crash_setup_memmap_entries(struct kimage *image, struct boot_params *params)
+ 	struct crash_memmap_data cmd;
+ 	struct crash_mem *cmem;
+
+-	cmem = vzalloc(struct_size(cmem, ranges, 1));
+-	if (!cmem)
+-		return -ENOMEM;
+-
+ 	memset(&cmd, 0, sizeof(struct crash_memmap_data));
+ 	cmd.params = params;
+ 
+@@ -321,6 +317,11 @@ int crash_setup_memmap_entries(struct kimage *image, struct boot_params *params)
+ 	}
+ 
+ 	/* Exclude some ranges from crashk_res and add rest to memmap */
++	cmem = vzalloc(struct_size(cmem, ranges, 1));
++	if (!cmem)
++		return -ENOMEM;
++	cmem->max_nr_ranges = 1;
++
+ 	ret = memmap_exclude_ranges(image, cmem, crashk_res.start, crashk_res.end);
+ 	if (ret)
+ 		goto out;
+
+1. I don't feel very good that you have moved vzalloc() to in front of
+memmap_exclude_ranges. Because if memory allocation fails, there is no need to
+do anything else afterwards.
+
+2. The cmem->max_nr_ranges should be set to 2. Because in
+memmap_exclude_ranges, a cmem->ranges[] will be filled in and if a split occurs
+later, another one will be added.
+
+Thanks
+fuqiang
+
+
+Hi Yuntao,
+
+Thanks for your understanding and encourage. :) 
+
+Thank you very much for your patient comment. This change does indeed improve
+readability. But as a combination of these two, how do you feel about moving 
+crash_setup_memmap_entries() behind vzalloc().
+
+The image->elf_load_addr is determined by arch_kexec_locate_mem_hole(), this
+function can ensure that the value is within the range of [crashk_res.start,
+crashk_res.end), but it seems that it cannot guarantee that its value will
+always be equal to crashk_res.start. Perhaps I have some omissions, please
+point them out.
+
+Thanks
+fuqiang
+
+~~~
+
+Hi Yuntao,
+
+I make the following changes based on your patch. This change can increase code
+readability on one hand, On the other hand, if these functions return errors,
+the rest process of crash_setup_memmap_entries() can be skipped.
+
+diff --git a/arch/x86/kernel/crash.c b/arch/x86/kernel/crash.c
+index c92d88680dbf..67a974c041b9 100644
+--- a/arch/x86/kernel/crash.c
++++ b/arch/x86/kernel/crash.c
+@@ -285,6 +285,12 @@ int crash_setup_memmap_entries(struct kimage *image, struct boot_params *params)
+        cmem = vzalloc(struct_size(cmem, ranges, 1));
+        if (!cmem)
+                return -ENOMEM;
++       cmem->max_nr_ranges = 1;
++
++       /* Exclude some ranges from crashk_res and add rest to memmap */
++       ret = memmap_exclude_ranges(image, cmem, crashk_res.start, crashk_res.end);
++       if (ret)
++               goto out;
+
+        memset(&cmd, 0, sizeof(struct crash_memmap_data));
+        cmd.params = params;
+@@ -320,11 +326,6 @@ int crash_setup_memmap_entries(struct kimage *image, struct boot_params *params)
+                add_e820_entry(params, &ei);
+        }
+
+-       /* Exclude some ranges from crashk_res and add rest to memmap */
+-       ret = memmap_exclude_ranges(image, cmem, crashk_res.start, crashk_res.end);
+-       if (ret)
+-               goto out;
+-
+        for (i = 0; i < cmem->nr_ranges; i++) {
+                ei.size = cmem->ranges[i].end - cmem->ranges[i].start + 1;
+
+Yes! you read the code very carefully and I didn't notice that! However, the
+location of elfheader in crashk_res.start is highly dependent on elfheader in
+crashk_res memory allocation order and position. At present, x86 first allocate
+the memory of elfheader. However, ppc64 doesn't seem to be like this (It first
+executes load_backup_segment()). Although arm64 allocates elfheader first, it
+sets kbuf.top_down to true in load_other_segments(). This will cause the
+elfheader to be allocated near crashk_res.end. I debugged using crash on the
+arm64 machine and the result is(Although the kernel version of the testing
+machine may be a bit low, the process of allocating elfheaders is consistent
+with upstream): 
+
+    crash> p crashk_res.start
+    $6 = 1375731712
+    crash> p crashk_res.end
+    $7 = 2147483647
+    crash> p kexec_crash_image.arch.elf_headers_mem
+    $9 = 2147352576
+
+So I think it's best to set cmem->max_nr_ranges to 2 for easy maintenance in
+the future. What do you think about ?
+
+
+Yes, Baoquan, you are right. It's my mistake. Thank you very much ~
+
+~~~
+
+Hi Baoquan
+
+This seems to be better for future maintenance. Thank you for your suggestion.
+I will post a new patch later.
+
+~~~
+
+Hi Baoquan
+
+Thank you very much for your suggestions in the patch log and code comments. I
+have learned a lot and I will gradually improve.
+
+I found the following patch in linux-next:
+https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/commit/?id=666ef13f2870c43ba8a402ec8a3cedf6eb6c6f5a
+
+I'm sorry, It's my mistake. Do you think it is still necessary to merge this
+patch based on that ?
+
+Thanks a lot again
+fuqiang
