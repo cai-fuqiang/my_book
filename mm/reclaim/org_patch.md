@@ -341,3 +341,261 @@ setup_paging:
 ```
 
 至此, 关于页表部分初始化部分代码分析完
+
+## swap
+接下来, 我们主要看下swap相关代码
+### INIT
+```cpp
+void init_swapping(void)
+{
+        extern int *blk_size[];
+        int swap_size,i,j;
+
+        if (!SWAP_DEV)
+                return;
+        /*
+         * blk_size 是一个二维数组,表示该block设备的大小, 
+         * 由[MAJOR, MINOR], 主次设备号索引.
+         */
+        if (!blk_size[MAJOR(SWAP_DEV)]) {
+                printk("Unable to get size of swap device\n\r");
+                return;
+        }
+        swap_size = blk_size[MAJOR(SWAP_DEV)][MINOR(SWAP_DEV)];
+        if (!swap_size)
+                return;
+        if (swap_size < 100) {
+                printk("Swap device too small (%d blocks)\n\r",swap_size);
+                return;
+        }
+        //这里相当于 / 4, 这个操作我不是很懂
+        //感觉可能是blk_size[]的单位是1024, 而每个页的大小是4096, 所以
+        //这里需要 / 4, 另外 SWAP_BITS 定义是 4098 * 8, 那么能够代表的最大大小是
+        // 8 * 4096 * 4096 也就是 128 M
+        swap_size >>= 2;
+        if (swap_size > SWAP_BITS)
+                swap_size = SWAP_BITS;
+        //swap_bitmap 用于表示哪些index的swap 被使用了
+        swap_bitmap = (char *) get_free_page();
+        if (!swap_bitmap) {
+                printk("Unable to start swapping: out of memory :-)\n\r");
+                return;
+        }
+        //从blkdev中读取一个页, index为0
+        read_swap_page(0,swap_bitmap);
+        //相当于swap文件系统, 第一个4096 的末尾[4086, 4095], 为字符串"SWAP-SPACE"
+        //如果不是说明不是swap文件系统
+        if (strncmp("SWAP-SPACE",swap_bitmap+4086,10)) {
+                printk("Unable to find swap-space signature\n\r");
+                free_page((long) swap_bitmap);
+                swap_bitmap = NULL;
+                return;
+        }
+        memset(swap_bitmap+4086,0,10);
+        //SWAP_BITS为 4096 << 3 也就是4096 * 8
+        //这段逻辑不是很懂,大概是检查 [swap_size, SWAP_BITS]
+        //之前是否有bit enable
+        for (i = 0 ; i < SWAP_BITS ; i++) {
+                if (i == 1)
+                        i = swap_size;
+                if (bit(swap_bitmap,i)) {
+                        printk("Bad swap-space bit-map\n\r");
+                        free_page((long) swap_bitmap);
+                        swap_bitmap = NULL;
+                        return;
+                }
+        }
+        j = 0;
+        //这一段也很迷, 查看swap_size内的swap_bitmap, 如果没有设置这个bit, 
+        //说明该页,不用做swap, 那综合来看, 应该是swap分区格式化的时候决定.
+        //kernel 目前不允许格式化swap分区大于128M.
+        for (i = 1 ; i < swap_size ; i++)
+                if (bit(swap_bitmap,i))
+                        j++;
+        if (!j) {
+                free_page((long) swap_bitmap);
+                swap_bitmap = NULL;
+                return;
+        }
+        printk("Swap device ok: %d pages (%d bytes) swap-space\n\r",j,j*4096);
+}
+```
+
+# swap_out
+```cpp
+/*
+ * Ok, this has a rather intricate logic - the idea is to make good
+ * and fast machine code. If we didn't worry about that, things would
+ * be easier.
+ */
+int swap_out(void)
+{
+        static int dir_entry = FIRST_VM_PAGE>>10;
+        static int page_entry = -1;
+        /*
+         * VM_PAGE  LAST_VM_PAGE - FIRST_VM_PAGE
+         *   LAST_VM_PAGE 为: 1024 * 1024 
+         *   FIRST_VM_PAGE为: 16 * 1024
+         *
+         *   所以counter为 1024 * 1024 - 64
+         */
+        int counter = VM_PAGES;
+        int pg_table;
+
+        while (counter>0) {
+                pg_table = pg_dir[dir_entry];
+                if (pg_table & 1)
+                        break;
+                //前面分析过, 每个pde有 1024 个entry, 所以这里减 1024
+                counter -= 1024;
+                dir_entry++;
+                //因为 dir_entry 是 static 的, 这里相当于回归到开始
+                //总之,这里是想把所有的pg_dir都遍历一遍, 直到找到一个
+                //pg_table 是 PRESENT的
+                if (dir_entry >= 1024)
+                        dir_entry = FIRST_VM_PAGE>>10;
+        }
+        pg_table &= 0xfffff000;
+        while (counter-- > 0) {
+                //这里每次也会自增, 比较巧妙的是, page_entry初始值为-1,
+                //这样第一次进来的时候, page_entry自增后为1, 不过无伤大雅,
+                //个人认为先回收page[0] 和先回收page[1]都一样.
+                page_entry++;
+                //回归
+                if (page_entry >= 1024) {
+                        page_entry = 0;
+                repeat:
+                        dir_entry++;
+                        if (dir_entry >= 1024)
+                                dir_entry = FIRST_VM_PAGE>>10;
+                        pg_table = pg_dir[dir_entry];
+                        if (!(pg_table&1))
+                                if ((counter -= 1024) > 0)
+                                        goto repeat;
+                                else
+                                        break;
+                        pg_table &= 0xfffff000;
+                }
+                //回收该page_entry
+                //整个的这段逻辑, 会把 "VM_PAGES" 范围之内的page 全部尝试 swap_out
+                if (try_to_swap_out(page_entry + (unsigned long *) pg_table))
+                        return 1;
+        }
+        printk("Out of swap-memory\n\r");
+        return 0;
+}
+```
+这个函数的整个逻辑是将 counter减小到0, counter的单位实际上是 PAGE_SIZE, 4k,
+这里
+* FIRST_VM_PAGE: 16, 即 16 * 4k = 64k
+* LAST_VM_PAGE : 1024 * 1024, 即  1024 * 1024 * 4k = 4G
+
+该代码最终会将counter减少到0, 也就是把整个的虚拟内存空间都遍历一遍. swap能swap的page
+
+## try_to_swap_out
+```cpp
+int try_to_swap_out(unsigned long * table_ptr)
+{
+        unsigned long page;
+        unsigned long swap_nr;
+
+        page = *table_ptr;
+        //pgtable没有PRESENT
+        if (!(PAGE_PRESENT & page))
+                return 0;
+        //回收的内存在 LOW_MEM, 低 16K
+        if (page - LOW_MEM > PAGING_MEMORY)
+                return 0;
+        //是dirty的
+        if (PAGE_DIRTY & page) {
+                page &= 0xfffff000;
+                //refcount != 1
+                if (mem_map[MAP_NR(page)] != 1)
+                        return 0;
+                //尝试获取一个swap idx
+                if (!(swap_nr = get_swap_page()))
+                        return 0;
+                //将页表设置为这个 idx << 1,  << 1的目的是将PRESENT位空出来.
+                *table_ptr = swap_nr<<1;
+                //invalidate tlb -- mov to cr3
+                invalidate();
+                //因为是dirty的需要writeback
+                write_swap_page(swap_nr, (char *) page);
+                free_page(page);
+                return 1;
+        }
+        *table_ptr = 0;
+        invalidate();
+        free_page(page);
+        return 1;
+}
+```
+该版本的代码比较简单, 只做一些必要的检查, 例如 refcount, PRESENT, LOW_MEM.
+然后dirty的page需要writeback. 比起现在的宏伟的代码, 真简单啊!!
+
+## get_swap_page
+```cpp
+static int get_swap_page(void)
+{
+        int nr;
+
+        if (!swap_bitmap)
+                return 0;
+        for (nr = 1; nr < 32768 ; nr++)
+                if (clrbit(swap_bitmap,nr))
+                        return nr;
+        return 0;
+}
+```
+该代码也比较简单, 就是从`swap_bitmap` 中找到一个可用的bit, 将其清0.
+我们来看下`32786`
+```
+4096 * 8
+```
+也就是 `SWAP_BITS`
+
+另外看下`clrbit`宏
+```cpp
+#define bitop(name,op) \
+static inline int name(char * addr,unsigned int nr) \
+{ \
+int __res; \
+__asm__ __volatile__("bt" op " %1,%2; adcl $0,%0" \
+:"=g" (__res) \
+:"r" (nr),"m" (*(addr)),"0" (0)); \
+return __res; \
+}
+bitop(clrbit,"r")
+```
+
+实际上执行的指令为
+```
+btr nr, *addr
+```
+* btr: Bit Test and Reset. 
+  ```
+  CF := Bit(BitBase, BitOffset);
+  Bit(BitBase, BitOffset) := 0;
+  ```
+  如果bit位是1, 则CF为1
+* adc : 
+  ```
+  DEST := DEST + SRC + CF;
+  ```
+  看下输出的约束中:
+  ```
+  g
+    Any register, memory or immediate integer operand is allowed, 
+    except for registers that are not general registers.
+  = 
+    Means that this operand is written to by this instruction: 
+    the previous value is discarded and replaced by new data.
+  ```
+而输入部将`%0` 初始为0, 所以最终为`0 + 0 + CF`, 综上判断, 该宏
+的作用就是 `test_and_clear_bit()`
+
+## write_swap_page
+```cpp
+#define write_swap_page(nr,buffer) ll_rw_page(WRITE,SWAP_DEV,(nr),(buffer));
+```
+不再展开
