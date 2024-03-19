@@ -811,4 +811,201 @@ void memcg_set_shrinker_bit(struct mem_cgroup *memcg, int nid, int shrinker_id)
   > 该流程发生的流程是 offline children cgroup, reparent. 所以不会有上面我们所说的race情况.
   > 也就是不会有 src->nr_items 在这个过程中change的情况.
 
-### clear shrinker bit
+### [clear shrinker bit](https://lore.kernel.org/all/153112558507.4097.12713813335683345488.stgit@localhost.localdomain/)
+
+COMMIT MESSAGE
+```
+Using the preparations made in previous patches, in case of memcg
+shrink, we may avoid shrinkers, which are not set in memcg's shrinkers
+bitmap. To do that, we separate iterations over memcg-aware and
+!memcg-aware shrinkers, and memcg-aware shrinkers are chosen
+via for_each_set_bit() from the bitmap. In case of big nodes,
+having many isolated environments, this gives significant
+performance growth. See next patches for the details.
+
+> preparation /ˈprɛpəˌreɪʃən/ : preparation is the act of preparing 
+> separate /ˈsɛpəˌreɪt/: Things that are separate are kept apart from other things. 
+>
+> 使用前一个patch中的准备工作, 在 memcg shrink的情况下, 我们可以避免
+> 那些没有在 shrinker bitmap设置的 shrinkers. 为了做到这些, 我们将
+> memcg-aware和 !memcg-aware 的shrinker进行分类, 并通过 for_each_set_bit() 从
+> bitmap 中选择 shrinkers. 在 big nodes的情况下, 会有很多 isolate environments,
+> 这带来了显著的性能提升. 请看下一个patchs了解更多细节.
+
+Note, that the patch does not respect to empty memcg shrinkers,
+since we never clear the bitmap bits after we set it once.
+Their shrinkers will be called again, with no shrinked objects
+as result. This functionality is provided by next patches.
+
+> 注意, 那个patch不去考虑 empty memcg shrinkers. 因为我们一旦设置了
+> 之后, 从不clear bitmap bits. 这些 shrinkers 将会再次被调用, 结果不会有
+> 被 shrink 的objects. 该功能将会在下一个patch中被提供.
+```
+
+我们先来看 `shrink_slab`对比
+```diff
+ /**
+  * shrink_slab - shrink slab caches
+  * @gfp_mask: allocation context
+@@ -572,8 +644,8 @@ static unsigned long shrink_slab(gfp_t gfp_mask, int nid,
+ 	struct shrinker *shrinker;
+ 	unsigned long freed = 0;
+ 
+-	if (memcg && (!memcg_kmem_enabled() || !mem_cgroup_online(memcg)))
+-		return 0;
+    //==(1)==
++	if (memcg && !mem_cgroup_is_root(memcg))
++		return shrink_slab_memcg(gfp_mask, nid, memcg, priority);
+ 
+ 	if (!down_read_trylock(&shrinker_rwsem))
+ 		goto out;
+@@ -585,13 +657,7 @@ static unsigned long shrink_slab(gfp_t gfp_mask, int nid,
+ 			.memcg = memcg,
+ 		};
+ 
+-		/*
+-		 * If kernel memory accounting is disabled, we ignore
+-		 * SHRINKER_MEMCG_AWARE flag and call all shrinkers
+-		 * passing NULL for memcg.
+-		 */
+-		if (memcg_kmem_enabled() &&
+-		    !!memcg != !!(shrinker->flags & SHRINKER_MEMCG_AWARE))
+        //==(2)==
++		if (!!memcg != !!(shrinker->flags & SHRINKER_MEMCG_AWARE))
+ 			continue;
+ 
+```
+
+1. `memcg && ! root memcg`会直接调用`shrink_slab_memcg`
+2. 在没有引入shrinker->map时, 我们分情况考虑需要处理的情况
+   + `memcg_kmem_enabled()`, 有两种情况需要处理
+       * memcg && shrinker->flags & SHRINKER_MEMCG_AWARE <br/>
+         这种情况是要回memcg相关的 shrinker(相当于指定memcg回收)
+       + !memcg && !shrinker->flags & SHRINKER_MEMCG_AWARE<br/>
+         这种情况是, 不要回收和memcg 相关的shrinker(相当于global)
+   + `!memcg_kmem_enabled()`<br/>
+     忽略 SHRINKER_MEMCG_AWARE, 对于!memcg 情况下call all shrinker
+     (其实能走到这, 说明是!memcg, 可以见(1)中的条件)
+
+   那么在引入该patch, 能走到这里来, 只有两种情况:
+   + !memcg : call UNWARE shrineker
+   + root memcg : call AWARE shrinker
+
+> NOTE
+>
+> 这个函数逻辑很乱, 但是在
+> ```
+> commit aeed1d325d429ac9699c4bf62d17156d60905519
+> Author: Vladimir Davydov <vdavydov.dev@gmail.com>
+> Date:   Fri Aug 17 15:48:17 2018 -0700
+> 
+>     mm/vmscan.c: generalize shrink_slab() calls in shrink_node()
+> ```
+> 该patch中进一步优化了这部分代码, 删除 传入 memcg NULL的代码,
+> 只传入 root memcg 或者 !root memcg, 只在 root memcg的情况下, 
+> call UNWARE shrinker
+>
+> 另外, 在后续版本的代码中(rhel 8.6 372 kernel) `root_mem_cgroup`
+> 很特殊. 在 `get_obj_cgroup_from_current()`中可以看到, 当为
+> `root_mem_cgroup`时, objcg返回NULL.
+
+我们接下来看`shrinker_slab_memcg()`相关代码
+```cpp
+#ifdef CONFIG_MEMCG_KMEM
+static unsigned long shrink_slab_memcg(gfp_t gfp_mask, int nid,
+			struct mem_cgroup *memcg, int priority)
+{
+	struct memcg_shrinker_map *map;
+	unsigned long freed = 0;
+	int ret, i;
+
+	if (!memcg_kmem_enabled() || !mem_cgroup_online(memcg))
+		return 0;
+
+	if (!down_read_trylock(&shrinker_rwsem))
+		return 0;
+
+	map = rcu_dereference_protected(memcg->nodeinfo[nid]->shrinker_map,
+					true);
+	if (unlikely(!map))
+		goto unlock;
+
+	for_each_set_bit(i, map->map, shrinker_nr_max) {
+		struct shrink_control sc = {
+			.gfp_mask = gfp_mask,
+			.nid = nid,
+			.memcg = memcg,
+		};
+		struct shrinker *shrinker;
+        //==(1)==
+		shrinker = idr_find(&shrinker_idr, i);
+		if (unlikely(!shrinker)) {
+			clear_bit(i, map->map);
+			continue;
+		}
+
+        //==(2)==
+		/* See comment in prealloc_shrinker() */
+		if (unlikely(list_empty(&shrinker->list)))
+			continue;
+
+		ret = do_shrink_slab(&sc, shrinker, priority);
+		freed += ret;
+
+		if (rwsem_is_contended(&shrinker_rwsem)) {
+			freed = freed ? : 1;
+			break;
+		}
+	}
+unlock:
+	up_read(&shrinker_rwsem);
+	return freed;
+}
+```
+1. 如果map中设置了, 但是 shrinker已经不在 idr中了, 那就说明
+   走了unregister的流程, 需要clear_bit()
+2. 理解这部分代码, 我们得需要看, 该patch中的另外一个改动
+
+```diff
+diff --git a/mm/vmscan.c b/mm/vmscan.c
+index db0970ba340d..d7a5b8566869 100644
+--- a/mm/vmscan.c
++++ b/mm/vmscan.c
+@@ -364,6 +364,21 @@ int prealloc_shrinker(struct shrinker *shrinker)
+ 	if (!shrinker->nr_deferred)
+ 		return -ENOMEM;
+ 
++	/*
++	 * There is a window between prealloc_shrinker()
++	 * and register_shrinker_prepared(). We don't want
++	 * to clear bit of a shrinker in such the state
++	 * in shrink_slab_memcg(), since this will impose
++	 * restrictions on a code registering a shrinker
++	 * (they would have to guarantee, their LRU lists
++	 * are empty till shrinker is completely registered).
++	 * So, we differ the situation, when 1)a shrinker
++	 * is semi-registered (id is assigned, but it has
++	 * not yet linked to shrinker_list) and 2)shrinker
++	 * is not registered (id is not assigned).
++	 * 
++	 * 在prealloc_shrinker()和 register_shrinker_prepared()
++	 * 之前有一个window. 我们不想在这样的状态下, 在shrink_slab_memcg()中
++	 * clear_bit(). 因为这将会在register a shrinker是增加一些
++	 * 限制(他们必须去保证, 他们的LRU lists在 shrinker 完全
++	 * register 之前是empty的. 所以, 我们下面两种情况不同, 当 
++	 * 1) shrinker 是半register的状态(id 已经被分配, 但是还没有linked
++	 * 到 shrinker_list) 
++	 * 2) shrinker还没有被注册 (id 还未分配)
++	 */
++	INIT_LIST_HEAD(&shrinker->list);
++
+ 	if (shrinker->flags & SHRINKER_MEMCG_AWARE) {
+ 		if (prealloc_memcg_shrinker(shrinker))
+ 			goto free_deferred;
+```
+
+大概就是通过`shrinker->list`是不是null, 用来判断, 有没有注册完全该shrinker,
+如果注册了一半(执行了 `prealloc_shrinker()`但是没有执行 `register_shrinker_prepared()`
+则不能clear_bit()
+
+

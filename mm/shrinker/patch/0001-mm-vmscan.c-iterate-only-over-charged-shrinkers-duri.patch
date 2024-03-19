@@ -1,0 +1,171 @@
+From b0dedc49a2daa0f44ddc51fbf686b2ef012fccbf Mon Sep 17 00:00:00 2001
+From: Kirill Tkhai <ktkhai@virtuozzo.com>
+Date: Fri, 17 Aug 2018 15:48:14 -0700
+Subject: [PATCH] mm/vmscan.c: iterate only over charged shrinkers during memcg
+ shrink_slab()
+
+Using the preparations made in previous patches, in case of memcg
+shrink, we may avoid shrinkers, which are not set in memcg's shrinkers
+bitmap.  To do that, we separate iterations over memcg-aware and
+!memcg-aware shrinkers, and memcg-aware shrinkers are chosen via
+for_each_set_bit() from the bitmap.  In case of big nodes, having many
+isolated environments, this gives significant performance growth.  See
+next patches for the details.
+
+Note that the patch does not respect to empty memcg shrinkers, since we
+never clear the bitmap bits after we set it once.  Their shrinkers will
+be called again, with no shrinked objects as result.  This functionality
+is provided by next patches.
+
+[ktkhai@virtuozzo.com: v9]
+  Link: http://lkml.kernel.org/r/153112558507.4097.12713813335683345488.stgit@localhost.localdomain
+Link: http://lkml.kernel.org/r/153063066653.1818.976035462801487910.stgit@localhost.localdomain
+Signed-off-by: Kirill Tkhai <ktkhai@virtuozzo.com>
+Acked-by: Vladimir Davydov <vdavydov.dev@gmail.com>
+Tested-by: Shakeel Butt <shakeelb@google.com>
+Cc: Al Viro <viro@zeniv.linux.org.uk>
+Cc: Andrey Ryabinin <aryabinin@virtuozzo.com>
+Cc: Chris Wilson <chris@chris-wilson.co.uk>
+Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Cc: Guenter Roeck <linux@roeck-us.net>
+Cc: "Huang, Ying" <ying.huang@intel.com>
+Cc: Johannes Weiner <hannes@cmpxchg.org>
+Cc: Josef Bacik <jbacik@fb.com>
+Cc: Li RongQing <lirongqing@baidu.com>
+Cc: Matthew Wilcox <willy@infradead.org>
+Cc: Matthias Kaehlcke <mka@chromium.org>
+Cc: Mel Gorman <mgorman@techsingularity.net>
+Cc: Michal Hocko <mhocko@kernel.org>
+Cc: Minchan Kim <minchan@kernel.org>
+Cc: Philippe Ombredanne <pombredanne@nexb.com>
+Cc: Roman Gushchin <guro@fb.com>
+Cc: Sahitya Tummala <stummala@codeaurora.org>
+Cc: Stephen Rothwell <sfr@canb.auug.org.au>
+Cc: Tetsuo Handa <penguin-kernel@I-love.SAKURA.ne.jp>
+Cc: Thomas Gleixner <tglx@linutronix.de>
+Cc: Waiman Long <longman@redhat.com>
+Signed-off-by: Andrew Morton <akpm@linux-foundation.org>
+Signed-off-by: Linus Torvalds <torvalds@linux-foundation.org>
+---
+ mm/vmscan.c | 84 +++++++++++++++++++++++++++++++++++++++++++++++------
+ 1 file changed, 75 insertions(+), 9 deletions(-)
+
+diff --git a/mm/vmscan.c b/mm/vmscan.c
+index db0970ba340d..d7a5b8566869 100644
+--- a/mm/vmscan.c
++++ b/mm/vmscan.c
+@@ -364,6 +364,21 @@ int prealloc_shrinker(struct shrinker *shrinker)
+ 	if (!shrinker->nr_deferred)
+ 		return -ENOMEM;
+ 
++	/*
++	 * There is a window between prealloc_shrinker()
++	 * and register_shrinker_prepared(). We don't want
++	 * to clear bit of a shrinker in such the state
++	 * in shrink_slab_memcg(), since this will impose
++	 * restrictions on a code registering a shrinker
++	 * (they would have to guarantee, their LRU lists
++	 * are empty till shrinker is completely registered).
++	 * So, we differ the situation, when 1)a shrinker
++	 * is semi-registered (id is assigned, but it has
++	 * not yet linked to shrinker_list) and 2)shrinker
++	 * is not registered (id is not assigned).
++	 */
++	INIT_LIST_HEAD(&shrinker->list);
++
+ 	if (shrinker->flags & SHRINKER_MEMCG_AWARE) {
+ 		if (prealloc_memcg_shrinker(shrinker))
+ 			goto free_deferred;
+@@ -543,6 +558,63 @@ static unsigned long do_shrink_slab(struct shrink_control *shrinkctl,
+ 	return freed;
+ }
+ 
++#ifdef CONFIG_MEMCG_KMEM
++static unsigned long shrink_slab_memcg(gfp_t gfp_mask, int nid,
++			struct mem_cgroup *memcg, int priority)
++{
++	struct memcg_shrinker_map *map;
++	unsigned long freed = 0;
++	int ret, i;
++
++	if (!memcg_kmem_enabled() || !mem_cgroup_online(memcg))
++		return 0;
++
++	if (!down_read_trylock(&shrinker_rwsem))
++		return 0;
++
++	map = rcu_dereference_protected(memcg->nodeinfo[nid]->shrinker_map,
++					true);
++	if (unlikely(!map))
++		goto unlock;
++
++	for_each_set_bit(i, map->map, shrinker_nr_max) {
++		struct shrink_control sc = {
++			.gfp_mask = gfp_mask,
++			.nid = nid,
++			.memcg = memcg,
++		};
++		struct shrinker *shrinker;
++
++		shrinker = idr_find(&shrinker_idr, i);
++		if (unlikely(!shrinker)) {
++			clear_bit(i, map->map);
++			continue;
++		}
++
++		/* See comment in prealloc_shrinker() */
++		if (unlikely(list_empty(&shrinker->list)))
++			continue;
++
++		ret = do_shrink_slab(&sc, shrinker, priority);
++		freed += ret;
++
++		if (rwsem_is_contended(&shrinker_rwsem)) {
++			freed = freed ? : 1;
++			break;
++		}
++	}
++unlock:
++	up_read(&shrinker_rwsem);
++	return freed;
++}
++#else /* CONFIG_MEMCG_KMEM */
++static unsigned long shrink_slab_memcg(gfp_t gfp_mask, int nid,
++			struct mem_cgroup *memcg, int priority)
++{
++	return 0;
++}
++#endif /* CONFIG_MEMCG_KMEM */
++
+ /**
+  * shrink_slab - shrink slab caches
+  * @gfp_mask: allocation context
+@@ -572,8 +644,8 @@ static unsigned long shrink_slab(gfp_t gfp_mask, int nid,
+ 	struct shrinker *shrinker;
+ 	unsigned long freed = 0;
+ 
+-	if (memcg && (!memcg_kmem_enabled() || !mem_cgroup_online(memcg)))
+-		return 0;
++	if (memcg && !mem_cgroup_is_root(memcg))
++		return shrink_slab_memcg(gfp_mask, nid, memcg, priority);
+ 
+ 	if (!down_read_trylock(&shrinker_rwsem))
+ 		goto out;
+@@ -585,13 +657,7 @@ static unsigned long shrink_slab(gfp_t gfp_mask, int nid,
+ 			.memcg = memcg,
+ 		};
+ 
+-		/*
+-		 * If kernel memory accounting is disabled, we ignore
+-		 * SHRINKER_MEMCG_AWARE flag and call all shrinkers
+-		 * passing NULL for memcg.
+-		 */
+-		if (memcg_kmem_enabled() &&
+-		    !!memcg != !!(shrinker->flags & SHRINKER_MEMCG_AWARE))
++		if (!!memcg != !!(shrinker->flags & SHRINKER_MEMCG_AWARE))
+ 			continue;
+ 
+ 		if (!(shrinker->flags & SHRINKER_NUMA_AWARE))
+-- 
+2.42.0
+
