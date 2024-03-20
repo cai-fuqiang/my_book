@@ -811,7 +811,7 @@ void memcg_set_shrinker_bit(struct mem_cgroup *memcg, int nid, int shrinker_id)
   > 该流程发生的流程是 offline children cgroup, reparent. 所以不会有上面我们所说的race情况.
   > 也就是不会有 src->nr_items 在这个过程中change的情况.
 
-### [clear shrinker bit](https://lore.kernel.org/all/153112558507.4097.12713813335683345488.stgit@localhost.localdomain/)
+### [clear shrinker bit  1](https://lore.kernel.org/all/153112558507.4097.12713813335683345488.stgit@localhost.localdomain/)
 
 COMMIT MESSAGE
 ```
@@ -908,6 +908,15 @@ as result. This functionality is provided by next patches.
 > 另外, 在后续版本的代码中(rhel 8.6 372 kernel) `root_mem_cgroup`
 > 很特殊. 在 `get_obj_cgroup_from_current()`中可以看到, 当为
 > `root_mem_cgroup`时, objcg返回NULL.
+>
+>> NOTE
+>> 
+>> 看了下mail list, 这个patch, 确实是`Vladimir Davydov`, 但是 Kirill
+>> 发出来了, 也在这个maillist中.
+>>
+>> [LINK](https://lore.kernel.org/all/153112559593.4097.7399035563205590079.stgit@localhost.localdomain/)
+>>
+>> 不再展开
 
 我们接下来看`shrinker_slab_memcg()`相关代码
 ```cpp
@@ -1008,4 +1017,329 @@ index db0970ba340d..d7a5b8566869 100644
 如果注册了一半(执行了 `prealloc_shrinker()`但是没有执行 `register_shrinker_prepared()`
 则不能clear_bit()
 
+所以,这个patch仅仅是让其在 unregister 时, 去`clear_bit()`, 我们在看看下面的patch
 
+
+### [clear shrinker bit 2 -- BEFORE MAGIC ](https://lore.kernel.org/all/153112560649.4097.6012718861285659974.stgit@localhost.localdomain/)
+
+COMMIT MESSAGE:
+```
+mm: Add SHRINK_EMPTY shrinker methods return value
+
+We need to differ the situations, when shrinker has
+very small amount of objects (see vfs_pressure_ratio()
+called from super_cache_count()), and when it has no
+objects at all. Currently, in the both of these cases,
+shrinker::count_objects() returns 0.
+
+> 我们需要区分两种情况,  当 shrinker 已经有非常小的object
+> 总量(请看 super_cache_count()->vfs_pressure_ratio()).
+> 和已经彻底没有object. 在当前的这两种情况下, 
+> shrinker::count_objects() 都返回0
+
+The patch introduces new SHRINK_EMPTY return value,
+which will be used for "no objects at all" case.
+It's is a refactoring mostly, as SHRINK_EMPTY is replaced
+by 0 by all callers of do_shrink_slab() in this patch,
+and all the magic will happen in further.
+
+> 该patch 引入了新的返回值: SHRINK_EMPTY, 用于表示 "no objects
+> at all"的情况. 这主要是一次重构, 在这个patch中,所有 do_shrink_slab()
+> 的callers 都将 SHRINK_EMPTY 替换为0, all the magic 将会在未来发生(
+> 所有的魔法, 幽默)
+```
+
+通过commit message得知, 该patch 主要是增加了一个返回值 `SHRINK_EMPTY`, 
+```diff
+ #define SHRINK_STOP (~0UL)
++#define SHRINK_EMPTY (~0UL - 1)
+```
+现在有两个特殊的返回值`SHRINK_EMPTY`, `0`
+* SHRINK_EMPTY : no objects at all
+* 0 : very small amount of objects
+```diff
+ /*
+  * A callback you can register to apply pressure to ageable caches.
+  *
+  * @count_objects should return the number of freeable items in the cache. If
+- * there are no objects to free or the number of freeable items cannot be
+- * determined, it should return 0. No deadlock checks should be done during the
++ * there are no objects to free, it should return SHRINK_EMPTY, while 0 is
++ * returned in cases of the number of freeable items cannot be determined
++ * or shrinker should skip this cache for this time (e.g., their number
++ * is below shrinkable limit). No deadlock checks should be done during the
+  * count callback - the shrinker relies on aggregating scan counts that couldn't
+  * be executed due to potential deadlocks to be run at a later call when the
+  * deadlock condition is no longer pending.
+```
+
+然后, 该patch只是一个中间版本, 在`do_shrink_slab`调用者检测到`SHRINK_EMPTY`时,
+先当作`0`处理.
+
+```diff
+@@ -456,8 +456,8 @@ static unsigned long do_shrink_slab(struct shrink_control *shrinkctl,
+ 	long scanned = 0, next_deferred;
+ 	freeable = shrinker->count_objects(shrinker, shrinkctl);
+-	if (freeable == 0)
+-		return 0;
++	if (freeable == 0 || freeable == SHRINK_EMPTY)
++		return freeable;
+ 
+ 	/*
+ 	 * copy the current shrinker scan count into a local variable
+@@ -596,6 +596,8 @@ static unsigned long shrink_slab_memcg(gfp_t gfp_mask, int nid,
+ 			continue;
+ 
+ 		ret = do_shrink_slab(&sc, shrinker, priority);
++		if (ret == SHRINK_EMPTY)
++			ret = 0;
+ 		freed += ret;
+ 
+ 		if (rwsem_is_contended(&shrinker_rwsem)) {
+@@ -641,6 +643,7 @@ static unsigned long shrink_slab(gfp_t gfp_mask, int nid,
+ {
+ 	struct shrinker *shrinker;
+ 	unsigned long freed = 0;
++	int ret;
+ 
+ 	if (!mem_cgroup_is_root(memcg))
+ 		return shrink_slab_memcg(gfp_mask, nid, memcg, priority);
+@@ -658,7 +661,10 @@ static unsigned long shrink_slab(gfp_t gfp_mask, int nid,
+ 		if (!(shrinker->flags & SHRINKER_NUMA_AWARE))
+ 			sc.nid = 0;
+ 
+-		freed += do_shrink_slab(&sc, shrinker, priority);
++		ret = do_shrink_slab(&sc, shrinker, priority);
++		if (ret == SHRINK_EMPTY)
++			ret = 0;
++		freed += ret;
+```
+
+我们来看其`SHRINK_EMPTY`的赋值:
+```diff
+diff --git a/fs/super.c b/fs/super.c
+index f5f96e52e0cd..7429588d6b49 100644
+--- a/fs/super.c
++++ b/fs/super.c
+@@ -144,6 +144,9 @@ static unsigned long super_cache_count(struct shrinker *shrink,
+ 	total_objects += list_lru_shrink_count(&sb->s_dentry_lru, sc);
+ 	total_objects += list_lru_shrink_count(&sb->s_inode_lru, sc);
+ 
++	if (!total_objects)
++		return SHRINK_EMPTY;
++
+ 	total_objects = vfs_pressure_ratio(total_objects);
+ 	return total_objects;
+ }
+
+diff --git a/mm/workingset.c b/mm/workingset.c
+index cd0b2ae615e4..bc72ad029b3e 100644
+--- a/mm/workingset.c
++++ b/mm/workingset.c
+@@ -399,6 +399,9 @@ static unsigned long count_shadow_nodes(struct shrinker *shrinker,
+ 	}
+ 	max_nodes = cache >> (RADIX_TREE_MAP_SHIFT - 3);
+ 
++	if (!nodes)
++		return SHRINK_EMPTY;
++
+ 	if (nodes <= max_nodes)
+ 		return 0;
+ 	return nodes - max_nodes;
+```
+
+
+### [clear shrinker bit 3 -- PERFORM MAGIC ](https://lore.kernel.org/all/153112560649.4097.6012718861285659974.stgit@localhost.localdomain/)
+
+COMMIT MESSAGE:
+```
+To avoid further unneed calls of do_shrink_slab()
+for shrinkers, which already do not have any charged
+objects in a memcg, their bits have to be cleared.
+
+> 为了避免未来不必要的shrinkers对 do_shrink_slab的调用,
+> 这些shrinker在一个memcg中并没有charge 任何的objects, 
+> 他们的bits 应该被cleared
+
+This patch introduces a lockless mechanism to do that
+without races without parallel list lru add. After
+do_shrink_slab() returns SHRINK_EMPTY the first time,
+we clear the bit and call it once again. Then we restore
+the bit, if the new return value is different.
+
+> 该patch 引入了一个lockless 机制, 可以在没有race 没有并行的 
+> list lru add 来做这件事情. 在 do_shrink_slab() 第一次返回 
+> SHRINK_EMPTY后, 我们 clear 该 bit, 并且再一次调用它. 然后
+> 如果返回值不一样, 我们 restore 该 bit.
+
+Note, that single smp_mb__after_atomic() in shrink_slab_memcg()
+covers two situations:
+
+> 注意: 这个 shrink_slab_memcg 中的 smp_mb__after_atomic() 覆盖了
+> 两种情况:
+
+1)list_lru_add()     shrink_slab_memcg
+    list_add_tail()    for_each_set_bit() <--- read bit
+                         do_shrink_slab() <--- missed list update (no barrier)
+    <MB>                 <MB>
+    set_bit()            do_shrink_slab() <--- seen list update
+
+This situation, when the first do_shrink_slab() sees set bit,
+but it doesn't see list update (i.e., race with the first element
+queueing), is rare. So we don't add <MB> before the first call
+of do_shrink_slab() instead of this to do not slow down generic
+case. Also, it's need the second call as seen in below in (2).
+
+> 这种情况, 当 第一次 do_shrink_slab()看到了该bit, 但是其看不到 list update
+> (i.e., 和第一次的 element queueing 冲突), 是罕见的. 所以我们没有在
+> do_shrink_slab()第一次调用之前增加 <MB>, 而是这样做, 以避免
+> 减慢一般情况的速度. 此外, 他需要第二个调用, 如下面(2)所示:
+
+2)list_lru_add()      shrink_slab_memcg()
+    list_add_tail()     ...
+    set_bit()           ...
+  ...                   for_each_set_bit()
+  do_shrink_slab()        do_shrink_slab()
+    clear_bit()           ...
+  ...                     ...
+  list_lru_add()          ...
+    list_add_tail()       clear_bit()
+    <MB>                  <MB>
+    set_bit()             do_shrink_slab()
+
+The barriers guarantees, the second do_shrink_slab()
+in the right side task sees list update if really
+cleared the bit. This case is drawn in the code comment.
+
+> drawn: 描绘绘画
+>
+> barriers 保证了右侧tasks中的第二个 do_shrink_slab()可以看到
+> list 更新,如果真的clear了该bit. 这种情况, 在 code comment
+> 中描述.
+
+[Results/performance of the patchset]
+
+After the whole patchset applied the below test shows signify
+increase of performance:
+
+> 在整个patchset被引用后, 下面的test 展示出显著的 性能提升
+
+$echo 1 > /sys/fs/cgroup/memory/memory.use_hierarchy
+$mkdir /sys/fs/cgroup/memory/ct
+$echo 4000M > /sys/fs/cgroup/memory/ct/memory.kmem.limit_in_bytes
+    $for i in `seq 0 4000`; do mkdir /sys/fs/cgroup/memory/ct/$i;
+			    echo $$ > /sys/fs/cgroup/memory/ct/$i/cgroup.procs;
+			    mkdir -p s/$i; mount -t tmpfs $i s/$i;
+			    touch s/$i/file; done
+
+Then, 5 sequential calls of drop caches:
+$time echo 3 > /proc/sys/vm/drop_caches
+
+1)Before:
+0.00user 13.78system 0:13.78elapsed 99%CPU
+0.00user 5.59system 0:05.60elapsed 99%CPU
+0.00user 5.48system 0:05.48elapsed 99%CPU
+0.00user 8.35system 0:08.35elapsed 99%CPU
+0.00user 8.34system 0:08.35elapsed 99%CPU
+
+2)After
+0.00user 1.10system 0:01.10elapsed 99%CPU
+0.00user 0.00system 0:00.01elapsed 64%CPU
+0.00user 0.01system 0:00.01elapsed 82%CPU
+0.00user 0.00system 0:00.01elapsed 64%CPU
+0.00user 0.01system 0:00.01elapsed 82%CPU
+
+The results show the performance increases at least in 548 times.
+
+> 性能提升了 548 倍
+
+Shakeel Butt tested this patchset with fork-bomb on his configuration:
+
+> Shakeel Butt 在他的配置中带该patchset测试 fork-bomb
+
+ > I created 255 memcgs, 255 ext4 mounts and made each memcg create a
+ > file containing few KiBs on corresponding mount. Then in a separate
+ > memcg of 200 MiB limit ran a fork-bomb.
+ >
+ >> 然后在一个单独限制为200M的memcg中运行一个 fork-bomb.
+ >
+ > I ran the "perf record -ag -- sleep 60" and below are the results:
+ >
+ > Without the patch series:
+ > Samples: 4M of event 'cycles', Event count (approx.): 3279403076005
+ > +  36.40%            fb.sh  [kernel.kallsyms]    [k] shrink_slab
+ > +  18.97%            fb.sh  [kernel.kallsyms]    [k] list_lru_count_one
+ > +   6.75%            fb.sh  [kernel.kallsyms]    [k] super_cache_count
+ > +   0.49%            fb.sh  [kernel.kallsyms]    [k] down_read_trylock
+ > +   0.44%            fb.sh  [kernel.kallsyms]    [k] mem_cgroup_iter
+ > +   0.27%            fb.sh  [kernel.kallsyms]    [k] up_read
+ > +   0.21%            fb.sh  [kernel.kallsyms]    [k] osq_lock
+ > +   0.13%            fb.sh  [kernel.kallsyms]    [k] shmem_unused_huge_count
+ > +   0.08%            fb.sh  [kernel.kallsyms]    [k] shrink_node_memcg
+ > +   0.08%            fb.sh  [kernel.kallsyms]    [k] shrink_node
+ >
+ > With the patch series:
+ > Samples: 4M of event 'cycles', Event count (approx.): 2756866824946
+ > +  47.49%            fb.sh  [kernel.kallsyms]    [k] down_read_trylock
+ > +  30.72%            fb.sh  [kernel.kallsyms]    [k] up_read
+ > +   9.51%            fb.sh  [kernel.kallsyms]    [k] mem_cgroup_iter
+ > +   1.69%            fb.sh  [kernel.kallsyms]    [k] shrink_node_memcg
+ > +   1.35%            fb.sh  [kernel.kallsyms]    [k] mem_cgroup_protected
+ > +   1.05%            fb.sh  [kernel.kallsyms]    [k] queued_spin_lock_slowpath
+ > +   0.85%            fb.sh  [kernel.kallsyms]    [k] _raw_spin_lock
+ > +   0.78%            fb.sh  [kernel.kallsyms]    [k] lruvec_lru_size
+ > +   0.57%            fb.sh  [kernel.kallsyms]    [k] shrink_node
+ > +   0.54%            fb.sh  [kernel.kallsyms]    [k] queue_work_on
+ > +   0.46%            fb.sh  [kernel.kallsyms]    [k] shrink_slab_memcg
+```
+Patch diff:
+```diff
+@@ -430,6 +430,8 @@ void memcg_set_shrinker_bit(struct mem_cgroup *memcg, int nid, int shrinker_id)
+ 
+ 		rcu_read_lock();
+ 		map = rcu_dereference(memcg->nodeinfo[nid]->shrinker_map);
++		/* Pairs with smp mb in shrink_slab() */
++		smp_mb__before_atomic();
+ 		set_bit(shrinker_id, map->map);
+ 		rcu_read_unlock();
+ 	}
+@@ -596,8 +596,30 @@ static unsigned long shrink_slab_memcg(gfp_t gfp_mask, int nid,
+ 			continue;
+ 
+ 		ret = do_shrink_slab(&sc, shrinker, priority);
+-		if (ret == SHRINK_EMPTY)
+-			ret = 0;
++		if (ret == SHRINK_EMPTY) {
++			clear_bit(i, map->map);
++			/*
++			 * After the shrinker reported that it had no objects to
++			 * free, but before we cleared the corresponding bit in
++			 * the memcg shrinker map, a new object might have been
++			 * added. To make sure, we have the bit set in this
++			 * case, we invoke the shrinker one more time and reset
++			 * the bit if it reports that it is not empty anymore.
++			 * The memory barrier here pairs with the barrier in
++			 * memcg_set_shrinker_bit():
+             * 
+             * 在shrinker 报告了已经没有objects 来free, 但是在我们clear
+             * memcg shrinker map 中的相应的bit之前, 一个新的objects可能
+             * 已经add. 为了确保 在这种情况下, 我们会 set bit, 我们调用
+             * shrinker 多次 并且 reset该bit, 如果报告了它不是empty.
+             * 这里的memory barrier 和 memcg_set_shrinker_bit() 是一对.
++			 *
++			 * list_lru_add()     shrink_slab_memcg()
++			 *   list_add_tail()    clear_bit()
++			 *   <MB>               <MB>
++			 *   set_bit()          do_shrink_slab()
++			 */
++			smp_mb__after_atomic();
++			ret = do_shrink_slab(&sc, shrinker, priority);
++			if (ret == SHRINK_EMPTY)
++				ret = 0;
++			else
++				memcg_set_shrinker_bit(memcg, nid, i);
++		}
+ 		freed += ret;
+ 
+ 		if (rwsem_is_contended(&shrinker_rwsem)) {
+```

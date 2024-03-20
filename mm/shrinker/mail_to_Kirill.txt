@@ -1,0 +1,78 @@
+Hi, Kirill
+
+May I ask you for some information about the patch "mm: Clear washer bit if
+there are no objects related to memcg". I noticed that you have add the 
+explanations on the role of memory barriers in set_shrinker_bit() and 
+shrink_slab_memcg in link [1]. But I don't understand the meaning of the 
+annotations below.
+
+> 1)list_lru_add()     shrink_slab_memcg
+>    list_add_tail()     for_each_set_bit() <--- read bit
+>                        do_shrink_slab() <--- missed list update (no barrier)
+>    <MB>                <MB>
+>    set_bit()           do_shrink_slab() <--- seen list update
+> 
+> This situation, when the first do_shrink_slab() sees set bit,
+> but it doesn't see list update (i.e., race with the first element
+> queueing), is rare. So we don't add <MB> before the first call
+>                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> of do_shrink_slab() instead of this to do not slow down generic
+> ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> case. Also, it's need the second call as seen in below in (2).
+> ^^^^
+
+In my understanding, it seems the <MB> in list_lru_add() can prevent the
+following case, rather than the <MB> in shrink_slab_memcg().
+
+list_lru_add                    shrink_slab_memcg
+  set_bit() <--no barrier	  
+                                  for_each_set_bit()
+                                  do_shrink_slab()    <-- missed list updated
+  list_add_tail()
+
+Even if <MB> is added to the shrink_stab_memcg, it may still cause the
+do_shrink_slab to miss the updated list twice.
+
+list_lru_add                    shrink_slab_memcg
+  set_bit() <-- no barrier	
+                                  for_each_set_bit()
+                                  do_shrink_slab()
+                                  clear_bit()
+                                  <MB>
+                                  do_shrink_slab()   <-- missed list updated
+  list_add_tail()
+
+So adding <MB> in the list_lru_add() is to let shrink_slab_memcg() see the
+correct order. Similarly, adding <MB> in shrink_slab_memcg() is to ensure that
+list_lru_add() sees the correct order. If not:
+
+list_lru_add                    shrink_slab_memcg
+  set_bit()
+                                  do_shrink_slab()
+  <MB>
+  list_add_tail()
+                                  clear_bit()       <-- missed list updated
+
+I think this patch is very clever that use do_shrink_slab twice in order to
+lockless. But I have some questions about add <MB> before the first call of
+do_shrink_slab(). This seems to have no impact because there should be no OoO
+between for_each_set_bit() and do_shrink_slab(), due to the following
+dependency chain.
+
+do_shrink_slab
+  --> shrinker
+  --> idr_find
+  --> bit
+  --> for_each_set_bit
+
+So can you help me explain that? 
+
+(I don't have a very thorough understanding of memory order. If there are any
+mistakes, please help point them out. Also, I don’t know if it’s appropriate to
+send you a separate email. If it offends you, please ignore this email.).
+
+[1]. https://lore.kernel.org/all/152399129187.3456.5685999465635300270.stgit@localhost.localdomain/
+
+Thanks
+
+fuqiang
