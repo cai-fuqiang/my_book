@@ -44,6 +44,7 @@ execution space also provides a separate stack for each privilege level.
 >   * 1/more data segment
 >
 > 如果操作系统或者 executive 使用了处理器的 privilege-level protection 机制,
+> task execution space 也应该提供给每个 privilege level 一个单独的stack.
 
 The TSS specifies the segments that make up the task execution space and
 provides a storage place for task state information. In multitasking systems,
@@ -53,17 +54,27 @@ execution, the segment selector, base address, limit, and segment descriptor
 attributes for the TSS are loaded into the task register (see Section 2.4.4,
 “Task Register (TR)”).
 
+> make up : 构成
+>
+> TSS 指定了构成 task execution space 的segments并且提供了保存task state information
+> 的地方. 在多任务系统中, TSS 也提供了对 linking tasks的支持. task由他的TSS的
+> 段选择子指定. 当任务被加载到 processor 来运行时, 该TSS的 segment selector, base 
+> address, limit 和 segment descriptor attr 都被加载到 task register (Section 2.4.4)
+
 If paging is implemented for the task, the base address of the page directory
 used by the task is loaded into control register CR3.
+
+> 如果该task实现了分页, 该用于该task的 page directory 的 base address 被加载到 控制寄存器
+> CR3.
 
 ![structure_of_a_task](pic/structure_of_a_task.png)
 
 ## 8.1.2 Task State
 
 The following items define the state of the currently executing task:
-* The task’s current execution space, defined by the segment selectors in the segment registers (CS, DS, SS, ES,
-FS, and GS).
 
+* The task’s current execution space, defined by the segment selectors in the
+  segment registers (CS, DS, SS, ES, FS, and GS).
 * The state of the general-purpose registers.
 * The state of the EFLAGS register.
 * The state of the EIP register.
@@ -75,21 +86,39 @@ FS, and GS).
 * Link to previously executed task (contained in the TSS).
 * The state of the shadow stack pointer (SSP).
 
+> NOTE
+>
+> 该段落中描述的 "contained in the TSS" 表示这些信息本身就保存在 TSS,
+> 而其他的信息只是在task switch 时 store/load.
+
 Prior to dispatching a task, all of these items are contained in the task’s
 TSS, except the state of the task register. Also, the complete contents of the
 LDTR register are not contained in the TSS, only the segment selector for the
 LDT.
 
+> 在调度一个任务之前, 所有的item 都会被包含在 task的 TSS中, 除了task register 
+> 的状态. 同时, LDTR register 完整的内容也不会包含进 TSS, 只包含了该LDT的 segment
+> selector.
+
 ## 8.1.3 Executing a Task
 
-* Software or the processor can dispatch a task for execution in one of the
-  following ways:
+Software or the processor can dispatch a task for execution in one of the
+following ways:
+
+> software 或者processor 可以通过执行下面的任意一种方式来调度任务
+
 * A explicit call to a task with the CALL instruction.
 * A explicit jump to a task with the JMP instruction.
 * An implicit call (by the processor) to an interrupt-handler task.
 * An implicit call to an exception-handler task.
 * A return (initiated with an IRET instruction) when the NT flag in the EFLAGS
   register is set.
+
+> * CALL task
+> * JMP task
+> * interrupt-handler task
+> * exception-handler task
+> * IRET (当 EFLAGS 中的 NT flag 被设置时)
 
 All of these methods for dispatching a task identify the task to be dispatched
 with a segment selector that points to a task gate or the TSS for the task.
@@ -98,6 +127,8 @@ instruction may select the TSS directly or a task gate that holds the selector
 for the TSS. When dispatching a task to handle an interrupt or exception, the
 IDT entry for the interrupt or exception must contain a task gate that holds
 the selector for the interrupt- or exception-handler TSS.
+
+> 
 
 When a task is dispatched for execution, a task switch occurs between the
 currently running task and the dispatched task. During a task switch, the
