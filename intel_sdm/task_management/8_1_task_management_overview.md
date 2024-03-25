@@ -128,7 +128,38 @@ for the TSS. When dispatching a task to handle an interrupt or exception, the
 IDT entry for the interrupt or exception must contain a task gate that holds
 the selector for the interrupt- or exception-handler TSS.
 
-> 
+> 所有这些调度任务的方法都通过 指向 该任务的 task gate 或者 TSS的段选择子来
+> 标识要调度的任务. 当通过 CALL 或者 JMP 指令调度一个任务时, 指令中的选择子
+> 可以直接选择TSS 或者一个持有该TSS的 task gate. 当调度一个任务来处理 interrupt
+> 或者 exception时, 对于该interrupt或者 exception 的 IDT entry必须包含持有
+> interrupt- 或者 exception-handler TSS 的selector的 task gate
+>
+> > NOTE
+> >
+> > IOW:
+> > ```
+> > +---------+
+> > |GDT/LDT  |
+> > +---------+
+> > |  ...    |
+> > +---------+
+> > |TSS DESC | <---call /jmp
+> > +---------+
+> > |TASKGATE |
+> > |(TSS     | <----call /jmp
+> > |segent   |
+> > |selector)|
+> > +---------+
+> >
+> > +---------+
+> > | IDT     |
+> > +---------+
+> > |TASKGATE |
+> > |(TSS     | <----call /jmp, TSS segment is interrupt/exception-handler TSS
+> > |segent   |
+> > |selector)|
+> > +---------+
+> > ```
 
 When a task is dispatched for execution, a task switch occurs between the
 currently running task and the dispatched task. During a task switch, the
@@ -137,9 +168,14 @@ or context) is saved in its TSS and execution of the task is suspended. The
 context for the dispatched task is then loaded into the processor and execution
 of that task begins with the instruction pointed to by the newly loaded EIP
 register. If the task has not been run since the system was last initialized,
-the EIP will point to the first instruc- tion of the task’s code; otherwise, it
+the EIP will point to the first instruction of the task’s code; otherwise, it
 will point to the next instruction after the last instruction that the task
 executed when it was last active.
+
+> 当一个任务调度来执行时, 在当前running task 和要 被dispatch的 task之前
+> 发生 task switch. 在task switch 中, 当前正在执行的的task的 execution
+> environment(被称作 task的 state/context) 被保存在他的 TSS 中, 并且该task
+> 的执行被suspend. 
 
 If the currently executing task (the calling task) called the task being
 dispatched (the called task), the TSS segment selector for the calling task is
