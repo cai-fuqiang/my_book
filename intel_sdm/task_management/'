@@ -221,17 +221,9 @@ privilege levels for protection. A task running at privilege level 3 that uses
 the same LDT and page tables as other privilege-level-3 tasks can access code
 and corrupt data and the stack of other tasks.
 
-> 如果 protection 机制没有被使用, 处理器在 tasks 之间没有提供 protection.
-> 即使操作系统为 protection 使用 multiple privilege level  也是正确的.
-> 运行在 特权级 3的tasks 使用相同的 LDT 和 page tables, 可以访问代码, 损坏
-> 数据和其他任务的堆栈.
-
 Use of task management facilities for handling multitasking applications is
 optional. Multitasking can be handled in software, with each software defined
 task executed in the context of a single IA-32 architecture task.
-
-> 使用 task management 功能来处理 multitasking application 是可选的. Multitasking
-> 可以被软件处理, 每个软件定义的人物在单个 IA-32 Architectures 上下文中执行. 
 
 If shadow stack is enabled, then the SSP of the task is located at the 4 bytes
 at offset 104 in the 32-bit TSS and is used by the processor to establish the
@@ -239,8 +231,3 @@ SSP when a task switch occurs from a task associated with this TSS. Note that
 the processor does not write the SSP of the task initiating the task switch to
 the TSS of that task, and instead the SSP of the previous task is pushed onto
 the shadow stack of the new task.
-
-> 如果 shadow stack 被使能, 然后 task 的 SSP 在 32-bit TSS 的 offset 104 位置(4 
-> Byte) 并且当 task switch 发生在 和 该 TSS 相关的 tasks时, 处理器用它来建立 SSP.
-> 注意, processor 没有将发起 task switch 的 SSP 写到该task的 TSS 中, 反而将previous
-> tasks 的 SSP 会被push到新tasks的 shadow stack上.

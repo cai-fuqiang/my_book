@@ -26,8 +26,8 @@ structures, see Section 8.7, “Task Management in 64-bit Mode.”
 
 ![32-bit-task-state-segment](pic/32-bit-task-state-segment.png)
 
-The processor updates dynamic fields when a task is suspended during a task switch. The following are dynamic
-fields:
+The processor updates dynamic fields when a task is suspended during a task
+switch. The following are dynamic fields:
 
 * General-purpose register fields — State of the EAX, ECX, EDX, EBX, ESP, EBP,
   ESI, and EDI registers prior to the task switch.
