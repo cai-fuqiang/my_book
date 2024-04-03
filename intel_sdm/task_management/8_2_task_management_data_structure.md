@@ -195,7 +195,7 @@ accessing the I/O permission bit map or interrupt redirection bit map.
 > 尝试switch到TSS descriptor limit小于67H的task时, 将会产生 invalid-TSS exception
 > (#TS). 如果 有I/O permission bit map 被包含 或者如果操作系统要store 额外的数据,
 > 则需要更大的limit; 处理器在 task switch 时, 不会检查limit是否 > 67H, 但是在访问
-> I/O permission bit map 或者 interrupt redirectionbit map 时, 要做limit的检查.
+> I/O permission bit map 或者 interrupt redirectionbit map 时, 要做limit的检查. 
 
 Any program or procedure with access to a TSS descriptor (that is, whose CPL is
 numerically equal to or less than the DPL of the TSS descriptor) can dispatch
@@ -220,9 +220,18 @@ allow task switching at the application (or user) privilege level.
 In 64-bit mode, task switching is not supported, but TSS descriptors still
 exist. The format of a 64-bit TSS is described in Section 8.7.
 
+> 在64-bit 模式中, 不再支持 task switching, 但是 TSS descriptors 仍然存在.
+> 64-bit TSS 格式如 Section 8.7 中的描述.
+
 In 64-bit mode, the TSS descriptor is expanded to 16 bytes (see Figure 8-4).
 This expansion also applies to an LDT descriptor in 64-bit mode. Table 3-2
 provides the encoding information for the segment type field.
+
+> expansion /ɪkˈspænʃn/: 扩展
+>
+> 在64-bit 模式中, TSS descriptor 被扩展为 16 bytes (查看 Figure 8-4). 该扩展
+> 仍然是用语 64-bit mode中的 LDT descritor. Table 3-2提供了segment type 字段
+> 的解码信息.
 
 ![TSS_LDT_DESC](pic/64_TSS_LDT_DESC.png)
 
@@ -235,6 +244,12 @@ This information is copied from the TSS descriptor in the GDT for the current
 task. Figure 8-5 shows the path the processor uses to access the TSS (using the
 information in the task register).
 
+> task register 持有 16-bit segment selector 和 整个的 segment descritor(32-bit 
+> base address (在 IA-32e mode 中为 64 bit), 16-bit segment limit, descritor
+> attributes) 和 当前task的的 TSS(请查看 Figure 2-6). 该信息从current task 在GDT
+> 中的 TSS descritor 中copy出. Figure 8-5 展示了processer 访问 TSS 使用的路径(使用
+> task register 中的信息)
+
 The task register has a visible part (that can be read and changed by software)
 and an invisible part (maintained by the processor and is inaccessible by
 software). The segment selector in the visible portion points to a TSS
@@ -244,6 +259,12 @@ register makes execution of the task more efficient. The LTR (load task
 register) and STR (store task register) instructions load and read the visible
 portion of the task register:
 
+> task register 有一个 visible part(可以被software 读取并更改)和一个 invisible
+> part(由处理器维护并且不可以被software访问). visible portion 中的segment selector
+> 指向 GDT 中的一个 TSS descritor. 处理器使用 task register 中的 invisible portion
+> 来缓存 TSS 的 segment descritor. 在寄存器中缓存这些信息可以让task的运行更有效率.
+> LTR 和 STR 指令 会 load 并且 read task register 中的 visible portion
+
 The LTR instruction loads a segment selector (source operand) into the task
 register that points to a TSS descriptor in the GDT. It then loads the
 invisible portion of the task register with information from the TSS
@@ -251,6 +272,10 @@ descriptor. LTR is a privileged instruction that may be executed only when the
 CPL is 0. It’s used during system initialization to put an initial value in the
 task register. Afterwards, the contents of the task register are changed
 implicitly when a task switch occurs.
+
+> LTR 指令 加载了一个segment selector(源操作数) 到 tasks register, 该 segment selecttor
+> 指向 GDT 中的一个 TSS descritor. 然后他从 TSS descriptor 得到的信息中
+> load invisible 的部分. LTR 是 privileged instruction
 
 The STR (store task register) instruction stores the visible portion of the
 task register in a general-purpose register or memory. This instruction can be
