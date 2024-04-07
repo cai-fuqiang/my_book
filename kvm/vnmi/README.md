@@ -110,7 +110,8 @@ Subject: [PATCH 2/2] KVM: VMX: Enable NMI with in-kernel irqchip
 我们先思考下, 为了支持virtual-NMI, 我们需要关注哪些?
 * vNMI feature detect
 * vNMI inject
-  + NMI-window
+  + NMI-window exit
+  + judge NMI-window is open or not 
 * unblocked nmi by IRET
 
 下面我们分别来看:
@@ -139,7 +140,86 @@ Subject: [PATCH 2/2] KVM: VMX: Enable NMI with in-kernel irqchip
 代码较简单, 不过多解释
 
 ### vNMI inject
-主要在 `vmx_intr_assist`, 
+
+在看 vNMI inject 接口之前, 我们先看下该接口用到的
+* 判断 NMI window 是否开启, enable NMI window exit
+  ```cpp
+  static void enable_nmi_window(struct kvm_vcpu *vcpu)
+  {
+         u32 cpu_based_vm_exec_control;
+  
+         if (!cpu_has_virtual_nmis())
+                 return;
+  
+         cpu_based_vm_exec_control = vmcs_read32(CPU_BASED_VM_EXEC_CONTROL);
+         cpu_based_vm_exec_control |= CPU_BASED_VIRTUAL_NMI_PENDING;
+         vmcs_write32(CPU_BASED_VM_EXEC_CONTROL, cpu_based_vm_exec_control);
+  }
+  
+  static int vmx_nmi_enabled(struct kvm_vcpu *vcpu)
+  {
+         u32 guest_intr = vmcs_read32(GUEST_INTERRUPTIBILITY_INFO);
+         return !(guest_intr & (GUEST_INTR_STATE_NMI |
+                                GUEST_INTR_STATE_MOV_SS |
+                                GUEST_INTR_STATE_STI));
+  }
+  ```
+  > NOTE
+  >
+  > 这里需要注意的是 `GUEST_INTR_STATE_STI`似乎也能影响 nmi是否能被注入,
+  > 我们知道这个主要是看下在 VMX-root operation 下该指令的行为:
+  >
+  > 在 intel sdm 介绍STI 指令时, 会有下面一句话:
+  >
+  > ```
+  > The IF flag and the STI and CLI instructions do not prohibit the generation
+  > of exceptions and nonmaskable interrupts (NMIs). However, NMIs (and
+  > system-management interrupts) may be inhibited on the instruction boundary
+  > following an execution of STI that begins with IF = 0.
+  > ```
+  > 大意为:
+  >
+  > ```
+  > prohibit [prəˈhɪbɪt] : 禁止,阻止,使不可能
+  > inhibit: 阻止,抑制
+  > ```
+  >
+  > IF flags和STI CLI 指令 并不能阻止 exception 和 NMIs的产生. 但是 NMI 和 SMI啃呢过会在
+  > STI在IF=0的情况下执行时, 会在其指令之后的 boundary inhibited.
+
+* 判断 intr window 是否开启, enable intr window exit
+  ```cpp
+  static int vmx_irq_enabled(struct kvm_vcpu *vcpu)
+  {
+         u32 guest_intr = vmcs_read32(GUEST_INTERRUPTIBILITY_INFO);
+         return (!(guest_intr & (GUEST_INTR_STATE_MOV_SS |
+                                GUEST_INTR_STATE_STI)) &&
+                 (vmcs_readl(GUEST_RFLAGS) & X86_EFLAGS_IF));
+  }
+  
+  static void enable_intr_window(struct kvm_vcpu *vcpu)
+  {
+         if (vcpu->arch.nmi_pending)
+                 enable_nmi_window(vcpu);
+         else if (kvm_cpu_has_interrupt(vcpu))
+                 enable_irq_window(vcpu);
+  }
+  ```
+* vmx_inject_nmi
+  ```cpp
+  static void vmx_inject_nmi(struct kvm_vcpu *vcpu)
+  {
+         vmcs_write32(VM_ENTRY_INTR_INFO_FIELD,
+                         INTR_TYPE_NMI_INTR | INTR_INFO_VALID_MASK | NMI_VECTOR);
+         vcpu->arch.nmi_pending = 0;
+  }
+  ```
+
+  可以看到这里会将 nmi_pending 设置为0
+
+***
+
+vNMI inject 的接口主要在 `vmx_intr_assist`, 
 
 > assist [əˈsɪst]: 帮助; 援助; 协助；促进
 

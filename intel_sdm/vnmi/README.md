@@ -1,32 +1,5 @@
 # 25.4.2 Guest Non-Register State
 
-## `Blocking by NMI`
-
-See Section 6.7.1, “Handling Multiple NMIs,” in the Intel® 64 and IA-32
-Architectures Software Developer’s Manual, Volume 3A and Section 32.8, “NMI
-Handling While in SMM.”
-
-> 请查看 intel sdm Section 6.7.1 "Handling Multiple NMIs." 和 "NMI Handling
-> While in SMM"章节.
-
-Delivery of a non-maskable interrupt (NMI) or a system-management interrupt
-(SMI) blocks subsequent NMIs until the next execution of IRET. See Section 26.3
-for how this behavior of IRET may change in VMX non-root operation. Setting
-this bit indicates that blocking of NMIs is in effect. Clearing this bit does
-not imply that NMIs are not (temporarily) blocked for other reasons.
-
-> NMI 或者 SNMI 的 delivery  会block 随后的 NMIs 直到下个IRET的执行. 请查看章节
-> 26.3 了解 IRET 在 VMX non-root operation 下行为是如何改变的. 设置该bit 指示着
-> blocking of NMIs 在生效. 清除该位并不意味这 NMI 不会(暂时) 因为其他原因阻塞.
-
-If the “virtual NMIs” VM-execution control (see Section 25.6.1) is 1, this bit
-does not control the blocking of NMIs. Instead, it refers to “virtual-NMI
-blocking” (the fact that guest software is not ready for an NMI).
-
-> 如果 "virtual NMIs" VM-execution control (请查看 Section 25.6.1) 是1, 该bit
-> 并不 control blocking of NMIs. 而相应的, 他指的是 "virtual-NMI blocking" 
-> (实际上是 guest software 并没有为 NMI 做好准备)
-
 # 25.6.1 Pin-Based VM-Execution Controls
 ## NMI exiting
 
